@@ -1,6 +1,6 @@
 # 验收报告 — 对照任务书
 
-> 状态：2026-11-02。M0–M7 基本完成，M9 大部分完成；M8 仅完成证券资料扩展，M10 完成发布工具/审计/性能门禁但未做 Electron/安装包。
+> 状态：2026-11-02。M0–M7 基本完成，M9 大部分完成；M8 完成证券资料/PIT/ETF+可转债数据与 paper 手数，M10 完成发布工具/审计/性能门禁/桌面壳/unsigned 打包。
 > 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **114/117**）。
 
 ## 里程碑
@@ -16,7 +16,7 @@
 | M7 研究工具 | ✅ | IC/RankIC/ICIR、分层、衰减、因子相关、grid/random 扫描、滚动、归因、DSR/PBO、成本敏感性、Monte Carlo、容量 |
 | M8 V2 数据 | 🟡 大部分 | 证券资料/PIT 财务/ETF+可转债 canonical 数据与 paper 手数已做；分钟线/V2 datasets 未做；C++ 回测仍按 board 手数 |
 | M9 V3 模拟交易 | 🟡 大部分 | 虚拟账户/逐日回放/委托撤单/成交/信号 CSV/提醒/本地插件/只读多策略组合/服务端模拟时钟自动推进；真实实时行情 feed 未接 |
-| M10 发布 | 🟡 大部分 | wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS app zip；Windows 包未在 Windows 验证、无签名/公证 |
+| M10 发布 | 🟡 大部分 | wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS zip + Windows zip（windows-latest CI 构建）；无签名/公证、未做安装运行验证 |
 
 ## 本轮实际门禁
 ```bash
@@ -48,16 +48,16 @@ make verify-cpp
 - [x] 认证：Bearer token、Host/Origin 校验、无 CORS、loopback only；token 从 `qc serve --open` URL 持久化后立即从地址栏移除。
 - [x] 合成数据标 `SYNTHETIC`；Tushare 真实网络需 Token，未验证。
 - [ ] features.json 全 true：**114/117**（未达完成定义）。
-- [ ] M8 V2 数据、M9 实时行情、M10 Electron/安装包：未完成（见下）。
+- [ ] M8 分钟线/V2 datasets、M9 实时行情：未完成（见下）。
 - [ ] 真实 Tushare 数据跑通：无 Token，未验证。
 - [ ] 5500×20y / 10000 组 sweep / 峰值 RSS：未测（verify-cpp 为小集）。
 
 ## 已知缺口（按优先级）
 1. **M9 实时行情与进阶**：真实实时 feed 未接（当前为历史快照/模拟时钟）；无部分成交/公司行为；不得声称可实盘。
-2. **M8 V2 数据**：证券资料/PIT 财务已扩展；分钟线/ETF/可转债/V2 datasets 未实现。
+2. **M8 V2 数据**：证券资料/PIT/ETF+可转债数据与 paper 手数已扩展；分钟线/V2 datasets 未实现。
 3. **M7 口径**：归因仍为行业 FIFO 近似；DSR/PBO/成本/MC/容量为研究近似。
-4. **M10 发布**：Electron dev shell 已完成；macOS/Windows 安装包未做；Windows 未验证；SBOM/audit/perf gate 已完成。
-5. **剩余边界**：M0 Windows CI、M2 实时 Tushare、M8 数据扩展、M10 安装包。
+4. **M10 发布**：Electron dev shell、unsigned macOS/Windows zip 已完成；签名/公证、安装运行验证未做；SBOM/audit/perf gate 已完成。
+5. **剩余边界**：M8 分钟线/V2 datasets、M9 实时行情、签名安装包。
 6. **数据验证**：Tushare 真实网络、全市场 5500×20y 基准、峰值 RSS、覆盖率统计未做。
 7. **规则 TODO(verify)**：ST 各板块幅度、盘后固定价历史范围、新股/退市整理期、分红个税、部分费率。
 
