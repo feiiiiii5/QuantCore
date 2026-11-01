@@ -173,6 +173,7 @@ TEST_CASE("cross-sectional kernels match fixed reference values", "[kernels][cro
   const std::vector<double> cross_zscore = {-0.16452254913212455, -0.71293104623920633,
                                             -0.43872679768566542, kNaN,
                                             -0.43872679768566542, 1.7549071907426617};
+  const std::vector<double> cross_neutral = {-0.6, -2.6, -1.6, kNaN, -1.6, 6.4};
   const std::vector<double> cross_mad_winsor3 = {3.0, 1.0, 2.0, kNaN, 2.0, 5.0};
   const std::vector<double> cross_quantile4 = {2.0, 0.0, 1.0, kNaN, 1.0, 3.0};
   const std::vector<double> cross_quantile5_1to10 = {0.0, 0.0, 1.0, 1.0, 2.0,
@@ -182,6 +183,8 @@ TEST_CASE("cross-sectional kernels match fixed reference values", "[kernels][cro
   expect_series(out, cross_rank);
   qc::kernels::cross_zscore(x.data(), x.size(), out.data());
   expect_series(out, cross_zscore);
+  qc::kernels::cross_neutralize(x.data(), x.size(), out.data());
+  expect_series(out, cross_neutral);
   qc::kernels::cross_mad_winsor(x.data(), x.size(), 3.0, out.data());
   expect_series(out, cross_mad_winsor3);
   qc::kernels::cross_quantile(x.data(), x.size(), 0, 4, out.data());

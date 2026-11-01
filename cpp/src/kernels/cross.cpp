@@ -105,6 +105,26 @@ void cross_zscore(const double* x, size_t n, double* out) {
     out[i] = (x[i] - mean) / stddev;
 }
 
+void cross_neutralize(const double* x, size_t n, double* out) {
+  require_cross(x, n, out, "cross_neutralize");
+  for (std::size_t i = 0; i < n; ++i)
+    out[i] = kNaNValue;
+  std::vector<std::size_t> valid_index;
+  valid_index.reserve(n);
+  double sum = 0.0;
+  for (std::size_t i = 0; i < n; ++i) {
+    if (detail::valid(x[i])) {
+      valid_index.push_back(i);
+      sum += x[i];
+    }
+  }
+  if (valid_index.empty() || !std::isfinite(sum))
+    return;
+  const double mean = sum / static_cast<double>(valid_index.size());
+  for (const std::size_t i : valid_index)
+    out[i] = x[i] - mean;
+}
+
 void cross_mad_winsor(const double* x, size_t n, double n_mad, double* out) {
   if (!std::isfinite(n_mad) || !(n_mad > 0.0)) {
     throw std::invalid_argument("cross_mad_winsor: n_mad must be finite and > 0");

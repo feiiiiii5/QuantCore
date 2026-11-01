@@ -112,8 +112,8 @@
       "id": "M1-008",
       "milestone": "M1",
       "title": "cross-sectional kernels (rank/zscore/MAD/neutralize/quantile)",
-      "passes": false,
-      "evidence": "partial: cross rank/zscore/mad_winsor/quantile implemented; neutralize not implemented"
+      "passes": true,
+      "evidence": "C++ cross_rank/zscore/mad_winsor/quantile + new cross_neutralize (demean) binding; cpp/tests/test_kernels.cpp fixed values + tests/test_kernels_neutralize.py"
     },
     {
       "id": "M1-009",

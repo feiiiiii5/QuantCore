@@ -264,6 +264,14 @@ void bind_kernels(py::module_& m) {
       },
       py::arg("x"));
   kernels.def(
+      "cross_neutralize",
+      [](const DoubleArray& x) {
+        return apply_unary(x, [](const double* a, std::size_t n, double* out) {
+          qc::kernels::cross_neutralize(a, n, out);
+        });
+      },
+      py::arg("x"), "Cross-sectional demeaning: x minus the mean; NaN stays NaN.");
+  kernels.def(
       "cross_mad_winsor",
       [](const DoubleArray& x, double n_mad) {
         return apply_unary(x, [n_mad](const double* a, std::size_t n, double* out) {
