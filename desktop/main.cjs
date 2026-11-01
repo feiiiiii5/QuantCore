@@ -9,6 +9,7 @@ const crypto = require("node:crypto");
 const ROOT = process.env.QC_REPO_ROOT || path.resolve(__dirname, "..");
 const PORT = Number(process.env.QC_DESKTOP_PORT || 8787);
 const TOKEN = process.env.QC_DESKTOP_TOKEN || crypto.randomBytes(18).toString("hex");
+const EXTERNAL_URL = process.env.QC_DESKTOP_URL || "";
 const HEADLESS = process.env.QC_HEADLESS === "1";
 const SMOKE = process.env.QC_SMOKE === "1";
 let server = null;
@@ -52,8 +53,8 @@ function stopServer() {
 }
 
 async function createWindow() {
-  startServer();
-  if (!(await waitForServer())) {
+  if (!EXTERNAL_URL) startServer();
+  if (!EXTERNAL_URL && !(await waitForServer())) {
     if (SMOKE) {
       console.error("[desktop] server did not become healthy");
       app.exit(2);
@@ -78,7 +79,9 @@ async function createWindow() {
     console.log("[desktop] UI loaded");
     if (SMOKE) setTimeout(() => { stopServer(); app.exit(0); }, 800);
   });
-  await window.loadURL(`http://127.0.0.1:${PORT}/?token=${encodeURIComponent(TOKEN)}`);
+  const target = EXTERNAL_URL || `http://127.0.0.1:${PORT}`;
+  const separator = target.includes("?") ? "&" : "?";
+  await window.loadURL(`${target}${separator}token=${encodeURIComponent(TOKEN)}`);
 }
 
 app.whenReady().then(() => {

@@ -777,8 +777,8 @@
       "id": "M10-002",
       "milestone": "M10",
       "title": "macOS package",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "electron-builder --mac zip builds dist/desktop/QuantCore-0.1.0-arm64-mac.zip; packaged app headless smoke loaded the real UI with QC_DESKTOP_URL (unsigned/not notarized; backend not bundled)"
     },
     {
       "id": "M10-003",

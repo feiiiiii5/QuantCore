@@ -14,7 +14,7 @@
 - M7：因子 IC/RankIC/ICIR、分层、衰减；参数扫描 + Sharpe 热力图；滚动验证；行业 FIFO 归因；Deflated Sharpe/PBO、成本敏感性、block bootstrap Monte Carlo、容量估计（近似口径）。
 - M9：大部分完成——本地虚拟账户/逐日回放/委托撤单/成交/T+1/费用/信号 CSV/提醒/JSON 持久化/本地插件/只读多策略组合/服务端模拟时钟自动推进；真实实时行情 feed 仍未接。
 - M8：部分完成——证券资料扩展、PIT 财务视图；分钟线/ETF/可转债/V2 datasets 未做。
-- M10：wheel + UI + 中文文档 + 许可 + CycloneDX SBOM/pip-audit + release/perf gate + Electron dev shell；macOS/Windows 安装包未做。
+- M10：wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS app zip；Windows 包未在 Windows 验证、无签名/公证。
 - 仓库：https://github.com/feiiiiii5/QuantCore （Apache-2.0）；申请季工作区未修改。
 
 ## 本轮实际验证

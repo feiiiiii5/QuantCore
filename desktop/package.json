@@ -6,9 +6,34 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "smoke": "QC_HEADLESS=1 QC_SMOKE=1 electron ."
+    "smoke": "QC_HEADLESS=1 QC_SMOKE=1 electron .",
+    "package:mac": "electron-builder --mac zip --publish never",
+    "package:win": "electron-builder --win zip --publish never"
   },
   "devDependencies": {
-    "electron": "^45.2.1"
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.quantcore.desktop",
+    "productName": "QuantCore",
+    "files": [
+      "main.cjs",
+      "package.json"
+    ],
+    "directories": {
+      "output": "../dist/desktop"
+    },
+    "mac": {
+      "target": [
+        "zip"
+      ],
+      "category": "public.app-category.finance"
+    },
+    "win": {
+      "target": [
+        "zip"
+      ]
+    }
   }
 }

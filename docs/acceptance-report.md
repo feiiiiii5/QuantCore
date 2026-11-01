@@ -1,7 +1,7 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02。M0–M7 基本完成，M9 大部分完成；M8 仅完成证券资料扩展，M10 完成发布工具/审计/性能门禁但未做 Electron/安装包。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **109/117**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **110/117**）。
 
 ## 里程碑
 | 阶段 | 状态 | 证据 |
@@ -16,7 +16,7 @@
 | M7 研究工具 | ✅ | IC/RankIC/ICIR、分层、衰减、因子相关、grid/random 扫描、滚动、归因、DSR/PBO、成本敏感性、Monte Carlo、容量 |
 | M8 V2 数据 | 🟡 部分 | 证券资料/PIT 财务已扩展；分钟线/ETF/可转债/V2 datasets 未做 |
 | M9 V3 模拟交易 | 🟡 大部分 | 虚拟账户/逐日回放/委托撤单/成交/信号 CSV/提醒/本地插件/只读多策略组合/服务端模拟时钟自动推进；真实实时行情 feed 未接 |
-| M10 发布 | 🟡 部分 | wheel + 静态 UI + 中文文档 + 许可 + SBOM/audit + release bundle/perf gate + Electron dev shell；macOS/Windows 安装包未做 |
+| M10 发布 | 🟡 大部分 | wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS app zip；Windows 包未在 Windows 验证、无签名/公证 |
 
 ## 本轮实际门禁
 ```bash

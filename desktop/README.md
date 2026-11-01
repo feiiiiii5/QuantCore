@@ -22,3 +22,15 @@ used in the browser. Closing the app stops the child server.
 
 Not included yet: signed macOS/Windows installers, auto-update, code signing. `M10-001`
 covers the dev shell; packaging remains a documented gap.
+
+## Packaging (unsigned)
+
+```bash
+pnpm -C desktop package:mac   # dist/desktop/QuantCore-0.1.0-arm64-mac.zip
+pnpm -C desktop package:win   # cross-built unsigned zip (not tested on Windows)
+```
+
+The packaged app is a client shell: set `QC_DESKTOP_URL`/`QC_DESKTOP_TOKEN` to an already
+running local `qc serve`, or keep `uv`/`qc` available so the shell can spawn its own server.
+It is **unsigned** and not notarized; macOS Gatekeeper and Windows SmartScreen will warn.
+No real orders, no broker connection.
