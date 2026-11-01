@@ -65,3 +65,7 @@
 ## 兼容性
 - 桌面优先（macOS/Windows），移动端为响应式兜底：≤900px 侧栏折叠为图标，表格横向滚动。
 - 浏览器：Chrome/Edge/Safari 当前版本；Playwright 使用本机 Chrome channel。
+
+## Desktop shell
+
+`desktop/` is an Electron dev shell (M10-001) that launches the local `qc serve` and loads the same UI with a random token; it is not a signed installer and does not change the local-only security model. `make desktop-smoke` verifies headless loading.

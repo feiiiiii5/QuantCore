@@ -770,8 +770,8 @@
       "id": "M10-001",
       "milestone": "M10",
       "title": "Electron shell",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "desktop/ Electron dev shell spawns qc serve, waits /health, loads token UI; headless smoke make desktop-smoke verified did-finish-load; unsigned and no installer (M10-002/003 remain false)"
     },
     {
       "id": "M10-002",
