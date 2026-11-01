@@ -37,6 +37,7 @@
 - 本地虚拟账户：创建/选择快照会话、逐日推进/自动推进、重置/删除；市价或限价委托、撤单、持仓/委托/成交/权益曲线、信号 CSV；明确不连接券商、不产生真实委托。
 
 ### 研究 `/research`
+- 稳健性：选择实验做 Deflated Sharpe、PBO/CSCV、成本敏感性、Monte Carlo 路径/分位、容量估算；近似口径在页面注明。
 - 因子诊断：表达式、预测期、分层数；IC/RankIC 时间序列、分层平均收益、衰减曲线、覆盖率/ICIR、分层明细。
 - 参数扫描：模板 + JSON 网格（服务端上限 200 组合），输出 Sharpe 热力图/表格与最佳点。
 - 滚动验证：模板/参数/折数，输出各折收益/Sharpe/回撤/交易数与柱状图。
@@ -58,7 +59,7 @@
 ## 预算与验证
 - 初始 JS 约 1.4MB raw（ECharts 1.0MB + app 0.31MB + React 0.05MB）；Monaco 3.3MB 仅 `/strategy` 按需加载。
 - Playwright 预算测试：首屏 <5s、初始 JS <2MB raw、无 console/page error；移动端 390px 无横向溢出。
-- `make e2e`：构建 UI + 隔离 `qc serve` + 15 条 Playwright，覆盖行情/选股/回测/实验/数据/策略/设置/研究/模拟/onboarding/暗色/性能/移动端。
+- `make e2e`：构建 UI + 隔离 `qc serve` + 16 条 Playwright，覆盖行情/选股/回测/实验/数据/策略/设置/研究/稳健性/模拟/onboarding/暗色/性能/移动端。
 
 ## 兼容性
 - 桌面优先（macOS/Windows），移动端为响应式兜底：≤900px 侧栏折叠为图标，表格横向滚动。

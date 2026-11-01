@@ -291,3 +291,8 @@ html, body { max-width: 100%; overflow-x: hidden; }
   .kpi { font-size: 20px; }
   .statusbar { font-size: 11px; }
 }
+
+/* robustness PBO list */
+.pbo-list { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; margin-bottom: 10px; }
+.check-row { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 3px 0; cursor: pointer; }
+.check-row input { width: auto; }

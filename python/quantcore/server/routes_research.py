@@ -10,11 +10,29 @@ from ..backtest.config import BacktestConfig
 from ..errors import CppUnavailableError, ExperimentError, QuantCoreError, StrategyValidationError
 from ..experiments import ExperimentStore
 from ..research.attribution import attribute_by_industry
+from ..research.experiment_data import ResearchDataError
 from ..research.factors import analyze_factor
+from ..research.robustness import (
+    compute_capacity,
+    compute_cost_sensitivity,
+    compute_monte_carlo,
+    compute_overfitting,
+    compute_pbo,
+)
 from ..research.sweep import MAX_SWEEP_POINTS, run_api_sweep
 from ..research.walk_forward import run_walk_forward
 from ..snapshot.reader import Snapshot, find_snapshot
-from .schemas import AttributionRequest, FactorRequest, SweepRequest, WalkForwardRequest
+from .schemas import (
+    AttributionRequest,
+    CapacityRequest,
+    CostSensitivityRequest,
+    FactorRequest,
+    MonteCarloRequest,
+    OverfittingRequest,
+    PBORequest,
+    SweepRequest,
+    WalkForwardRequest,
+)
 from .workspace import Workspace, json_safe
 
 
@@ -135,3 +153,60 @@ def register_research_routes(app: FastAPI, ctx: Workspace) -> None:
             }
         )
         return json_safe(report)
+
+    # -- M7 robustness: overfitting / PBO / costs / Monte Carlo / capacity -------------
+    @app.post("/api/research/overfitting")
+    def overfitting(payload: OverfittingRequest) -> Any:
+        store = ExperimentStore(ctx.settings.experiments_root)
+        try:
+            return json_safe(compute_overfitting(store, payload.run_id, payload.n_trials))
+        except (ResearchDataError, ValueError) as exc:
+            raise _bad_request(exc) from exc
+
+    @app.post("/api/research/pbo")
+    def pbo(payload: PBORequest) -> Any:
+        store = ExperimentStore(ctx.settings.experiments_root)
+        try:
+            return json_safe(compute_pbo(store, list(payload.run_ids), payload.n_splits))
+        except (ResearchDataError, ValueError) as exc:
+            raise _bad_request(exc) from exc
+
+    @app.post("/api/research/cost_sensitivity")
+    def cost_sensitivity(payload: CostSensitivityRequest) -> Any:
+        store = ExperimentStore(ctx.settings.experiments_root)
+        try:
+            return json_safe(
+                compute_cost_sensitivity(
+                    store,
+                    payload.run_id,
+                    payload.multipliers,
+                    snapshots_root=str(ctx.settings.snapshots_root),
+                )
+            )
+        except (ResearchDataError, ValueError) as exc:
+            raise _bad_request(exc) from exc
+
+    @app.post("/api/research/monte_carlo")
+    def monte_carlo(payload: MonteCarloRequest) -> Any:
+        store = ExperimentStore(ctx.settings.experiments_root)
+        try:
+            return json_safe(
+                compute_monte_carlo(store, payload.run_id, payload.n_paths, payload.horizon)
+            )
+        except (ResearchDataError, ValueError) as exc:
+            raise _bad_request(exc) from exc
+
+    @app.post("/api/research/capacity")
+    def capacity(payload: CapacityRequest) -> Any:
+        store = ExperimentStore(ctx.settings.experiments_root)
+        try:
+            return json_safe(
+                compute_capacity(
+                    store,
+                    payload.run_id,
+                    payload.adv_participation,
+                    snapshots_root=str(ctx.settings.snapshots_root),
+                )
+            )
+        except (ResearchDataError, ValueError) as exc:
+            raise _bad_request(exc) from exc

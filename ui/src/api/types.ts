@@ -470,3 +470,59 @@ export interface PaperSessionDetail {
   equity_curve: Array<{ date: number; equity: number }>;
   fills?: Array<Record<string, unknown>>;
 }
+
+export interface OverfittingResult {
+  run_id: string;
+  observations: number;
+  periods_per_year: number;
+  sharpe: number;
+  deflated_sharpe: number;
+  expected_max_sharpe: number;
+  n_trials: number;
+  skew: number;
+  kurtosis: number;
+  verdict: "robust" | "inconclusive" | "likely_overfit" | string;
+}
+
+export interface PBOResult {
+  run_ids: string[];
+  n_splits: number;
+  combinations: number;
+  pbo: number;
+  median_oos_rank: number;
+  logits: number[][];
+}
+
+export interface CostSensitivityPoint {
+  multiplier: number;
+  total_return: number;
+  annualized_return: number;
+  sharpe: number;
+  max_drawdown: number;
+  total_fees: number;
+}
+
+export interface CostSensitivityResult {
+  run_id: string;
+  points: CostSensitivityPoint[];
+  breakeven_multiplier: number | null;
+}
+
+export interface MonteCarloResult {
+  run_id: string;
+  n_paths: number;
+  horizon: number;
+  terminal_return: { p05: number; p25: number; p50: number; p75: number; p95: number };
+  max_drawdown: { p05: number; p50: number; p95: number };
+  paths: number[][];
+}
+
+export interface CapacityResult {
+  run_id: string;
+  capacity_cny: number;
+  participation: number;
+  avg_turnover: number;
+  avg_adv_cny: number;
+  limiting_sec: string;
+  notes: string;
+}

@@ -644,22 +644,22 @@
       "id": "M7-007",
       "milestone": "M7",
       "title": "Deflated Sharpe/PBO",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Deflated Sharpe + PBO/CSCV: tests/test_research_v3.py; POST /api/research/overfitting,pbo; UI Research > 稳健性"
     },
     {
       "id": "M7-008",
       "milestone": "M7",
       "title": "cost sensitivity",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Cost sensitivity re-runs experiments with scaled costs; tests/test_research_v3.py; UI 稳健性 cost chart"
     },
     {
       "id": "M7-009",
       "milestone": "M7",
       "title": "bootstrap/Monte Carlo",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Block bootstrap Monte Carlo with deterministic seed; tests/test_research_v3.py; UI fan chart/percentiles"
     },
     {
       "id": "M7-010",
@@ -672,15 +672,15 @@
       "id": "M7-011",
       "milestone": "M7",
       "title": "capacity estimate",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Capacity estimate from snapshot ADV + trade share; tests/test_research_v3.py; UI capacity card"
     },
     {
       "id": "M8-001",
       "milestone": "M8",
       "title": "GEM/STAR/BSE rules",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "GEM/STAR/BSE lot, price-limit, after-hours and ST rule paths exercised by tests/test_reference_engine.py and cpp/tests/test_engine.cpp"
     },
     {
       "id": "M8-002",
@@ -799,7 +799,7 @@
       "milestone": "M10",
       "title": "SBOM/audit",
       "passes": false,
-      "evidence": ""
+      "evidence": "scripts/sbom.py generates offline CycloneDX from uv.lock + pnpm-lock; vulnerability audit still pending"
     },
     {
       "id": "M10-006",
@@ -812,8 +812,8 @@
       "id": "M10-007",
       "milestone": "M10",
       "title": "release checklist",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "docs/RELEASE.md checklist + scripts/release.sh local bundle; not Electron/installer"
     },
     {
       "id": "M10-008",

@@ -242,3 +242,17 @@ test("paper trading session creates, steps and renders the virtual account", asy
   expect(errors).toEqual([]);
   await page.screenshot({ path: "/tmp/qc-paper.png", fullPage: true });
 });
+
+test("research robustness computes deflated Sharpe without overflow", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/research");
+  await expect(page.getByRole("heading", { name: "研究" })).toBeVisible();
+  await page.getByRole("tab", { name: /稳健性/ }).click();
+  await expect(page.getByRole("button", { name: /Deflated Sharpe/ })).toBeVisible();
+  await page.getByRole("button", { name: /Deflated Sharpe/ }).click();
+  await expect(page.getByText(/观测 \d+ 日/)).toBeVisible({ timeout: 45_000 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: "/tmp/qc-robustness.png", fullPage: true });
+});

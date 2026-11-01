@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { Grid3X3, Layers, PieChart, Play, Sigma } from "lucide-react";
+import { Grid3X3, Layers, PieChart, Play, ShieldCheck, Sigma } from "lucide-react";
 import type { EChartsOption } from "echarts";
 import { isApiError } from "../api/client";
 import { useAttribution, useExperiments, useFactor, useSweep, useWalkForward } from "../api/queries";
 import Chart from "../components/Chart";
+import RobustnessPanel from "../components/RobustnessPanel";
 import StatePanel from "../components/StatePanel";
 import { zhCN as t } from "../i18n/zh-CN";
 
-type Tab = "factor" | "sweep" | "walk" | "attribution";
+type Tab = "factor" | "sweep" | "walk" | "attribution" | "robust";
 const TABS: Array<{ id: Tab; label: string; icon: typeof Sigma }> = [
   { id: "factor", label: "因子诊断", icon: Sigma },
   { id: "sweep", label: "参数扫描", icon: Grid3X3 },
   { id: "walk", label: "滚动验证", icon: Layers },
   { id: "attribution", label: "归因", icon: PieChart },
+  { id: "robust", label: "稳健性", icon: ShieldCheck },
 ];
 const dateText = (value: number) => {
   const text = String(value);
@@ -236,6 +238,7 @@ export default function ResearchPage() {
           </div>
         </div>
       ) : null}
+      {tab === "robust" ? <RobustnessPanel experiments={experiments} /> : null}
       {tab === "attribution" ? (
         <div className="grid two-col">
           <div className="card">

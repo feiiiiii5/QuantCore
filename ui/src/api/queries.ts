@@ -107,3 +107,19 @@ export function useDeleteExperiment() {
     onSuccess: () => { void client.invalidateQueries({ queryKey: ["experiments"] }); },
   });
 }
+
+export function useOverfitting() {
+  return useMutation({ mutationFn: api.overfitting });
+}
+export function usePBO() {
+  return useMutation({ mutationFn: api.pbo });
+}
+export function useCostSensitivity() {
+  return useMutation({ mutationFn: api.costSensitivity });
+}
+export function useMonteCarlo() {
+  return useMutation({ mutationFn: api.monteCarlo });
+}
+export function useCapacity() {
+  return useMutation({ mutationFn: api.capacity });
+}

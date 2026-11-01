@@ -1,7 +1,8 @@
 import type {
   AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, Experiment, ExperimentDetail,
   FactorResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
-  PaperOrder, PaperSessionDetail, PaperSessionSummary,
+  CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperOrder,
+  PaperSessionDetail, PaperSessionSummary, PBOResult,
   ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
   Template, ValidationResult, WalkForwardResult,
 } from "./types";
@@ -155,6 +156,11 @@ export const api = {
     request<{ order: PaperOrder; cancelled: boolean }>(`/api/paper/sessions/${id}/orders/${orderId}/cancel`, { method: "POST" }),
   deletePaperSession: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/api/paper/sessions/${id}`, { method: "DELETE" }),
+  overfitting: (payload: Record<string, unknown>) => request<OverfittingResult>("/api/research/overfitting", { method: "POST", body: JSON.stringify(payload) }),
+  pbo: (payload: Record<string, unknown>) => request<PBOResult>("/api/research/pbo", { method: "POST", body: JSON.stringify(payload) }),
+  costSensitivity: (payload: Record<string, unknown>) => request<CostSensitivityResult>("/api/research/cost_sensitivity", { method: "POST", body: JSON.stringify(payload) }),
+  monteCarlo: (payload: Record<string, unknown>) => request<MonteCarloResult>("/api/research/monte_carlo", { method: "POST", body: JSON.stringify(payload) }),
+  capacity: (payload: Record<string, unknown>) => request<CapacityResult>("/api/research/capacity", { method: "POST", body: JSON.stringify(payload) }),
   factor: (payload: Record<string, unknown>) => request<FactorResult>("/api/research/factor", { method: "POST", body: JSON.stringify(payload) }),
   sweep: (payload: Record<string, unknown>) => request<SweepResult>("/api/research/sweep", { method: "POST", body: JSON.stringify(payload) }),
   walkForward: (payload: Record<string, unknown>) => request<WalkForwardResult>("/api/research/walk_forward", { method: "POST", body: JSON.stringify(payload) }),

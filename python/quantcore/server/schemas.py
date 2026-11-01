@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -188,3 +188,43 @@ class PaperOrderRequest(BaseModel):
         if self.order_type == "market" and self.limit_price is not None:
             raise ValueError("limit_price is only valid for limit orders")
         return self
+
+
+# ---------------------------------------------------------------- research robustness (M7)
+class OverfittingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str = Field(min_length=1, max_length=160)
+    n_trials: int = Field(default=1, ge=1, le=1000)
+
+
+class PBORequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_ids: list[str] = Field(min_length=1, max_length=20)
+    n_splits: int = Field(default=8, ge=2, le=20)
+
+    @model_validator(mode="after")
+    def _even_splits(self) -> PBORequest:
+        if self.n_splits % 2 != 0:
+            raise ValueError("n_splits must be even (CSCV splits into equal halves)")
+        return self
+
+
+class CostSensitivityRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str = Field(min_length=1, max_length=160)
+    multipliers: list[Annotated[float, Field(ge=0, le=100)]] = Field(
+        default_factory=lambda: [0.0, 0.5, 1.0, 2.0, 3.0], min_length=1, max_length=10
+    )
+
+
+class MonteCarloRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str = Field(min_length=1, max_length=160)
+    n_paths: int = Field(default=500, ge=1, le=5000)
+    horizon: int = Field(default=250, ge=1, le=5000)
+
+
+class CapacityRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str = Field(min_length=1, max_length=160)
+    adv_participation: float = Field(default=0.1, gt=0, le=1)
