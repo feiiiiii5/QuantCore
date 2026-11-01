@@ -26,7 +26,7 @@
 - [x] 先正确后快：C++ 95 测试 + 差分 + 确定性 + 基准；参考实现只在 tests/reference。
 - [x] 不编造：规则/费率 TODO(verify)；合成数据标 SYNTHETIC；无真实数据入库。
 - [x] 大陆网络镜像/工具链文档：docs/DEV-SETUP.md。
-- [ ] features.json 全 true：**63/117**（未达完成定义）。
+- [ ] features.json 全 true：**62/117**（未达完成定义）。
 - [ ] `make e2e`：仅有 UI vitest；Playwright e2e 未接。
 - [ ] 真实 Tushare 数据跑通：无 Token，未验证。
 - [ ] 5500×20y / 10000 组 sweep / 峰值 RSS：未测（verify-cpp 只跑 300×965 小集）。

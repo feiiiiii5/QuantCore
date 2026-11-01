@@ -45,7 +45,9 @@ pnpm -C ui build && pnpm -C ui test
 ## 下一步
 1. py-platform 收尾测试/lint/CLI/API；Lead 跑 `make test`、`make lint`、`make verify-cpp`。
 2. 补实验 Parquet 产物与 replay 一致性；再补 M7 因子分析/sweep。
-3. 触发 GitHub 上传（repo 名 QuantCore），最后更新 features.json/验收报告。
+3. ✅ 已上传 GitHub public 仓库：https://github.com/feiiiiii5/QuantCore （main 分支，Apache-2.0）。
+4. GitHub Actions `ci`：macOS + Ubuntu 全绿（push 触发，run 41321931285）；Windows 未验证，未纳入 push CI。
+5. 下一步（未做）：M5 WebSocket/取消/通知、M6 后端接线、C++ 并行 sweep、M7 因子分析、真实 Tushare 验证、Windows 端口。
 
 ## 续跑方法
 ```bash

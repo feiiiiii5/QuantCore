@@ -54,7 +54,7 @@ make ci-local     # 本地完整门禁
 - C++ core：panel/kernels/expression/engine，ctest **95/95**；`make verify-cpp` 差分/基准通过。
 - Python：pytest **93 passed / 2 skipped（共 95）**，ruff/mypy 全绿；合成数据→快照→.qpanel→C++ 回测→实验/HTML 报告 CLI 端到端可跑。
 - UI：React 19 + Vite 六页壳，`pnpm build/test` 通过；M6 尚未接真实后端数据。
-- 诚实状态：`docs/features.json` **63/117 passes**；M0–M3 完成，M4 大部分，M5/M6 部分，M7–M10 未实现。详见 [验收报告](docs/acceptance-report.md)。
+- 诚实状态：`docs/features.json` **62/117 passes**；M0–M3 完成，M4 大部分，M5/M6 部分，M7–M10 未实现。详见 [验收报告](docs/acceptance-report.md)。
 - 仅研究与模拟；合成数据标 `SYNTHETIC`；真实 Tushare 需 Token，未在本次验证。
 
 ## 许可证
