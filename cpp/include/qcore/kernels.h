@@ -22,7 +22,7 @@ void rolling_decay_linear(const double* x, size_t n, size_t window, double* out)
 void cross_rank(const double* x, size_t n, double* out);        // 0..1, NaN stays NaN
 void cross_zscore(const double* x, size_t n, double* out);
 void cross_mad_winsor(const double* x, size_t n, double n_mad, double* out);
-void cross_quantile(const double* x, size_t n, int q, int nq, double* out);  // 0..nq-1 bucket index
+void cross_quantile(const double* x, size_t n, int q, int nq, double* out);  // out[i] = 0..nq-1 bucket; q reserved/unused (validated)
 
 // Panel-wide convenience: input field, output same shape as field layout.
 void rolling_panel(const Panel& panel, const std::string& field, size_t window,

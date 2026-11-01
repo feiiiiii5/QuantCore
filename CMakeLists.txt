@@ -29,6 +29,7 @@ file(GLOB_RECURSE QC_CORE_SOURCES CONFIGURE_DEPENDS
      ${CMAKE_CURRENT_SOURCE_DIR}/cpp/src/core/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/cpp/src/panel/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/cpp/src/kernels/*.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/src/expr/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/cpp/src/sim/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/cpp/src/analytics/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/cpp/src/sweep/*.cpp)

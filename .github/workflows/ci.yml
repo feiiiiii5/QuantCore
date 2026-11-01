@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      UV_DEFAULT_INDEX: https://pypi.tuna.tsinghua.edu.cn/simple
+      PIP_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v4
+      - name: Install
+        run: |
+          uv sync --all-extras --python 3.12
+          cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DQC_BUILD_PYTHON=OFF -DQC_BUILD_TESTS=ON -DQC_BUILD_BENCH=ON
+          cmake --build build/cmake -j 4
+      - name: Lint
+        run: |
+          uv run ruff check python tests
+          uv run mypy python/quantcore
+      - name: Test
+        run: |
+          uv run pytest -q
+          ctest --test-dir build/cmake --output-on-failure
+      - name: Verify C++ backend
+        run: uv run python scripts/verify_cpp.py
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v4
+      - name: Build + test
+        shell: pwsh
+        run: |
+          uv sync --all-extras --python 3.12
+          cmake -S . -B build/cmake -G "Visual Studio 17 2022" -A x64 -DQC_BUILD_PYTHON=OFF -DQC_BUILD_TESTS=ON
+          cmake --build build/cmake --config Release
+          ctest --test-dir build/cmake -C Release --output-on-failure
+          uv run pytest -q

@@ -5,6 +5,7 @@ namespace py = pybind11;
 void bind_panel(py::module_& m);
 void bind_kernels(py::module_& m);
 void bind_engine(py::module_& m);
+void bind_expr(py::module_& m);
 
 PYBIND11_MODULE(_qcore, m) {
   m.doc() = "QuantCore C++20 core (panel, kernels, backtest engine)";
@@ -13,4 +14,5 @@ PYBIND11_MODULE(_qcore, m) {
   bind_panel(m);
   bind_kernels(m);
   bind_engine(m);
+  bind_expr(m);
 }
