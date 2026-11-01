@@ -23,7 +23,7 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - name: Install
         run: |
-          uv sync --all-extras --python 3.12
+          uv sync --all-extras --no-editable --python 3.12
           cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DQC_BUILD_PYTHON=OFF -DQC_BUILD_TESTS=ON -DQC_BUILD_BENCH=ON
           cmake --build build/cmake -j 4
       - name: Lint
