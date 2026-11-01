@@ -52,6 +52,8 @@ class SyntheticConfig:
     n_ipo: int | None = None
     include_financials: bool = True
     include_corporate_actions: bool = True
+    n_etf: int = 0
+    n_cb: int = 0
 
     def __post_init__(self) -> None:
         if self.n_sec < 1:
@@ -62,6 +64,8 @@ class SyntheticConfig:
             raise ValueError("board_mix must sum to 1")
         if not 0.0 <= self.st_fraction < 1.0:
             raise ValueError("st_fraction must be in [0, 1)")
+        if self.n_etf < 0 or self.n_cb < 0:
+            raise ValueError("n_etf/n_cb must be non-negative")
 
     def scaled(self, fraction: float, minimum: int, maximum: int | None = None) -> int:
         """Scenario count scaled by ``fraction`` of ``n_sec`` (clamped)."""
@@ -184,6 +188,51 @@ def generate_synthetic_panel(config: SyntheticConfig | None = None) -> PanelData
             )
         )
 
+    # V2 assets: ETFs and convertible bonds share the canonical bars schema; board stays
+    # MAIN (the C++ engine currently uses board lot rules; paper trading applies sec_type
+    # lots below).  They deliberately receive no stock-specific scenarios.
+    asset_type: dict[str, str] = {}
+    for plan in plans:
+        asset_type[plan.sec_id] = "STOCK"
+    next_index = len(plans)
+    for offset in range(cfg.n_etf):
+        plan = _SecurityPlan(
+            index=next_index + offset,
+            sec_id=f"E{offset:05d}",
+            code=f"510{offset:03d}"[:6],
+            exchange="SH",
+            board="MAIN",
+            name=f"SYN_ETF{offset:03d}",
+            industry="ETF",
+            list_idx=0,
+            end_idx=n_time,
+            total_shares=1_000_000_000,
+            float_shares=1_000_000_000,
+            drift=float(rng.normal(0.0001, 0.0002)),
+            vol=float(rng.uniform(0.004, 0.015)),
+            base_price=float(np.round(rng.uniform(2.0, 6.0), 2)),
+        )
+        plans.append(plan)
+        asset_type[plan.sec_id] = "ETF"
+    for offset in range(cfg.n_cb):
+        plan = _SecurityPlan(
+            index=next_index + cfg.n_etf + offset,
+            sec_id=f"C{offset:05d}",
+            code=f"110{offset:03d}"[:6],
+            exchange="SH",
+            board="MAIN",
+            name=f"SYN_CB{offset:03d}",
+            industry="可转债",
+            list_idx=0,
+            end_idx=n_time,
+            total_shares=100_000_000,
+            float_shares=100_000_000,
+            drift=float(rng.normal(0.00005, 0.0003)),
+            vol=float(rng.uniform(0.005, 0.02)),
+            base_price=100.0,
+        )
+        plans.append(plan)
+        asset_type[plan.sec_id] = "CONVERTIBLE"
     _assign_scenarios(plans, rng, n_time, cfg)
 
     security_rows: list[dict[str, Any]] = []
@@ -206,7 +255,7 @@ def generate_synthetic_panel(config: SyntheticConfig | None = None) -> PanelData
                 "board": plan.board,
                 "list_date": list_date,
                 "delist_date": delist_date,
-                "sec_type": "STOCK",
+                "sec_type": asset_type.get(plan.sec_id, "STOCK"),
                 "industry": plan.industry,
                 "source": SYNTHETIC_SOURCE,
             }

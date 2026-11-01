@@ -78,10 +78,19 @@ def fee_breakdown(
     }
 
 
-def canonical_buy_qty(board: str, qty: int, rules: RuleSetConfig) -> int:
-    """Validate/return a buy quantity that satisfies the board's lot rules."""
+def canonical_buy_qty(board: str, qty: int, rules: RuleSetConfig, sec_type: str = "STOCK") -> int:
+    """Validate/return a buy quantity that satisfies the asset/board lot rules."""
     if qty <= 0:
         raise PaperValidationError("qty must be positive")
+    asset = str(sec_type or "STOCK").upper()
+    if asset == "ETF":
+        if qty % rules.etf_lot != 0:
+            raise PaperValidationError(f"ETF qty must be a multiple of {rules.etf_lot}")
+        return qty
+    if asset in {"CONVERTIBLE", "CB", "BOND"}:
+        if qty % rules.cb_lot != 0:
+            raise PaperValidationError(f"convertible-bond qty must be a multiple of {rules.cb_lot}")
+        return qty
     board_code = str(board or "MAIN").upper()
     if board_code == "STAR":
         if qty < rules.star_lot:

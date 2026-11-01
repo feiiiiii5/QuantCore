@@ -700,8 +700,8 @@
       "id": "M8-004",
       "milestone": "M8",
       "title": "ETF/convertible bond",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Canonical sec_type ETF/CONVERTIBLE, deterministic synthetic fixtures (510*/110*), paper lot rules (ETF 100 / CB 10) and API securities sec_type; C++ backtest lot rules remain board-based (documented limitation)"
     },
     {
       "id": "M8-005",
@@ -784,8 +784,8 @@
       "id": "M10-003",
       "milestone": "M10",
       "title": "Windows package",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "CI desktop-windows-package on windows-latest installs Electron and builds unsigned QuantCore-*-win.zip; artifact existence verified; not a signed installer and no end-user Windows runtime test"
     },
     {
       "id": "M10-004",

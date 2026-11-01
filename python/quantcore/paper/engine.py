@@ -143,7 +143,9 @@ class PaperSessionEngine:
             limit = None
 
         if side_int == 0:
-            canonical_buy_qty(self.market.board(sec), int(qty), self.rules)
+            canonical_buy_qty(
+                self.market.board(sec), int(qty), self.rules, self.market.sec_type(sec)
+            )
         else:
             held = self.session.positions.get(self.market.sec_ids[sec])
             if held is None or held.qty <= 0:

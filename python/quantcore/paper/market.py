@@ -52,6 +52,9 @@ class PaperMarketData:
     def board(self, sec: int) -> str:
         return str(self.meta[sec].get("board") or "MAIN").upper()
 
+    def sec_type(self, sec: int) -> str:
+        return str(self.meta[sec].get("sec_type") or "STOCK").upper()
+
     def code(self, sec: int) -> str:
         return str(self.meta[sec].get("code", ""))
 

@@ -52,6 +52,8 @@ class RuleSetConfig(BaseModel):
     main_lot: int = Field(default=100, ge=1)
     star_lot: int = Field(default=200, ge=1)
     bse_lot: int = Field(default=100, ge=1)
+    etf_lot: int = Field(default=100, ge=1)
+    cb_lot: int = Field(default=10, ge=1)
     t_plus_one: bool = True
     after_hours: bool = True
     after_hours_extension_date: int = 20260706

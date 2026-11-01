@@ -24,7 +24,7 @@ make lint
 # ruff check/format 通过；mypy 85 files 无问题
 
 uv run pytest -q -p no:warnings
-# 190 collected；188 passed / 2 skipped
+# 192 collected；190 passed / 2 skipped
 
 pnpm -C ui test
 # 7 passed (4 files)
