@@ -47,7 +47,7 @@ make verify-cpp
 - [x] 仅研究与模拟：无真实下单；`BrokerGateway` 未实现；界面与报告有“不构成投资建议”。
 - [x] 认证：Bearer token、Host/Origin 校验、无 CORS、loopback only；token 从 `qc serve --open` URL 持久化后立即从地址栏移除。
 - [x] 合成数据标 `SYNTHETIC`；Tushare 真实网络需 Token，未验证。
-- [ ] features.json 全 true：**107/117**（未达完成定义）。
+- [ ] features.json 全 true：**109/117**（未达完成定义）。
 - [ ] M8 V2 数据、M9 实时行情、M10 Electron/安装包：未完成（见下）。
 - [ ] 真实 Tushare 数据跑通：无 Token，未验证。
 - [ ] 5500×20y / 10000 组 sweep / 峰值 RSS：未测（verify-cpp 为小集）。
@@ -56,14 +56,14 @@ make verify-cpp
 1. **M9 实时行情与进阶**：真实实时 feed 未接（当前为历史快照/模拟时钟）；无部分成交/公司行为；不得声称可实盘。
 2. **M8 V2 数据**：证券资料/PIT 财务已扩展；分钟线/ETF/可转债/V2 datasets 未实现。
 3. **M7 口径**：归因仍为行业 FIFO 近似；DSR/PBO/成本/MC/容量为研究近似。
-4. **M10 发布**：Electron、macOS/Windows 安装包未做；Windows 未验证；SBOM/audit/perf gate 已完成。
-5. **剩余边界**：C++ 并行参数 sweep、M0 Windows CI、M2 实时 Tushare、M8 数据扩展。
+4. **M10 发布**：Electron dev shell 已完成；macOS/Windows 安装包未做；Windows 未验证；SBOM/audit/perf gate 已完成。
+5. **剩余边界**：M0 Windows CI、M2 实时 Tushare、M8 数据扩展、M10 安装包。
 6. **数据验证**：Tushare 真实网络、全市场 5500×20y 基准、峰值 RSS、覆盖率统计未做。
 7. **规则 TODO(verify)**：ST 各板块幅度、盘后固定价历史范围、新股/退市整理期、分红个税、部分费率。
 
 ## 下一步
 1. 补 M8 V2 数据与 M10 Electron/安装包；真实 Tushare 小样本验证。
 2. 保持无真实下单与本地优先；每轮 make ci-local/e2e/verify-cpp 后再 push。
-3. 剩余 10 项 features.json 清零后再宣称完整交付。
+3. 剩余 8 项 features.json 清零后再宣称完整交付。
 4. 全市场 5500×20y 基准、10k sweep、峰值 RSS 仍未测。
 5. Windows CI/打包仍未验证。
