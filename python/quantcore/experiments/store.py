@@ -95,7 +95,9 @@ class ExperimentStore:
         payload = {**record.metadata, **updates, "updated_at": _now()}
         self._write_metadata(self.path(run_id), payload)
         return ExperimentRecord(
-            run_id=run_id, kind=str(payload.get("kind", record.kind)), directory=record.directory,
+            run_id=run_id,
+            kind=str(payload.get("kind", record.kind)),
+            directory=record.directory,
             metadata=payload,
         )
 
@@ -106,7 +108,9 @@ class ExperimentStore:
             raise ExperimentError(f"experiment not found: {run_id}")
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         return ExperimentRecord(
-            run_id=run_id, kind=str(metadata.get("kind", "unknown")), directory=directory,
+            run_id=run_id,
+            kind=str(metadata.get("kind", "unknown")),
+            directory=directory,
             metadata=metadata,
         )
 

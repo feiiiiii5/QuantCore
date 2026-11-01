@@ -130,9 +130,7 @@ class WarehouseManifest:
             "schema_version": self.schema_version,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
-            "datasets": {
-                name: stats.to_dict() for name, stats in sorted(self.datasets.items())
-            },
+            "datasets": {name: stats.to_dict() for name, stats in sorted(self.datasets.items())},
         }
 
     def to_json(self) -> str:
@@ -258,7 +256,7 @@ class ParquetStore:
         stats = DatasetStats(
             dataset=name,
             partition_column=partition_column,
-            rows=int(len(frame)),
+            rows=len(frame),
             files=sorted(desired, key=lambda item: item.relative_path),
             content_hash=_content_hash(desired),
             updated_at=_now(),
@@ -346,9 +344,7 @@ class ParquetStore:
                 files = self._existing_files(name)
                 if not files:
                     continue
-                literals = ", ".join(
-                    "'" + str(path).replace("'", "''") + "'" for path in files
-                )
+                literals = ", ".join("'" + str(path).replace("'", "''") + "'" for path in files)
                 connection.execute(
                     f'CREATE OR REPLACE VIEW "{name}" AS '
                     f"SELECT * FROM read_parquet([{literals}], union_by_name=true)"
@@ -391,8 +387,11 @@ class ParquetStore:
             "root": str(self.root),
             "manifest_hash": self.manifest_hash(),
             "datasets": {
-                name: {"rows": stats.rows, "files": len(stats.files),
-                       "content_hash": stats.content_hash}
+                name: {
+                    "rows": stats.rows,
+                    "files": len(stats.files),
+                    "content_hash": stats.content_hash,
+                }
                 for name, stats in sorted(self._manifest.datasets.items())
             },
             "state_schema_version": self.state.current_version(),

@@ -144,7 +144,11 @@ SCHEMA_VERSION = "1"
 def _coerce_frame(frame: pd.DataFrame, schema: dict[str, str]) -> pd.DataFrame:
     """Return *frame* with canonical columns/order and best-effort dtypes."""
     out = frame.copy()
-    identity = [column for column in ("date", "sec_id", "open", "high", "low", "close", "volume") if column in schema]
+    identity = [
+        column
+        for column in ("date", "sec_id", "open", "high", "low", "close", "volume")
+        if column in schema
+    ]
     for column, dtype in schema.items():
         if column not in out.columns:
             if schema is BARS_COLUMNS and column in identity:
@@ -189,8 +193,9 @@ def normalize_bars(frame: pd.DataFrame) -> pd.DataFrame:
         out["turnover"] = out["turnover"].where(out["turnover"].notna(), derived)
     for column in ("mktcap", "float_mktcap"):
         if out[column].isna().any():
-            scale = pd.to_numeric(out["total_shares" if column == "mktcap" else "float_shares"],
-                                  errors="coerce").fillna(0.0)
+            scale = pd.to_numeric(
+                out["total_shares" if column == "mktcap" else "float_shares"], errors="coerce"
+            ).fillna(0.0)
             out[column] = out[column].where(out[column].notna(), out["close"] * scale)
     out["suspended"] = out["suspended"].fillna(False).astype(bool)
     out["st"] = out["st"].fillna(False).astype(bool)
@@ -249,9 +254,12 @@ class PanelData:
             self.financials = normalize_financials(self.financials)
         if not self.corporate_actions.empty:
             self.corporate_actions = normalize_corporate_actions(self.corporate_actions)
-        if self.meta.get("synthetic") and "source" in self.bars.columns:
-            if not (self.bars["source"] == "SYNTHETIC").all():
-                raise ValueError("synthetic panel bars must be labelled SYNTHETIC")
+        if (
+            self.meta.get("synthetic")
+            and "source" in self.bars.columns
+            and not (self.bars["source"] == "SYNTHETIC").all()
+        ):
+            raise ValueError("synthetic panel bars must be labelled SYNTHETIC")
 
     # -- basic views ------------------------------------------------------
     @property

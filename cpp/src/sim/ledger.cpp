@@ -231,7 +231,7 @@ void Ledger::assert_invariants(Date date) const {
   }
   const int128 lhs = static_cast<int128>(cash_) + static_cast<int128>(market_value());
   const int128 rhs = static_cast<int128>(initial_cash_) + static_cast<int128>(realized_) +
-                       static_cast<int128>(unrealized()) + static_cast<int128>(dividends_);
+                     static_cast<int128>(unrealized()) + static_cast<int128>(dividends_);
   if (lhs != rhs) {
     fail("net value conservation failed on " + std::to_string(date) + ": cash+mv=" +
          std::to_string(cash_ + market_value()) + " initial+realized+unrealized+div=" +

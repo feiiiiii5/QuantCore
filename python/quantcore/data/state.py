@@ -129,7 +129,9 @@ class SQLiteState:
                 "version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
             )
             current = int(
-                connection.execute("SELECT MAX(version) AS v FROM schema_migrations").fetchone()["v"]
+                connection.execute("SELECT MAX(version) AS v FROM schema_migrations").fetchone()[
+                    "v"
+                ]
                 or 0
             )
             for version, script in MIGRATIONS:
@@ -213,9 +215,7 @@ class SQLiteState:
 
     def list_snapshots(self) -> list[dict[str, Any]]:
         with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM snapshots ORDER BY created_at DESC"
-            ).fetchall()
+            rows = connection.execute("SELECT * FROM snapshots ORDER BY created_at DESC").fetchall()
         snapshots: list[dict[str, Any]] = []
         for row in rows:
             snapshots.append(dict(row))
@@ -275,9 +275,7 @@ class SQLiteState:
 
     def update_job_progress(self, job_id: str, progress: float) -> None:
         with self.connect() as connection:
-            connection.execute(
-                "UPDATE jobs SET progress=? WHERE id=?", (float(progress), job_id)
-            )
+            connection.execute("UPDATE jobs SET progress=? WHERE id=?", (float(progress), job_id))
             connection.commit()
 
     def complete_job(self, job_id: str, result: dict[str, Any]) -> None:

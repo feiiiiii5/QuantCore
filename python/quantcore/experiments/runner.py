@@ -17,10 +17,9 @@ import quantcore
 
 from ..backtest.config import BacktestConfig
 from ..backtest.engine import run_backtest
-from ..backtest.result import BacktestResult
 from ..data.panel import PanelData
 from ..errors import ExperimentError, SnapshotError
-from ..snapshot.reader import Snapshot, find_snapshot, load_snapshot
+from ..snapshot.reader import Snapshot, load_snapshot
 from ..strategy.spec import StrategySpec
 from .store import ExperimentRecord, ExperimentStore
 
@@ -174,7 +173,9 @@ def run_experiment(
         "engine_version": result.engine_version,
         "environment": capture_environment(),
         "metrics": result.metrics,
-        "synthetic": bool((snapshot.manifest.synthetic if snapshot else panel_data.meta.get("synthetic", False))),
+        "synthetic": bool(
+            snapshot.manifest.synthetic if snapshot else panel_data.meta.get("synthetic", False)
+        ),
         "status": "completed",
     }
     run_id = store.create("backtest", metadata, content_hash=spec.content_hash(base_dir))
@@ -278,4 +279,3 @@ def replay_experiment(store: ExperimentStore, run_id: str) -> ReplayResult:
         differences=differences,
         metadata={"engine_backend": fresh.engine_backend, "engine_version": fresh.engine_version},
     )
-

@@ -145,9 +145,7 @@ def _board_price_path(
     )
 
     one_line_mask = np.zeros(n, dtype=bool)
-    for day, up in [(d, True) for d in plan.one_line_up] + [
-        (d, False) for d in plan.one_line_down
-    ]:
+    for day, up in [(d, True) for d in plan.one_line_up] + [(d, False) for d in plan.one_line_down]:
         offset = day - start
         if 0 <= offset < n:
             one_line_mask[offset] = True

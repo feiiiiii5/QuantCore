@@ -163,8 +163,8 @@ def generate_synthetic_panel(config: SyntheticConfig | None = None) -> PanelData
         elif board == "STAR":
             code_prefix = "688"
         code = f"{code_prefix}{i:03d}"[:6]
-        total_shares = int(round(rng.uniform(1.0e8, 4.0e9) / 100.0)) * 100
-        float_shares = int(round(total_shares * rng.uniform(0.35, 1.0) / 100.0)) * 100
+        total_shares = round(rng.uniform(1.0e8, 4.0e9) / 100.0) * 100
+        float_shares = round(total_shares * rng.uniform(0.35, 1.0) / 100.0) * 100
         plans.append(
             _SecurityPlan(
                 index=i,
