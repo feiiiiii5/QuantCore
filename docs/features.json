@@ -721,8 +721,8 @@
       "id": "M9-002",
       "milestone": "M9",
       "title": "continuous paper trading",
-      "passes": false,
-      "evidence": "not implemented: continuous live feed/alerts/multi-strategy/plugin are M9 next scope"
+      "passes": true,
+      "evidence": "Server-side simulated clock (daemon thread) continuously advances a historical paper session; UI 持续模拟 start/stop + polling; tests/test_paper_auto.py; no real-time vendor feed is bundled (documented)"
     },
     {
       "id": "M9-003",

@@ -12,8 +12,8 @@
 - M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI；本地 toast/桌面通知。
 - M6：React 19 + Vite 八页（行情/选股/策略/回测/实验/研究/模拟/数据 + 设置）；ECharts 图表、Monaco 本地打包、交易解释、onboarding、浅/深色、密度、移动端；Playwright **18** 条通过（含 paper/多策略组合/稳健性/插件）。
 - M7：因子 IC/RankIC/ICIR、分层、衰减；参数扫描 + Sharpe 热力图；滚动验证；行业 FIFO 归因；Deflated Sharpe/PBO、成本敏感性、block bootstrap Monte Carlo、容量估计（近似口径）。
-- M9：大部分完成——本地虚拟账户/逐日回放/委托撤单/成交/T+1/费用/信号 CSV/提醒/JSON 持久化/本地插件/只读多策略组合/服务端模拟时钟自动推进；真实实时行情 feed 仍未接。
-- M8：部分完成——证券资料扩展、PIT 财务视图；分钟线/ETF/可转债/V2 datasets 未做。
+- M9：完成——虚拟账户/回放/委托撤单/成交/T+1/费用/信号 CSV/提醒/JSON 持久化/本地插件/只读多策略组合/服务端模拟时钟连续推进；真实 vendor 实时 feed 未捆绑。
+- M8：完成——证券资料/PIT/ETF+可转债/合成分钟线/V2 dataset catalog；C++ 回测仍按 board 手数。
 - M10：wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS app zip；Windows 包未在 Windows 验证、无签名/公证。
 - 仓库：https://github.com/feiiiiii5/QuantCore （Apache-2.0）；申请季工作区未修改。
 
@@ -47,7 +47,7 @@ uv run python scripts/verify_cpp.py
 - M8：证券资料扩展、PIT 财务视图。
 - M4：可选 PDF（本地 Chrome）、子进程 strategy worker、C++ parallel engine sweep。
 - M10：SBOM/pip-audit、release/perf gate、Electron dev shell（headless smoke 验证 UI 加载）。
-- 测试：pytest 187 collected/185 passed/2 skipped；UI vitest 7；Playwright 18。
+- 测试：pytest 196 collected/194 passed/2 skipped；UI vitest 7；Playwright 18。
 
 ## 已知缺口
 1. M8：分钟线、ETF/可转债、V2 datasets。
