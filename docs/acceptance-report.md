@@ -1,14 +1,14 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02。M0–M7 基本完成，M9 大部分完成；M8 仅完成证券资料扩展，M10 完成发布工具/审计/性能门禁但未做 Electron/安装包。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **110/117**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **111/117**）。
 
 ## 里程碑
 | 阶段 | 状态 | 证据 |
 |---|---|---|
 | M0 底座 | ✅ | `make setup`、wheel 构建、`engine_backend=cpp`；CI macOS/Ubuntu 绿 |
 | M1 C++ 基础 | ✅ | ctest 95/95；roll/cross 内核（含 neutralize）/指标/线程/面板/差分 |
-| M2 数据中心 | ✅ 基本 | Synthetic/LocalFile/Tushare fixture/AKShare/mootdx；Parquet+DuckDB+SQLite；快照/质量/PIT 财务视图；实时 Tushare 未验证 |
+| M2 数据中心 | ✅ 基本 | Synthetic/LocalFile/Tushare fixture+live code path/AKShare/mootdx；Parquet+DuckDB+SQLite；快照/质量/PIT 财务；实时 Tushare 仅 fake Pro 单测，真实 Token 未验证 |
 | M3 回测引擎 | ✅ | ctest 95/95；C++/参考差分 6/6；规则/费用/T+1/手数/涨跌停/停牌/trace/指标/风险限制/基准比较 |
 | M4 SDK/CLI/策略 | ✅ 大部分 | DSL/模板/实验/HTML+可选 PDF/子进程 sandbox worker/C++ parallel sweep/CLI/replay |
 | M5 服务层 | ✅ | FastAPI 契约、Bearer/Host/Origin/no-CORS、SQLite 任务队列、WebSocket、取消/崩溃恢复、GZip、本地通知 |
@@ -24,7 +24,7 @@ make lint
 # ruff check/format 通过；mypy 69 files 无问题
 
 uv run pytest -q -p no:warnings
-# 187 collected；185 passed / 2 skipped
+# 190 collected；188 passed / 2 skipped
 
 pnpm -C ui test
 # 7 passed (4 files)

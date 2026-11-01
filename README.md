@@ -70,7 +70,7 @@ make desktop-smoke # Electron dev shell 启动本地 qc serve + UI（非安装�
 make e2e          # 隔离 qc serve + Playwright（需要本机 Chrome）
 ```
 
-本轮实测：pytest **187 collected / 185 passed / 2 skipped**；UI vitest **7 passed**；Playwright **18 passed**；
+本轮实测：pytest **190 collected / 188 passed / 2 skipped**；UI vitest **7 passed**；Playwright **18 passed**；
 ctest **95/95**；ruff/mypy 全绿。`make e2e` 会构建 UI，使用临时 data/experiments 启动 `qc serve`，不污染工作区。
 
 ## API 与文档
@@ -84,11 +84,11 @@ ctest **95/95**；ruff/mypy 全绿。`make e2e` 会构建 UI，使用临时 data
 ## 当前状态（2026-11-02）
 
 - C++ core：panel/kernels/expression/engine，ctest **95/95**；`make verify-cpp` 差分/基准通过。
-- Python：185 passed / 2 skipped；ruff/mypy 全绿；数据→快照→C++ 回测→实验/HTML 报告 CLI 端到端。
+- Python：188 passed / 2 skipped；ruff/mypy 全绿；数据→快照→C++ 回测→实验/HTML 报告 CLI 端到端。
 - 服务端：FastAPI 契约、任务队列/取消/崩溃恢复、WebSocket、安全头、GZip；`qc serve` 同源托管构建后的 UI。
 - 前端：八页工作台真实接线；行情 K 线/涨跌分布、选股 DSL/导出、策略 Monaco/校验、回测任务/指标/交易解释、
   实验复现/报告/导出/对比、数据中心/onboarding、研究因子/扫描/滚动/归因/稳健性、本地模拟账户/逐日回放、本地通知；Playwright 18 条。
-- 诚实状态：`docs/features.json` **110/117**。M0–M3 核心完成，M5（含本地通知）/M6 完成，M7 基础+稳健性（DSR/PBO/成本/MC/容量）与 M9 大部分（模拟账户/回放/插件/组合/通知）完成；M8 部分（证券资料/PIT 财务）、M9 实时行情与 M10 安装包仍未实现。
+- 诚实状态：`docs/features.json` **111/117**。M0–M3 核心完成，M5（含本地通知）/M6 完成，M7 基础+稳健性（DSR/PBO/成本/MC/容量）与 M9 大部分（模拟账户/回放/插件/组合/通知）完成；M8 部分（证券资料/PIT 财务）、M9 实时行情与 M10 安装包仍未实现。
   完整缺口与证据见 [验收报告](docs/acceptance-report.md)；不要据本 README 声称可实盘或已 100% 完成。
 - 仅研究与模拟；合成数据标 `SYNTHETIC`；真实 Tushare 需 Token，未在本次验证。
 

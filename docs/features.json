@@ -175,8 +175,8 @@
       "id": "M2-005",
       "milestone": "M2",
       "title": "Tushare live provider (optional token)",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Tushare live daily/financials/actions endpoints + token/network gating implemented; tests/test_tushare_live.py uses an in-process fake Pro API (no network); real Tushare token/network not verified"
     },
     {
       "id": "M2-006",

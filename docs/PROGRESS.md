@@ -6,7 +6,7 @@
 ## 当前状态
 - M0：完成。`make setup/test`、wheel、macOS/Ubuntu CI；Windows 未纳入。
 - M1：C++ types/calendar/tpool/.qpanel/内核/指标/零拷贝绑定；ctest 95/95；cross-sectional neutralize 已实现并绑定。
-- M2：Synthetic/LocalFile/Tushare(fixture)/AKShare/mootdx；摄取/质量/快照(内容寻址+PIT 元数据)/Parquet+DuckDB+SQLite；PIT 财务视图；实时 Tushare 未验证。
+- M2：Synthetic/LocalFile/Tushare(fixture+live API 代码路径)/AKShare/mootdx；摄取/质量/快照(内容寻址+PIT 元数据)/Parquet+DuckDB+SQLite；PIT 财务视图；真实 Tushare Token 未验证。
 - M3：event-driven 引擎，规则/费用/T+1/手数/涨跌停/停牌/除权除息/trace/指标；差分 6/6；风险限制/基准比较；引擎 300×965 月度调仓约 2.6ms。
 - M4：DSL/7 模板/lookahead/实验存储/HTML+可选 PDF 报告/CLI/replay/子进程 sandbox worker/C++ parallel engine batch sweep。
 - M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI；本地 toast/桌面通知。
@@ -24,7 +24,7 @@ make lint
 # ruff check/format 通过；mypy 85 files 无问题
 
 uv run pytest -q -p no:warnings
-# 187 collected；185 passed / 2 skipped
+# 190 collected；188 passed / 2 skipped
 
 pnpm -C ui test
 # 7 passed (4 files)

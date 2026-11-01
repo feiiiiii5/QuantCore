@@ -213,6 +213,33 @@ def normalize_tushare_actions(frame: pd.DataFrame) -> pd.DataFrame:
     return normalize_corporate_actions(out)
 
 
+def _subset_tushare_frame(
+    frame: pd.DataFrame,
+    start: int,
+    end: int,
+    codes: Iterable[str] | None,
+    *,
+    date_column: str,
+) -> pd.DataFrame:
+    """Filter a normalised Tushare frame by date, accepting ts_code/code/sec_id."""
+    out = subset_frame(frame, start, end, date_column=date_column, codes=None)
+    if codes is None:
+        return out
+    wanted = {str(value) for value in codes}
+    # Normalisation keeps the canonical code/sec_id but may drop ts_code; accept either the
+    # Tushare ``600000.SH`` form or the canonical ``600000``/``SH.600000`` form.
+    wanted_codes = {value.split(".")[0] for value in wanted}
+    mask = out.index.to_series().map(lambda _: False)
+    if "code" in out.columns:
+        mask = mask | out["code"].astype(str).isin(wanted_codes)
+    if "sec_id" in out.columns:
+        sec_text = out["sec_id"].astype(str)
+        mask = mask | sec_text.isin(wanted) | sec_text.str.split(".").str[-1].isin(wanted_codes)
+    if "ts_code" in out.columns:
+        mask = mask | out["ts_code"].astype(str).isin(wanted)
+    return out[mask].reset_index(drop=True)
+
+
 class TushareProvider(DataProvider):
     """Tushare Pro adapter (fixture-first, live opt-in)."""
 
@@ -367,11 +394,12 @@ class TushareProvider(DataProvider):
             return normalize_tushare_daily(
                 pd.DataFrame(columns=["ts_code", "trade_date", "open", "high", "low", "close"])
             )
-        return subset_frame(
+        return _subset_tushare_frame(
             normalize_tushare_daily(pd.concat(frames, ignore_index=True)),
             start_i,
             end_i,
-            codes=codes,
+            codes,
+            date_column="date",
         )
 
     def fetch_financials(
@@ -384,8 +412,28 @@ class TushareProvider(DataProvider):
                 frame, to_date_int(start), to_date_int(end), date_column="ann_date", codes=codes
             )
         self.ensure_available()
-        raise ProviderUnavailableError(
-            "live Tushare financials are not implemented yet; fixture mode is supported (M2)"
+        code_list = list(codes or [])
+        if not code_list:
+            raise ProviderUnavailableError("live Tushare financials require an explicit code list")
+        start_i, end_i = to_date_int(start), to_date_int(end)
+        frames = []
+        for code in code_list:
+            frame = self._live_call(
+                "fina_indicator",
+                ts_code=code,
+                start_date=str(start_i),
+                end_date=str(end_i),
+            )
+            if not frame.empty:
+                frames.append(frame)
+        if not frames:
+            return normalize_tushare_financials(pd.DataFrame())
+        return _subset_tushare_frame(
+            normalize_tushare_financials(pd.concat(frames, ignore_index=True)),
+            start_i,
+            end_i,
+            code_list,
+            date_column="ann_date",
         )
 
     def fetch_corporate_actions(
@@ -398,6 +446,23 @@ class TushareProvider(DataProvider):
                 frame, to_date_int(start), to_date_int(end), date_column="ex_date", codes=codes
             )
         self.ensure_available()
-        raise ProviderUnavailableError(
-            "live Tushare corporate actions are not implemented yet; fixture mode is supported (M2)"
+        code_list = list(codes or [])
+        if not code_list:
+            raise ProviderUnavailableError(
+                "live Tushare corporate actions require an explicit code list"
+            )
+        start_i, end_i = to_date_int(start), to_date_int(end)
+        frames = []
+        for code in code_list:
+            frame = self._live_call("dividend", ts_code=code)
+            if not frame.empty:
+                frames.append(frame)
+        if not frames:
+            return normalize_tushare_actions(pd.DataFrame())
+        return _subset_tushare_frame(
+            normalize_tushare_actions(pd.concat(frames, ignore_index=True)),
+            start_i,
+            end_i,
+            code_list,
+            date_column="ex_date",
         )
