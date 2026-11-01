@@ -15,7 +15,7 @@
 | M6 UI V1 | ✅ | 八页工作台接通真实 API；Playwright **15** 条；浅/深色、移动端、无横向溢出、性能预算 |
 | M7 研究工具 | ✅ 大部分 | IC/RankIC/ICIR、分层、衰减、扫描、滚动、归因、DSR/PBO、成本敏感性、Monte Carlo、容量；因子相关/随机扫描未做 |
 | M8 V2 数据 | ❌ | 未实现 |
-| M9 V3 模拟交易 | 🟡 大部分 | 虚拟账户/逐日回放/委托撤单/成交/信号 CSV/提醒/本地插件/只读多策略组合；持续实时未做 |
+| M9 V3 模拟交易 | 🟡 大部分 | 虚拟账户/逐日回放/委托撤单/成交/信号 CSV/提醒/本地插件/只读多策略组合/服务端模拟时钟自动推进；真实实时行情 feed 未接 |
 | M10 发布 | 🟡 部分 | wheel + 静态 UI + 中文文档 + 许可；Electron/安装包/SBOM 未做 |
 
 ## 本轮实际门禁
@@ -24,7 +24,7 @@ make lint
 # ruff check/format 通过；mypy 69 files 无问题
 
 uv run pytest -q -p no:warnings
-# 183 collected；181 passed / 2 skipped
+# 185 collected；183 passed / 2 skipped
 
 pnpm -C ui test
 # 7 passed (4 files)

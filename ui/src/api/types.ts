@@ -611,6 +611,15 @@ export interface PluginBacktestAccepted {
   plugin: string;
 }
 
+export interface PaperAutoStatus {
+  session_id: string;
+  running: boolean;
+  ticks?: number;
+  error?: string | null;
+  interval_ms?: number;
+  days_per_tick?: number;
+}
+
 export interface PaperPortfolioAllocation {
   session_id: string;
   name: string;

@@ -246,6 +246,9 @@ test("paper trading session creates, steps and renders the virtual account", asy
   await expect(page.getByText(/pending|已提交/).first()).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: /下一交易日/ }).click();
   await expect(page.getByText("持仓市值")).toBeVisible();
+  await page.getByRole("button", { name: "持续模拟" }).click();
+  await expect(page.getByText("持续模拟中")).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: /停止持续模拟/ }).click();
   await expect(page.getByText("虚拟账户仅用于研究")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);

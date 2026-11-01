@@ -114,3 +114,7 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 
 ## Plugin execution isolation (M4)
 - Local plugin backtest jobs set `sandbox_worker=true`: custom strategy code runs in a child Python process (`quantcore.strategy.worker`) with CPU/file-size limits, loads one immutable snapshot, writes a weights `.npy`, and the engine runs in the parent. Static AST audit remains the interface check; this is process isolation, not a multi-tenant security boundary.
+
+## Paper auto-run (M9, simulated clock)
+- `POST /api/paper/sessions/{sid}/auto` `{interval_ms?:50..60000, days_per_tick?:1..30}` starts a server-side simulated clock that steps the existing historical session (no live market feed); `POST .../auto/stop`; `GET .../auto` status.
+- Runs are daemon threads, persist each step, stop at session end/delete; UI button and 1s polling while active.

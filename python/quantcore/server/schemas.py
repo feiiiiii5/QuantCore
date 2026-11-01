@@ -183,6 +183,14 @@ class PaperStepRequest(BaseModel):
     to_date: int | str | None = None
 
 
+class PaperAutoRequest(BaseModel):
+    """Start/stop the simulated clock for one paper session (no live market feed)."""
+
+    model_config = ConfigDict(extra="forbid")
+    interval_ms: int = Field(default=1000, ge=50, le=60_000)
+    days_per_tick: int = Field(default=1, ge=1, le=30)
+
+
 class PaperOrderRequest(BaseModel):
     """Submit a simulated order; fills happen on a later ``step``."""
 

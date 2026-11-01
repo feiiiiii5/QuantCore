@@ -1,7 +1,7 @@
 import type {
   AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, Experiment, ExperimentDetail,
   FactorCorrelationResult, FactorResult, FinancialsResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
-  CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperOrder, PaperPortfolioResult,
+  CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperAutoStatus, PaperOrder, PaperPortfolioResult,
   PaperSessionDetail, PaperSessionSummary, PBOResult, PluginBacktestAccepted, PluginInfo, PluginValidation,
   ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityProfile, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
   Template, ValidationResult, WalkForwardResult,
@@ -150,6 +150,11 @@ export const api = {
     request<PluginBacktestAccepted>(`/api/strategies/plugins/${encodeURIComponent(name)}/backtest`, { method: "POST", body: JSON.stringify(payload) }),
   paperPortfolio: (payload: Record<string, unknown>) =>
     request<PaperPortfolioResult>("/api/paper/portfolio", { method: "POST", body: JSON.stringify(payload) }),
+  startPaperAuto: (id: string, intervalMs = 1000) =>
+    request<PaperAutoStatus>(`/api/paper/sessions/${id}/auto`, { method: "POST", body: JSON.stringify({ interval_ms: intervalMs, days_per_tick: 1 }) }),
+  stopPaperAuto: (id: string) =>
+    request<PaperAutoStatus>(`/api/paper/sessions/${id}/auto/stop`, { method: "POST" }),
+  paperAutoStatus: (id: string) => request<PaperAutoStatus>(`/api/paper/sessions/${id}/auto`),
   paperSessions: () => request<PaperSessionSummary[]>("/api/paper/sessions"),
   createPaperSession: (payload: Record<string, unknown>) =>
     request<PaperSessionSummary>("/api/paper/sessions", { method: "POST", body: JSON.stringify(payload) }),

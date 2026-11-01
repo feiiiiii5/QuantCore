@@ -37,6 +37,7 @@ export default function PaperPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [autoRunning, setAutoRunning] = useState(false);
   const [alerts, setAlerts] = useState<Array<{ id: string; type: "equity_above" | "equity_below"; value: number }>>([]);
   const [alertType, setAlertType] = useState<"equity_above" | "equity_below">("equity_below");
   const [alertValue, setAlertValue] = useState("");
@@ -50,6 +51,14 @@ export default function PaperPage() {
     setPlaying(false);
   }, []);
   useEffect(() => stopPlay, [stopPlay]);
+  useEffect(() => {
+    if (!autoRunning || !selected) return;
+    const timer = window.setInterval(() => {
+      api.paperSession(selected).then((next) => { setDetail(next); checkAlerts(next); }).catch(() => undefined);
+      api.paperAutoStatus(selected).then((status) => { if (!status.running) setAutoRunning(false); }).catch(() => undefined);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [autoRunning, selected]);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -125,6 +134,19 @@ export default function PaperPage() {
       if (fills > 0) notify({ title: "模拟成交", body: `${fills} 笔委托在 ${dateText(next.session.current_date)} 成交（仅本地模拟）`, kind: "success" });
       await loadSessions();
     } catch (e) { stopPlay(); setError(`${e}`); }
+  };
+
+  const toggleAuto = async () => {
+    if (!selected) return;
+    try {
+      if (autoRunning) { await api.stopPaperAuto(selected); setAutoRunning(false); notify({ title: "持续模拟已停止", kind: "info" }); }
+      else {
+        const status = await api.startPaperAuto(selected, 1000);
+        setAutoRunning(status.running);
+        notify({ title: "持续模拟已启动", body: "服务端模拟时钟每 1s 推进 1 个交易日（历史快照，非实时行情）", kind: "info" });
+      }
+      await loadSessions();
+    } catch (e) { setError(`${e}`); }
   };
 
   const togglePlay = () => {
@@ -209,6 +231,7 @@ export default function PaperPage() {
           <button className="btn" onClick={() => void downloadSignals()} disabled={!selected}>信号 CSV</button>
           <button className="btn" onClick={() => void step()} disabled={!selected || playing}><SkipForward size={15} /> 下一交易日</button>
           <button className="btn" onClick={togglePlay} disabled={!selected}>{playing ? <Pause size={15} /> : <Play size={15} />} {playing ? "暂停" : "自动推进"}</button>
+          <button className={`btn ${autoRunning ? "danger" : ""}`} onClick={() => void toggleAuto()} disabled={!selected}>{autoRunning ? <Square size={15} /> : <Play size={15} />} {autoRunning ? "停止持续模拟" : "持续模拟"}</button>
           <button className="btn" onClick={() => void reset()} disabled={!selected}><RefreshCw size={15} /> 重置</button>
           <button className="btn danger" onClick={() => void remove()} disabled={!selected}><Trash2 size={15} /> 删除</button>
         </div>
@@ -240,7 +263,7 @@ export default function PaperPage() {
         <div className="card">
           {!detail ? <StatePanel empty emptyHint="创建或选择一个模拟会话，推进交易日并提交模拟委托。" /> : (
             <>
-              <div className="card-head"><h3>{detail.session.name}</h3><span className="muted small">{dateText(detail.session.current_date)} / {dateText(detail.session.end_date)} · 快照 {detail.session.snapshot || "—"}</span></div>
+              <div className="card-head"><h3>{detail.session.name}</h3><span className="muted small">{dateText(detail.session.current_date)} / {dateText(detail.session.end_date)} · 快照 {detail.session.snapshot || "—"}{autoRunning ? " · 持续模拟中" : ""}</span></div>
               <div className="grid kpis">
                 <div><h3>总权益</h3><div className={`kpi ${(account?.pnl || 0) >= 0 ? "up" : "down"}`}>{money(account?.equity || 0)}</div></div>
                 <div><h3>现金</h3><div className="kpi">{money(account?.cash || 0)}</div></div>

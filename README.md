@@ -69,7 +69,7 @@ make audit        # CycloneDX SBOM + pip-audit 依赖审计
 make e2e          # 隔离 qc serve + Playwright（需要本机 Chrome）
 ```
 
-本轮实测：pytest **183 collected / 181 passed / 2 skipped**；UI vitest **7 passed**；Playwright **18 passed**；
+本轮实测：pytest **185 collected / 183 passed / 2 skipped**；UI vitest **7 passed**；Playwright **18 passed**；
 ctest **95/95**；ruff/mypy 全绿。`make e2e` 会构建 UI，使用临时 data/experiments 启动 `qc serve`，不污染工作区。
 
 ## API 与文档
@@ -83,7 +83,7 @@ ctest **95/95**；ruff/mypy 全绿。`make e2e` 会构建 UI，使用临时 data
 ## 当前状态（2026-11-02）
 
 - C++ core：panel/kernels/expression/engine，ctest **95/95**；`make verify-cpp` 差分/基准通过。
-- Python：181 passed / 2 skipped；ruff/mypy 全绿；数据→快照→C++ 回测→实验/HTML 报告 CLI 端到端。
+- Python：183 passed / 2 skipped；ruff/mypy 全绿；数据→快照→C++ 回测→实验/HTML 报告 CLI 端到端。
 - 服务端：FastAPI 契约、任务队列/取消/崩溃恢复、WebSocket、安全头、GZip；`qc serve` 同源托管构建后的 UI。
 - 前端：八页工作台真实接线；行情 K 线/涨跌分布、选股 DSL/导出、策略 Monaco/校验、回测任务/指标/交易解释、
   实验复现/报告/导出/对比、数据中心/onboarding、研究因子/扫描/滚动/归因/稳健性、本地模拟账户/逐日回放、本地通知；Playwright 18 条。

@@ -7,6 +7,7 @@ from the immutable snapshot referenced by the session.
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -17,6 +18,7 @@ from ..errors import QuantCoreError
 from ..paper import PaperError, PaperMarketData, PaperSession, PaperSessionEngine, PaperStore
 from ..paper.portfolio import build_portfolio
 from .schemas import (
+    PaperAutoRequest,
     PaperOrderRequest,
     PaperPortfolioRequest,
     PaperSessionCreateRequest,
@@ -42,6 +44,7 @@ def _snapshot_meta(workspace: Workspace, snapshot: Any, panel: Any) -> dict[str,
 
 def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
     store = PaperStore(Path(workspace.settings.data_root) / "paper")
+    auto_runs: dict[str, dict[str, Any]] = {}
 
     def _fail(exc: PaperError) -> NoReturn:
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
@@ -103,6 +106,87 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
             _fail(exc)
         store.save(session)
         return json_safe(session.session_view())
+
+    def _auto_loop(session_id: str, stop: threading.Event, interval_ms: int, days: int) -> None:
+        state = auto_runs.setdefault(session_id, {})
+        state.update(running=True, ticks=0, error=None)
+        while not stop.wait(interval_ms / 1000.0):
+            with store.session_lock(session_id):
+                try:
+                    session = store.load(session_id)
+                    engine = _engine_for(session)
+                    if session.status != "active" or session.current_date >= session.end_date:
+                        state["running"] = False
+                        return
+                    engine.step(days=days)
+                    store.save(session)
+                    state["ticks"] = int(state.get("ticks") or 0) + 1
+                except PaperError as exc:
+                    state.update(running=False, error=exc.message)
+                    return
+        state["running"] = False
+
+    @app.post("/api/paper/sessions/{session_id}/auto")
+    def start_auto(session_id: str, payload: PaperAutoRequest | None = None) -> Any:
+        body = payload or PaperAutoRequest()
+        current = auto_runs.get(session_id)
+        if current and current.get("running"):
+            raise HTTPException(status_code=409, detail="paper auto-run is already active")
+        try:
+            session = store.load(session_id)
+        except PaperError as exc:
+            _fail(exc)
+        if session.status != "active" or session.current_date >= session.end_date:
+            raise HTTPException(status_code=409, detail="paper session is already finished")
+        stop = threading.Event()
+        state: dict[str, Any] = {
+            "stop": stop,
+            "thread": None,
+            "running": True,
+            "ticks": 0,
+            "error": None,
+        }
+        thread = threading.Thread(
+            target=_auto_loop,
+            args=(session_id, stop, int(body.interval_ms), int(body.days_per_tick)),
+            daemon=True,
+            name=f"qc-paper-auto-{session_id}",
+        )
+        state["thread"] = thread
+        auto_runs[session_id] = state
+        thread.start()
+        return {
+            "session_id": session_id,
+            "running": True,
+            "interval_ms": body.interval_ms,
+            "days_per_tick": body.days_per_tick,
+        }
+
+    @app.post("/api/paper/sessions/{session_id}/auto/stop")
+    def stop_auto(session_id: str) -> Any:
+        state = auto_runs.get(session_id)
+        if state is None:
+            return {"session_id": session_id, "running": False, "stopped": False}
+        stop = state.get("stop")
+        if isinstance(stop, threading.Event):
+            stop.set()
+        state["running"] = False
+        return {
+            "session_id": session_id,
+            "running": False,
+            "stopped": True,
+            "ticks": state.get("ticks", 0),
+        }
+
+    @app.get("/api/paper/sessions/{session_id}/auto")
+    def auto_status(session_id: str) -> Any:
+        state = auto_runs.get(session_id) or {}
+        return {
+            "session_id": session_id,
+            "running": bool(state.get("running")),
+            "ticks": int(state.get("ticks") or 0),
+            "error": state.get("error"),
+        }
 
     @app.get("/api/paper/sessions")
     def list_sessions() -> Any:
@@ -191,6 +275,9 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
 
     @app.delete("/api/paper/sessions/{session_id}")
     def delete_session(session_id: str) -> Any:
+        state = auto_runs.get(session_id)
+        if state and isinstance(state.get("stop"), threading.Event):
+            state["stop"].set()
         with store.session_lock(session_id):
             try:
                 store.delete(session_id)
