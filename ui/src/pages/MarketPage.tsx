@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw, SlidersHorizontal } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useBars, useFinancials, useOverview, useSecurities, useSecurityProfile } from "../api/queries";
+import { useBars, useFinancials, useMinuteBars, useOverview, useSecurities, useSecurityProfile } from "../api/queries";
 import type { SecurityRow } from "../api/types";
 import KLineChart from "../components/KLineChart";
 import Sparkline from "../components/Sparkline";
@@ -24,12 +24,14 @@ export default function MarketPage() {
   const [showMA5, setShowMA5] = useState(true);
   const [showMA20, setShowMA20] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
+  const [minuteMode, setMinuteMode] = useState(false);
   const setMarketCode = useWorkspace((state) => state.setMarketCode);
   const setMarketQuery = useWorkspace((state) => state.setMarketQuery);
   const code = searchParams.get("code") || picked || rows[0]?.code || "";
   const bars = useBars(code || null);
   const profile = useSecurityProfile(code || null);
   const financials = useFinancials(code || null);
+  const minuteBars = useMinuteBars(code || null, minuteMode);
 
   useEffect(() => {
     if (!code && rows[0]) { setPicked(rows[0].code); setMarketCode(rows[0].code); }
@@ -124,12 +126,25 @@ export default function MarketPage() {
                   <button className={`chip ${showMA5 ? "active" : ""}`} onClick={() => setShowMA5((value) => !value)} aria-pressed={showMA5}>MA5</button>
                   <button className={`chip ${showMA20 ? "active" : ""}`} onClick={() => setShowMA20((value) => !value)} aria-pressed={showMA20}>MA20</button>
                   <button className={`chip ${showVolume ? "active" : ""}`} onClick={() => setShowVolume((value) => !value)} aria-pressed={showVolume}>量</button>
+                  <button className={`chip ${minuteMode ? "active" : ""}`} onClick={() => setMinuteMode((value) => !value)} aria-pressed={minuteMode}>分钟</button>
                   <SlidersHorizontal size={14} className="muted" aria-hidden="true" />
                 </div>
               </div>
-              {bars.isLoading ? <StatePanel loading /> : bars.error ? <StatePanel error={bars.error.message} onRetry={() => void bars.refetch()} /> : bars.data ? (
+              {!minuteMode && (bars.isLoading ? <StatePanel loading /> : bars.error ? <StatePanel error={bars.error.message} onRetry={() => void bars.refetch()} /> : bars.data ? (
                 <KLineChart bars={bars.data} palette={palette} height={430} showMA5={showMA5} showMA20={showMA20} showVolume={showVolume} />
-              ) : <StatePanel empty emptyHint="选择左侧证券查看 K 线、成交量与均线" />}
+              ) : <StatePanel empty emptyHint="选择左侧证券查看 K 线、成交量与均线" />)}
+              {minuteMode ? (
+                <div className="minute-panel" data-testid="minute-panel">
+                  <div className="card-head"><h3>分钟线（合成）<span className="muted small">5 个时段 · SYNTHETIC_MINUTE</span></h3></div>
+                  {minuteBars.isLoading ? <StatePanel loading /> : minuteBars.error ? <StatePanel error={minuteBars.error.message} onRetry={() => void minuteBars.refetch()} /> : minuteBars.data ? (
+                    <div className="table-wrap" style={{ maxHeight: 260 }}>
+                      <table><thead><tr><th>时间</th><th className="num">开</th><th className="num">高</th><th className="num">低</th><th className="num">收</th><th className="num">量</th></tr></thead>
+                        <tbody>{minuteBars.data.bars.map((bar) => <tr key={bar.datetime}><td className="mono">{String(bar.datetime).slice(-4).replace(/(\d{2})(\d{2})/, "$1:$2")}</td><td className="num">{num(bar.open)}</td><td className="num">{num(bar.high)}</td><td className="num">{num(bar.low)}</td><td className="num">{num(bar.close)}</td><td className="num">{compact(bar.volume)}</td></tr>)}</tbody>
+                      </table>
+                    </div>
+                  ) : <StatePanel empty emptyHint="选择证券查看合成分钟线" />}
+                </div>
+              ) : null}
               {profile.data ? (
                 <div className="profile-strip">
                   <div><span>交易所</span><strong>{profile.data.exchange || "—"}</strong></div>

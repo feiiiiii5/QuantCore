@@ -150,6 +150,29 @@ export interface Bars {
   suspended: number[];
 }
 
+export interface MinuteBar {
+  datetime: number;
+  date: number;
+  sec_id: string;
+  code: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  amount: number;
+  source: string;
+}
+
+export interface MinuteBars {
+  code: string;
+  date: number | null;
+  synthetic: boolean;
+  source: string;
+  snapshot: string | null;
+  bars: MinuteBar[];
+}
+
 export interface ScreenerPreset {
   id: string;
   name: string;

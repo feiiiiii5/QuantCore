@@ -8,7 +8,9 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 
+from ..data.minute import synthetic_minute_bars
 from ..data.panel import PANEL_FIELDS
+from ..errors import DataValidationError
 from .workspace import Workspace, json_safe
 
 INDEX_DEFS: tuple[tuple[str, str | None], ...] = (
@@ -172,6 +174,26 @@ def register_market_routes(app: FastAPI, ctx: Workspace) -> None:
         payload["snapshot"] = _snapshot_info(meta)
         payload["updated_at"] = meta.get("created_at") or ""
         return json_safe(payload)
+
+    @app.get("/api/market/minute-bars")
+    def minute_bars(
+        code: str = Query(..., min_length=1),
+        date: str | None = Query(default=None),
+        snapshot: str | None = Query(default=None),
+    ) -> Any:
+        panel, meta = _latest_panel(ctx, snapshot)
+        try:
+            frame = synthetic_minute_bars(panel, code, date)
+        except DataValidationError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return {
+            "code": code,
+            "date": int(frame.iloc[0]["date"]) if not frame.empty else None,
+            "synthetic": True,
+            "source": "SYNTHETIC_MINUTE",
+            "snapshot": meta.get("snapshot_id") or meta.get("id"),
+            "bars": json_safe(frame.to_dict(orient="records")),
+        }
 
     @app.get("/api/market/bars")
     def bars(

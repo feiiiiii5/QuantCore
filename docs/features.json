@@ -686,8 +686,8 @@
       "id": "M8-002",
       "milestone": "M8",
       "title": "minute bars",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Canonical MINUTE_BAR_COLUMNS + deterministic 5-bucket synthetic minute generator (OHLC/volume/amount preserving), GET /api/market/minute-bars, UI 分钟线 panel; C++ engine stays daily (documented)"
     },
     {
       "id": "M8-003",
