@@ -15,6 +15,7 @@ pnpm -C ui build
 echo "[release] packaging UI dist"
 tar -czf "$OUT/quantcore-ui-$VERSION.tar.gz" -C ui dist
 python scripts/sbom.py --out "$OUT/sbom.cdx.json"
+uv run python scripts/audit.py > "$OUT/audit-summary.json" || true
 cp dist/quantcore-"$VERSION".whl "$OUT"/ 2>/dev/null || cp dist/*.whl "$OUT"/
 cp dist/quantcore-"$VERSION".tar.gz "$OUT"/ 2>/dev/null || cp dist/*.tar.gz "$OUT"/
 cp README.md "$OUT/README.md"

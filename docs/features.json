@@ -798,8 +798,8 @@
       "id": "M10-005",
       "milestone": "M10",
       "title": "SBOM/audit",
-      "passes": false,
-      "evidence": "scripts/sbom.py generates offline CycloneDX from uv.lock + pnpm-lock; vulnerability audit still pending"
+      "passes": true,
+      "evidence": "scripts/sbom.py CycloneDX (offline) + scripts/audit.py pip-audit (80 packages, 0 known vulnerabilities locally); make audit; docs/RELEASE.md"
     },
     {
       "id": "M10-006",

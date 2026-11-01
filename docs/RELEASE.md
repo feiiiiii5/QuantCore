@@ -15,6 +15,7 @@ not a brokerage integration and not an Electron installer.
 ## Bundle
 
 - [ ] `make release` → `dist/release/quantcore-<version>-py3-none-any.whl`, sdist, `quantcore-ui-<version>.tar.gz`, `sbom.cdx.json`, `SHA256SUMS`.
+- [ ] `make audit` generates SBOM + `dist/pip-audit.json`; 0 known vulnerabilities or documented exceptions.
 - [ ] `python scripts/sbom.py` parses `uv.lock` + `ui/pnpm-lock.yaml` offline; component counts are plausible.
 - [ ] Checksums verify: `cd dist/release && sha256sum -c SHA256SUMS` (macOS: `shasum -a 256 -c`).
 - [ ] `uv run qc serve --ui-dir ui/dist` from a clean checkout shows the eight-page UI, `/health`, `/api/meta`.

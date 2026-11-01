@@ -8,7 +8,7 @@ export UV_DEFAULT_INDEX ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export PIP_INDEX_URL ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export UV_HTTP_TIMEOUT ?= 120
 
-.PHONY: setup setup-ui build test bench lint verify-cpp perf-gate ui-check e2e ci-local package sbom release fmt clean cmake configure
+.PHONY: setup setup-ui build test bench lint verify-cpp perf-gate ui-check e2e ci-local package sbom audit release fmt clean cmake configure
 
 setup:
 	$(UV) python install $(PYTHON_VERSION)
@@ -64,6 +64,9 @@ package:
 
 sbom:
 	$(UV) run python scripts/sbom.py
+
+audit:
+	$(UV) run python scripts/audit.py
 
 release:
 	bash scripts/release.sh
