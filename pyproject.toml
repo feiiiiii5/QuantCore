@@ -74,6 +74,7 @@ known-first-party = ["quantcore", "tests"]
 python_version = "3.12"
 mypy_path = "python"
 explicit_package_bases = true
+disable_error_code = ["import-untyped"]  # scikit-build editable install exposes only the extension in site-packages
 warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_optional = true
