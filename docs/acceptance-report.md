@@ -47,7 +47,7 @@ make verify-cpp
 - [x] 仅研究与模拟：无真实下单；`BrokerGateway` 未实现；界面与报告有“不构成投资建议”。
 - [x] 认证：Bearer token、Host/Origin 校验、无 CORS、loopback only；token 从 `qc serve --open` URL 持久化后立即从地址栏移除。
 - [x] 合成数据标 `SYNTHETIC`；Tushare 真实网络需 Token，未验证。
-- [ ] features.json 全 true：**109/117**（未达完成定义）。
+- [ ] features.json 全 true：**111/117**（未达完成定义）。
 - [ ] M8 V2 数据、M9 实时行情、M10 Electron/安装包：未完成（见下）。
 - [ ] 真实 Tushare 数据跑通：无 Token，未验证。
 - [ ] 5500×20y / 10000 组 sweep / 峰值 RSS：未测（verify-cpp 为小集）。
@@ -64,6 +64,6 @@ make verify-cpp
 ## 下一步
 1. 补 M8 V2 数据与 M10 Electron/安装包；真实 Tushare 小样本验证。
 2. 保持无真实下单与本地优先；每轮 make ci-local/e2e/verify-cpp 后再 push。
-3. 剩余 8 项 features.json 清零后再宣称完整交付。
+3. 剩余 6 项 features.json 清零后再宣称完整交付。
 4. 全市场 5500×20y 基准、10k sweep、峰值 RSS 仍未测。
 5. Windows CI/打包仍未验证。
