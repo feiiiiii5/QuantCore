@@ -21,7 +21,7 @@
 ## 本轮实际门禁
 ```bash
 make lint
-# ruff check/format 通过；mypy 69 files 无问题
+# ruff check/format 通过；mypy 87 files 无问题
 
 uv run pytest -q -p no:warnings
 # 196 collected；194 passed / 2 skipped

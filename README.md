@@ -76,7 +76,7 @@ ctest **95/95**；ruff/mypy 全绿。`make e2e` 会构建 UI，使用临时 data
 ## API 与文档
 
 - [UI/API 契约 v2](docs/UI-API.md) · [快速上手](docs/QUICKSTART.md) · [UI 说明](docs/UI.md)
-- [计划与里程碑](docs/PLAN.md) · [进度](docs/PROGRESS.md) · [验收报告](docs/acceptance-report.md) · [决策](docs/DECISIONS.md)
+- [迁移会话交接](docs/HANDOFF.md) · [计划与里程碑](docs/PLAN.md) · [进度](docs/PROGRESS.md) · [验收报告](docs/acceptance-report.md) · [决策](docs/DECISIONS.md)
 - [回测语义](docs/engine-semantics.md) · [规则来源](docs/rules-sources.md) · [数据字典](docs/data-dictionary.md)
 - [架构](docs/ARCHITECTURE.md) · [开发环境/镜像](docs/DEV-SETUP.md) · [策略手册](docs/strategy-guide.md)
 - [API](docs/API.md) · [贡献](CONTRIBUTING.md)

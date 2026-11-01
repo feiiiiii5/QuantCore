@@ -20,8 +20,9 @@ The shell chooses a random token, starts `qc serve` on `127.0.0.1:8787`, waits f
 then loads `/?token=...`; the token is removed from the address bar by the same UI bootstrap
 used in the browser. Closing the app stops the child server.
 
-Not included yet: signed macOS/Windows installers, auto-update, code signing. `M10-001`
-covers the dev shell; packaging remains a documented gap.
+Not included: signed/notarized installers, auto-update and code signing. Unsigned macOS
+and Windows zips are buildable (see below); `M10-002/003` only claim the unsigned artifacts,
+not an end-user install experience.
 
 ## Packaging (unsigned)
 

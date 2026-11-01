@@ -14,14 +14,14 @@
 - M7：因子 IC/RankIC/ICIR、分层、衰减；参数扫描 + Sharpe 热力图；滚动验证；行业 FIFO 归因；Deflated Sharpe/PBO、成本敏感性、block bootstrap Monte Carlo、容量估计（近似口径）。
 - M9：完成——虚拟账户/回放/委托撤单/成交/T+1/费用/信号 CSV/提醒/JSON 持久化/本地插件/只读多策略组合/服务端模拟时钟连续推进；真实 vendor 实时 feed 未捆绑。
 - M8：完成——证券资料/PIT/ETF+可转债/合成分钟线/V2 dataset catalog；C++ 回测仍按 board 手数。
-- M10：wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS app zip；Windows 包未在 Windows 验证、无签名/公证。
+- M10：wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS/Windows zip（Windows 包由 `windows-latest` CI 构建）；无签名/公证，未做安装运行验证。
 - 仓库：https://github.com/feiiiiii5/QuantCore （Apache-2.0）；申请季工作区未修改。
 
 ## 本轮实际验证
 ```bash
 cd /Users/fei/Desktop/QuantCore
 make lint
-# ruff check/format 通过；mypy 85 files 无问题
+# ruff check/format 通过；mypy 87 files 无问题
 
 uv run pytest -q -p no:warnings
 # 196 collected；194 passed / 2 skipped
@@ -50,12 +50,12 @@ uv run python scripts/verify_cpp.py
 - 测试：pytest 196 collected/194 passed/2 skipped；UI vitest 7；Playwright 18。
 
 ## 已知缺口
-1. M8：分钟线、ETF/可转债、V2 datasets。
-2. M9：真实实时行情 feed、部分成交/公司行为。
-3. M10：macOS/Windows 安装包与签名；Windows CI 未验证。
-4. M2：实时 Tushare（无 Token 验证）；全市场 5500×20y 基准与峰值 RSS 未测。
+1. M9：真实 vendor 实时 feed 未接（当前是历史快照/服务端模拟时钟）；部分成交/公司行为未实现。
+2. M8：分钟线是 SYNTHETIC 视图；C++ 回测仍按 board 手数（ETF/可转债 paper 手数已实现）。
+3. M10：unsigned macOS/Windows zip 已能构建，但签名/公证/安装运行验证未做。
+4. M2：真实 Tushare Token/网络未验证；全市场 5500×20y 基准与峰值 RSS 未测。
 5. 规则 TODO(verify) 仍需外部核实。
-6. `docs/features.json` **109/117**；不得声称完整。
+6. `docs/features.json` **117/117**；功能门禁全 true，但上述限制意味着不得宣称生产级实盘/签名安装包已完成。
 
 ## 续跑方法
 ```bash
