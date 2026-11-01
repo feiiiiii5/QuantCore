@@ -805,8 +805,8 @@
       "id": "M10-006",
       "milestone": "M10",
       "title": "performance regression gate",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "scripts/perf_gate.py compares verify_cpp open/factors/backtest/ratio vs docs/performance-baseline.json; make perf-gate"
     },
     {
       "id": "M10-007",

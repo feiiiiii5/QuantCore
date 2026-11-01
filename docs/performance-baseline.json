@@ -1,0 +1,17 @@
+{
+  "measured_at": "2026-11-02",
+  "host": "macOS arm64 (local development)",
+  "panel": {"n_sec": 300, "n_time": 965},
+  "baseline": {
+    "open_ms": 0.268,
+    "factors_20_ms_8threads": 21.75,
+    "backtest_ms": 2.79,
+    "cpp_vs_reference_ratio": 167.0
+  },
+  "tolerances": {
+    "open_ms_max_factor": 2.5,
+    "factors_20_ms_8threads_max_factor": 2.0,
+    "backtest_ms_max_factor": 2.0,
+    "cpp_vs_reference_ratio_min_factor": 0.5
+  }
+}

@@ -8,7 +8,7 @@ export UV_DEFAULT_INDEX ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export PIP_INDEX_URL ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export UV_HTTP_TIMEOUT ?= 120
 
-.PHONY: setup setup-ui build test bench lint verify-cpp ui-check e2e ci-local package sbom release fmt clean cmake configure
+.PHONY: setup setup-ui build test bench lint verify-cpp perf-gate ui-check e2e ci-local package sbom release fmt clean cmake configure
 
 setup:
 	$(UV) python install $(PYTHON_VERSION)
@@ -42,6 +42,9 @@ lint:
 
 verify-cpp: build
 	$(UV) run python scripts/verify_cpp.py
+
+perf-gate: build
+	$(UV) run python scripts/perf_gate.py
 
 e2e:
 	@$(UV) run pytest -q -m e2e; code=$$?; if [ $$code -ne 0 ] && [ $$code -ne 5 ]; then exit $$code; fi

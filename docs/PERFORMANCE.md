@@ -42,3 +42,11 @@
 
 说明：`make verify-cpp` 使用上述小集，全市场 5500×20y 与 10000 组参数是 nightly/后续性能任务，
 结果必须实测后填入，不回填未测数字。Python 包装层可通过复用已打开 Panel/异步写盘优化。
+
+## Regression gate
+
+`make perf-gate` runs `scripts/verify_cpp.py` on the deterministic 300×965 panel and
+compares open / 20-factor / backtest / C++-vs-reference ratio against
+`docs/performance-baseline.json` with generous local tolerances (2–2.5× max, ratio floor
+0.5×). The absolute thresholds in `verify_cpp.py` remain the CI gate; `perf-gate` is the
+local early-warning check for silent multi-fold slowdowns.
