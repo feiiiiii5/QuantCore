@@ -8,7 +8,7 @@ export UV_DEFAULT_INDEX ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export PIP_INDEX_URL ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export UV_HTTP_TIMEOUT ?= 120
 
-.PHONY: setup setup-ui build test bench lint verify-cpp perf-gate ui-check e2e ci-local package sbom audit release fmt clean cmake configure
+.PHONY: setup setup-ui build test bench lint verify-cpp perf-gate ui-check e2e desktop-smoke ci-local package sbom audit release fmt clean cmake configure
 
 setup:
 	$(UV) python install $(PYTHON_VERSION)
@@ -54,6 +54,9 @@ e2e:
 ui-check:
 	pnpm -C ui test
 	pnpm -C ui build
+
+desktop-smoke:
+	bash scripts/desktop_smoke.sh
 
 ci-local: setup lint test verify-cpp ui-check
 	@echo "ci-local passed"
