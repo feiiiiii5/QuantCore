@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { zhCN as t } from "./i18n/zh-CN";
 import GlobalSearch from "./components/GlobalSearch";
+import Toasts from "./components/Toasts";
 import StatusBar from "./components/StatusBar";
 import Onboarding from "./components/Onboarding";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -153,6 +154,7 @@ export default function App() {
         </section>
         <StatusBar />
       </main>
+      <Toasts />
       {onboarding ? <Onboarding onDone={(runId) => { setOnboarding(false); navigate(`/experiments?run=${encodeURIComponent(runId)}`); }} onClose={() => setOnboarding(false)} /> : null}
     </div>
   );

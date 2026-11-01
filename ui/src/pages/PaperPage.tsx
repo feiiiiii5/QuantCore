@@ -9,6 +9,7 @@ import type {
   SnapshotStatus,
 } from "../api/types";
 import Chart from "../components/Chart";
+import { notify } from "../lib/notify";
 import StatePanel from "../components/StatePanel";
 
 const money = (value: number) => `¥${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -93,7 +94,10 @@ export default function PaperPage() {
   const step = async () => {
     if (!selected) return;
     try {
-      setDetail(await api.stepPaper(selected, 1));
+      const next = await api.stepPaper(selected, 1);
+      setDetail(next);
+      const fills = next.fills?.length ?? 0;
+      if (fills > 0) notify({ title: "模拟成交", body: `${fills} 笔委托在 ${dateText(next.session.current_date)} 成交（仅本地模拟）`, kind: "success" });
       await loadSessions();
     } catch (e) { stopPlay(); setError(`${e}`); }
   };

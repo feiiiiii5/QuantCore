@@ -16,6 +16,7 @@ import { useWorkspace, type BacktestDraft } from "../store/workspace";
 import type { ColumnDef } from "@tanstack/react-table";
 import VirtualTable from "../components/VirtualTable";
 import { zhCN as t } from "../i18n/zh-CN";
+import { notify } from "../lib/notify";
 
 const DEFAULTS: BacktestDraft = {
   template: "momentum", paramsText: '{"top_n": 10, "lookback": 60}', start: "2022-01-04", end: "2024-12-31", cash: "1000000",
@@ -69,8 +70,11 @@ export default function BacktestPage() {
     if (!job) return;
     if (job.status === "done") {
       const runId = typeof job.result?.run_id === "string" ? job.result.run_id : "";
-      if (runId) { setExperimentId(runId); setNotice(`实验已保存：${runId}`); }
-      else setError("任务完成但没有返回 run_id；请检查后端实验存储。");
+      if (runId) {
+        setExperimentId(runId);
+        setNotice(`实验已保存：${runId}`);
+        notify({ title: "回测完成", body: `结果已写入实验 ${runId.slice(-8)}`, kind: "success" });
+      } else setError("任务完成但没有返回 run_id；请检查后端实验存储。");
       resetSubmit();
     } else if (job.status === "failed" || job.status === "cancelled") {
       setError(job.error || (job.status === "cancelled" ? "已取消" : "回测失败"));

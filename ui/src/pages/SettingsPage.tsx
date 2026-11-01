@@ -3,6 +3,7 @@ import { CheckCircle2, Database, PlugZap, ShieldCheck } from "lucide-react";
 import { configure, getApiBase, getToken } from "../api/client";
 import { useDataStatus, useHealth, useMeta } from "../api/queries";
 import { dateInt } from "../lib/format";
+import { ensureNotificationPermission } from "../lib/notify";
 import { zhCN as t } from "../i18n/zh-CN";
 
 export default function SettingsPage() {
@@ -13,6 +14,7 @@ export default function SettingsPage() {
   const [colorMode, setColorMode] = useState(localStorage.getItem("qc_color_mode") || "red-up");
   const [saved, setSaved] = useState(false);
   const [test, setTest] = useState("");
+  const [notifyState, setNotifyState] = useState<string>(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const health = useHealth();
   const meta = useMeta();
   const data = useDataStatus();
@@ -59,6 +61,12 @@ export default function SettingsPage() {
             <label>涨跌颜色<select value={colorMode} onChange={(event) => setColorMode(event.target.value)}><option value="red-up">红涨绿跌</option><option value="green-up">绿涨红跌</option><option value="color-blind">色盲友好（蓝/橙）</option></select></label>
           </div>
           <p className="muted small">快捷键：⌘K / Ctrl-K 聚焦搜索；/ 聚焦搜索；Esc 关闭；Alt+1…8 切换页面。设置保存后即时生效。</p>
+          <h3 style={{ marginTop: 20 }}>提醒</h3>
+          <div className="button-row">
+            <button className="btn" onClick={async () => setNotifyState(await ensureNotificationPermission())}>启用桌面提醒</button>
+            <span className="muted small">当前：{notifyState === "granted" ? "已允许" : notifyState === "denied" ? "已拒绝/不支持" : notifyState}</span>
+          </div>
+          <p className="muted small">回测完成、模拟委托成交时显示本地 toast；仅在授予浏览器通知权限后发送系统通知，不联网。</p>
         </div>
         <div className="card">
           <h3><Database size={14} /> 服务与数据源状态</h3>

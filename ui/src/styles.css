@@ -296,3 +296,12 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .pbo-list { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; margin-bottom: 10px; }
 .check-row { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 3px 0; cursor: pointer; }
 .check-row input { width: auto; }
+
+/* toast notifications */
+.toast-stack { position: fixed; right: 18px; bottom: 42px; z-index: 200; display: flex; flex-direction: column; gap: 8px; max-width: 360px; }
+.toast { display: flex; align-items: flex-start; gap: 8px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 9px; padding: 9px 10px; box-shadow: 0 14px 32px rgba(0,0,0,.18); font-size: 12px; }
+.toast.success { border-left-color: var(--down); }
+.toast.error { border-left-color: var(--up); }
+.toast strong { display: block; font-size: 12.5px; }
+.toast small { display: block; color: var(--muted); margin-top: 2px; }
+.toast .icon-btn { margin-left: auto; flex: none; }

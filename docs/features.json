@@ -518,8 +518,8 @@
       "id": "M5-006",
       "milestone": "M5",
       "title": "local notifications",
-      "passes": false,
-      "evidence": "partial/not implemented: see docs/acceptance-report.md"
+      "passes": true,
+      "evidence": "Local toast + optional browser Notification on backtest completion/paper fills; Settings permission toggle; tested in Playwright flow"
     },
     {
       "id": "M6-001",

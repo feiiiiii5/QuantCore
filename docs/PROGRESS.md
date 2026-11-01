@@ -9,7 +9,7 @@
 - M2：Synthetic/LocalFile/Tushare(fixture)/AKShare/mootdx；摄取/质量/快照(内容寻址+PIT 元数据)/Parquet+DuckDB+SQLite；合成全市场快照可建。
 - M3：event-driven 引擎，规则/费用/T+1/手数/涨跌停/停牌/除权除息/trace/指标；差分 6/6；引擎 300×965 月度调仓约 2.6ms。
 - M4：DSL（tokenizer/parser/CSE/eval）、7 模板、lookahead/sandbox 接口、实验存储/HTML 报告、CLI backtest/replay；C++ 并行 sweep、PDF 未做。
-- M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI。
+- M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI；本地 toast/桌面通知。
 - M6：React 19 + Vite 八页（行情/选股/策略/回测/实验/研究/模拟/数据 + 设置）；ECharts 图表、Monaco 本地打包、交易解释、onboarding、浅/深色、密度、移动端；Playwright **16** 条通过（含 paper/稳健性）。
 - M7：因子 IC/RankIC/ICIR、分层、衰减；参数扫描 + Sharpe 热力图；滚动验证；行业 FIFO 归因；Deflated Sharpe/PBO、成本敏感性、block bootstrap Monte Carlo、容量估计（近似口径）。
 - M9：基础完成——本地虚拟账户/逐日回放/委托撤单/成交/T+1/费用/信号 CSV/JSON 持久化；无持续实时/提醒/多组合/插件。

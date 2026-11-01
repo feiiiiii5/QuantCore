@@ -1,7 +1,7 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02。M0–M3 核心完成，M5/M6 工作台接通，M7 基础研究能力与 M9 基础模拟交易完成；M8、M9 进阶与部分 M10 未实现。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **90/117**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **91/117**）。
 
 ## 里程碑
 | 阶段 | 状态 | 证据 |
@@ -11,7 +11,7 @@
 | M2 数据中心 | ✅ 基本 | Synthetic/LocalFile/Tushare fixture/AKShare/mootdx；Parquet+DuckDB+SQLite；快照/质量/PIT 元数据 |
 | M3 回测引擎 | ✅ | ctest 95/95；C++/参考差分 6/6；规则/费用/T+1/手数/涨跌停/停牌/trace/指标 |
 | M4 SDK/CLI/策略 | 🟡 大部分 | DSL 17 用例/309 assertions；7 模板；lookahead/实验/HTML 报告/CLI/replay；C++ 并行 sweep/PDF 未做 |
-| M5 服务层 | ✅ | FastAPI 契约、Bearer/Host/Origin/no-CORS、SQLite 任务队列、WebSocket、取消/崩溃恢复、GZip |
+| M5 服务层 | ✅ | FastAPI 契约、Bearer/Host/Origin/no-CORS、SQLite 任务队列、WebSocket、取消/崩溃恢复、GZip、本地通知 |
 | M6 UI V1 | ✅ | 八页工作台接通真实 API；Playwright **15** 条；浅/深色、移动端、无横向溢出、性能预算 |
 | M7 研究工具 | ✅ 大部分 | IC/RankIC/ICIR、分层、衰减、扫描、滚动、归因、DSR/PBO、成本敏感性、Monte Carlo、容量；因子相关/随机扫描未做 |
 | M8 V2 数据 | ❌ | 未实现 |
