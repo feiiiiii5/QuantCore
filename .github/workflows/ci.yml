@@ -49,6 +49,30 @@ jobs:
       - name: Verify C++ backend
         run: uv run python scripts/verify_cpp.py
 
+  desktop-windows-package:
+    # Unsigned client shell package; backend is launched separately/not bundled.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - name: Install desktop deps
+        run: pnpm -C desktop install --frozen-lockfile
+      - name: Build Windows zip (unsigned)
+        run: pnpm -C desktop exec electron-builder --win zip --publish never
+      - name: Verify package artifact
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist/desktop/*win*.zip
+          if (-not $zip) { throw "Windows zip not produced" }
+          Write-Host "built $($zip.FullName) ($($zip.Length) bytes)"
+
   windows-smoke:
     # C++/mmap remains unsupported on Windows; this job keeps the pure-Python control plane
     # (providers, strategy DSL/templates, synthetic panel) covered in the CI matrix.
