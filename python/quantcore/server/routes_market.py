@@ -276,6 +276,57 @@ def register_market_routes(app: FastAPI, ctx: Workspace) -> None:
                     "float_mktcap": float(row.get("float_mktcap", 0.0)),
                     "suspended": bool(float(row.get("suspended", 0.0)) > 0.5),
                     "st": bool(float(row.get("st", 0.0)) > 0.5),
+                    "exchange": str(row.get("exchange", "")),
+                    "sec_type": str(row.get("sec_type", "STOCK")),
+                    "list_date": int(row.get("list_date", 0) or 0),
+                    "delist_date": int(row.get("delist_date", 0) or 0),
+                    "source": str(row.get("source", "")),
                 }
             )
         return json_safe(rows)
+
+    @app.get("/api/market/securities/{code}")
+    def security_profile(code: str, snapshot: str | None = Query(default=None)) -> Any:
+        panel, _ = _latest_panel(ctx, snapshot)
+        meta = panel.securities
+        match = meta[
+            (meta["code"].astype(str) == str(code)) | (meta["sec_id"].astype(str) == str(code))
+        ]
+        if match.empty:
+            raise HTTPException(status_code=404, detail=f"unknown security: {code}")
+        record = match.iloc[0].to_dict()
+        bars = panel.bars[panel.bars["sec_id"].astype(str) == str(record["sec_id"])].sort_values(
+            "date"
+        )
+        latest = bars.tail(1).to_dict(orient="records")
+        quote = latest[0] if latest else {}
+        previous = float(quote.get("pre_close") or quote.get("close") or 0.0)
+        close = float(quote.get("close") or 0.0)
+        return json_safe(
+            {
+                "sec_id": str(record["sec_id"]),
+                "code": str(record.get("code", "")),
+                "name": str(record.get("name", "")),
+                "exchange": str(record.get("exchange", "")),
+                "board": str(record.get("board", "MAIN")),
+                "sec_type": str(record.get("sec_type", "STOCK")),
+                "industry": str(record.get("industry", "")),
+                "source": str(record.get("source", "")),
+                "list_date": int(record.get("list_date", 0) or 0),
+                "delist_date": int(record.get("delist_date", 0) or 0),
+                "quote": {
+                    "date": int(quote.get("date", 0) or 0),
+                    "close": close,
+                    "pre_close": previous,
+                    "change_pct": round(close / previous * 100 - 100, 4) if previous else 0.0,
+                    "open": float(quote.get("open") or 0.0),
+                    "high": float(quote.get("high") or 0.0),
+                    "low": float(quote.get("low") or 0.0),
+                    "volume": float(quote.get("volume") or 0.0),
+                    "amount": float(quote.get("amount") or 0.0),
+                    "turnover": round(float(quote.get("turnover") or 0.0) * 100.0, 4),
+                    "st": bool(float(quote.get("st") or 0.0) > 0.5),
+                    "suspended": bool(float(quote.get("suspended") or 0.0) > 0.5),
+                },
+            }
+        )

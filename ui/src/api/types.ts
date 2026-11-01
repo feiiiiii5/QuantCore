@@ -97,6 +97,38 @@ export interface SecurityRow {
   float_mktcap: number;
   suspended: boolean;
   st: boolean;
+  exchange?: string;
+  sec_type?: string;
+  list_date?: number;
+  delist_date?: number;
+  source?: string;
+}
+
+export interface SecurityProfile {
+  sec_id: string;
+  code: string;
+  name: string;
+  exchange: string;
+  board: string;
+  sec_type: string;
+  industry: string;
+  source: string;
+  list_date: number;
+  delist_date: number;
+  quote: {
+    date: number;
+    close: number;
+    pre_close: number;
+    change_pct: number;
+    open: number;
+    high: number;
+    low: number;
+    volume: number;
+    amount: number;
+    turnover: number;
+    st: boolean;
+    suspended: boolean;
+  };
 }
 
 export interface Bars {

@@ -693,8 +693,8 @@
       "id": "M8-003",
       "milestone": "M8",
       "title": "stock profile expansion",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "GET /api/market/securities now returns exchange/sec_type/list_date/delist_date/source; GET /api/market/securities/{code} profile+quote; UI profile strip; tests/test_market_profile.py"
     },
     {
       "id": "M8-004",

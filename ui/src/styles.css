@@ -309,3 +309,10 @@ html, body { max-width: 100%; overflow-x: hidden; }
 /* paper alerts */
 .alert-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .link-btn { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 2px; font-size: 12px; }
+
+/* security profile strip */
+.profile-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+.profile-strip div { min-width: 0; }
+.profile-strip span { display: block; color: var(--muted); font-size: 10.5px; }
+.profile-strip strong { display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 900px) { .profile-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

@@ -3,7 +3,7 @@ import type {
   FactorResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
   CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperOrder,
   PaperSessionDetail, PaperSessionSummary, PBOResult,
-  ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
+  ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityProfile, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
   Template, ValidationResult, WalkForwardResult,
 } from "./types";
 
@@ -108,6 +108,7 @@ export const api = {
   overview: (snapshot?: string) => request<MarketOverview>(`/api/market/overview${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),
   bars: (code: string, snapshot?: string) => request<Bars>(`/api/market/bars?code=${encodeURIComponent(code)}${snapshot ? `&snapshot=${encodeURIComponent(snapshot)}` : ""}`),
   securities: (query = "", limit = 300) => request<SecurityRow[]>(`/api/market/securities?query=${encodeURIComponent(query)}&limit=${limit}`),
+  securityProfile: (code: string, snapshot?: string) => request<SecurityProfile>(`/api/market/securities/${encodeURIComponent(code)}${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),
 
   screenerPresets: () => request<ScreenerPreset[]>("/api/screener/presets"),
   runScreener: (payload: { expression: string; universe?: Record<string, unknown>; limit?: number }) =>

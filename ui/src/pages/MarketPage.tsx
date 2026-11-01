@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw, SlidersHorizontal } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useBars, useOverview, useSecurities } from "../api/queries";
+import { useBars, useOverview, useSecurities, useSecurityProfile } from "../api/queries";
 import type { SecurityRow } from "../api/types";
 import KLineChart from "../components/KLineChart";
 import Sparkline from "../components/Sparkline";
@@ -28,6 +28,7 @@ export default function MarketPage() {
   const setMarketQuery = useWorkspace((state) => state.setMarketQuery);
   const code = searchParams.get("code") || picked || rows[0]?.code || "";
   const bars = useBars(code || null);
+  const profile = useSecurityProfile(code || null);
 
   useEffect(() => {
     if (!code && rows[0]) { setPicked(rows[0].code); setMarketCode(rows[0].code); }
@@ -128,6 +129,16 @@ export default function MarketPage() {
               {bars.isLoading ? <StatePanel loading /> : bars.error ? <StatePanel error={bars.error.message} onRetry={() => void bars.refetch()} /> : bars.data ? (
                 <KLineChart bars={bars.data} palette={palette} height={430} showMA5={showMA5} showMA20={showMA20} showVolume={showVolume} />
               ) : <StatePanel empty emptyHint="选择左侧证券查看 K 线、成交量与均线" />}
+              {profile.data ? (
+                <div className="profile-strip">
+                  <div><span>交易所</span><strong>{profile.data.exchange || "—"}</strong></div>
+                  <div><span>板块 / 类型</span><strong>{profile.data.board} · {profile.data.sec_type}</strong></div>
+                  <div><span>行业</span><strong>{profile.data.industry || "—"}</strong></div>
+                  <div><span>上市日</span><strong>{profile.data.list_date ? String(profile.data.list_date).replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3") : "—"}</strong></div>
+                  <div><span>数据源</span><strong>{profile.data.source || "—"}</strong></div>
+                  <div><span>最近成交额</span><strong>{compact(profile.data.quote.amount)}</strong></div>
+                </div>
+              ) : null}
             </div>
           </div>
           {overview.data.snapshot.synthetic ? <p className="notice">当前为 SYNTHETIC 合成行情，仅用于功能演示，不代表真实市场。</p> : null}
