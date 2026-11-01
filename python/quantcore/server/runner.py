@@ -175,9 +175,15 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
         target = panel
     _progress(0.2, ctx)
     _check(ctx)
-    strategy = spec.load()
-    _progress(0.35, ctx)
-    weights = strategy.generate_targets(panel)
+    if bool(payload.get("sandbox_worker")) and spec.module is not None and snapshot is not None:
+        from ..strategy.sandbox_worker import generate_targets_sandboxed
+
+        _progress(0.35, ctx)
+        weights = generate_targets_sandboxed(spec.module, snapshot.path)
+    else:
+        strategy = spec.load()
+        _progress(0.35, ctx)
+        weights = strategy.generate_targets(panel)
     _progress(0.55, ctx)
     _check(ctx)
     result = run_backtest(

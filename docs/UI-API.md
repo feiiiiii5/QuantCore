@@ -111,3 +111,6 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 
 ## Report export (M4)
 - `GET /api/experiments/{run_id}/report` → HTML; `GET /api/experiments/{run_id}/report.pdf` → PDF via local Chrome/Chromium print-to-pdf (503 with `{detail}` when no browser is installed; optional, not required for research runs).
+
+## Plugin execution isolation (M4)
+- Local plugin backtest jobs set `sandbox_worker=true`: custom strategy code runs in a child Python process (`quantcore.strategy.worker`) with CPU/file-size limits, loads one immutable snapshot, writes a weights `.npy`, and the engine runs in the parent. Static AST audit remains the interface check; this is process isolation, not a multi-tenant security boundary.

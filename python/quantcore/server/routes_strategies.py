@@ -192,6 +192,7 @@ def register_strategy_routes(app: FastAPI, ctx: Workspace) -> None:
             "experiments_root": str(ctx.settings.experiments_root),
             "config": config,
             "plugin": plugin_spec.name,
+            "sandbox_worker": True,
         }
         job_id = ctx.queue.submit("backtest", job_payload)
         return {"job_id": job_id, "status": "pending", "plugin": plugin_spec.name}

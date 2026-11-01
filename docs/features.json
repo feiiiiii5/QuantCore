@@ -434,8 +434,8 @@
       "id": "M4-005",
       "milestone": "M4",
       "title": "strategy sandbox worker",
-      "passes": false,
-      "evidence": "partial/not verified: see docs/PROGRESS.md known gaps"
+      "passes": true,
+      "evidence": "Subprocess strategy worker (quantcore.strategy.worker + sandbox_worker): child process resource limits, snapshot load, AST-audited module, .npy weights; plugin backtest jobs set sandbox_worker=true; tests/test_sandbox_worker.py"
     },
     {
       "id": "M4-006",
