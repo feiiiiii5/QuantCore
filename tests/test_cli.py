@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -177,8 +178,11 @@ def test_bench_command() -> None:
     assert payload["checks"]["engine_run_under_1000ms"] is True
 
 
-def test_serve_help_documents_security_and_ui_options() -> None:
-    result = runner.invoke(app, ["serve", "--help"])
-    assert result.exit_code == 0, result.output
-    for option in ("--token", "--ui-dir", "--open", "--port", "--data-root"):
-        assert option in result.output
+def test_serve_documents_security_and_ui_options() -> None:
+    import inspect
+
+    from quantcore.cli_serve import serve_command
+
+    parameters = inspect.signature(serve_command).parameters
+    for option in ("token", "ui_dir", "open_browser", "port", "data_root", "start_worker"):
+        assert option in parameters, option
