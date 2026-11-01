@@ -714,57 +714,57 @@
       "id": "M9-001",
       "milestone": "M9",
       "title": "historical replay",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "PaperSessionEngine replays an immutable snapshot day by day; UI /paper step/auto-play; tests/test_paper_engine.py"
     },
     {
       "id": "M9-002",
       "milestone": "M9",
       "title": "continuous paper trading",
       "passes": false,
-      "evidence": ""
+      "evidence": "not implemented: continuous live feed/alerts/multi-strategy/plugin are M9 next scope"
     },
     {
       "id": "M9-003",
       "milestone": "M9",
       "title": "alerts",
       "passes": false,
-      "evidence": ""
+      "evidence": "not implemented: continuous live feed/alerts/multi-strategy/plugin are M9 next scope"
     },
     {
       "id": "M9-004",
       "milestone": "M9",
       "title": "multi-strategy portfolio",
       "passes": false,
-      "evidence": ""
+      "evidence": "not implemented: continuous live feed/alerts/multi-strategy/plugin are M9 next scope"
     },
     {
       "id": "M9-005",
       "milestone": "M9",
       "title": "plugin API",
       "passes": false,
-      "evidence": ""
+      "evidence": "not implemented: continuous live feed/alerts/multi-strategy/plugin are M9 next scope"
     },
     {
       "id": "M9-006",
       "milestone": "M9",
       "title": "signal CSV export",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "GET /api/paper/sessions/{id}/signals.csv + UI button; tests/test_paper_api.py"
     },
     {
       "id": "M9-007",
       "milestone": "M9",
       "title": "BrokerGateway disabled",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "No BrokerGateway/real order routing exists; paper package only reads local snapshots; docs/acceptance-report.md"
     },
     {
       "id": "M9-008",
       "milestone": "M9",
       "title": "simulated account",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "PaperSession/PaperStore virtual cash/positions/orders/trades persisted under data/paper; tests/test_paper_engine.py"
     },
     {
       "id": "M10-001",
@@ -825,5 +825,5 @@
   ],
   "verified_at": "2026-11-02",
   "verified_by": "pytest 123 collected; Playwright 12; pnpm build/test; ruff/mypy; ctest 95/95",
-  "note": "M0-M3 core; M5 API/WS/jobs/security; M6 full workbench; M7 factor/sweep/heatmap/walk-forward/attribution. M8/M9 and remaining M10 items are still false; neutralize, benchmark comparison, sandbox worker, PDF, C++ parallel sweep, Windows and real Tushare remain open."
+  "note": "M0-M4 core, M5 WebSocket/cancel, M6 full UI, M7 basic research, M9 basic paper replay/account/CSV; M8, M9 advanced, M10 packaging still false. Do not claim full completion."
 }

@@ -68,3 +68,11 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 
 ## Errors
 `{detail:string|object}`; 400 validation, 401/403 auth, 404, 409 conflict, 422 pydantic/template validation, 500 internal (no stack in body).
+
+## Paper trading (M9, local simulation only — no real orders)
+- `POST /api/paper/sessions` body `{snapshot?,initial_cash?,start?,end?,name?}` → **201** session view
+- `GET /api/paper/sessions` → list; `GET /api/paper/sessions/{sid}` → `{session,snapshot,account:{cash,market_value,equity,pnl,pnl_pct},positions[],orders[],trades[],equity_curve[]}`
+- `POST /api/paper/sessions/{sid}/step` body `{}`/`{days}`/`{to_date}` → detail + `fills[]`; `POST .../reset`
+- `POST .../orders` body `{code|sec_id,side:"buy"|"sell",qty,order_type:"market"|"limit",limit_price?}` → `{order}`
+- `POST .../orders/{oid}/cancel`; `GET .../signals.csv`; `DELETE /api/paper/sessions/{sid}`
+- Orders fill on the next `step` at the next open / limit touch; board lots, T+1, price limits, suspensions and fee model are reused from backtest config. Sessions persist as atomic JSON under `data_root/paper/`; no broker, no network.

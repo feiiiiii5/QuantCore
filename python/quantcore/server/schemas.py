@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -149,3 +149,42 @@ class OnboardingRequest(BaseModel):
 
 JOB_STATUSES = ("pending", "running", "done", "failed", "cancelled")
 TERMINAL_JOB_STATUSES = ("done", "failed", "cancelled")
+
+
+# ---------------------------------------------------------------- paper trading (M9)
+class PaperSessionCreateRequest(BaseModel):
+    """Create a simulated session over one immutable snapshot (never a real account)."""
+
+    model_config = ConfigDict(extra="forbid")
+    snapshot: str | None = Field(default=None, max_length=200)
+    initial_cash: float = Field(default=1_000_000.0, gt=0, le=1e12, description="CNY")
+    start: int | str | None = None
+    end: int | str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+
+
+class PaperStepRequest(BaseModel):
+    """Advance the simulated clock (default one trading day)."""
+
+    model_config = ConfigDict(extra="forbid")
+    days: int = Field(default=1, ge=1, le=1000)
+    to_date: int | str | None = None
+
+
+class PaperOrderRequest(BaseModel):
+    """Submit a simulated order; fills happen on a later ``step``."""
+
+    model_config = ConfigDict(extra="forbid")
+    code: str = Field(min_length=1, max_length=32)
+    side: Literal["buy", "sell"]
+    qty: int = Field(gt=0, le=100_000_000)
+    order_type: Literal["market", "limit"] = "market"
+    limit_price: float | None = Field(default=None, gt=0, le=1_000_000)
+
+    @model_validator(mode="after")
+    def _limit_price_matches_type(self) -> PaperOrderRequest:
+        if self.order_type == "limit" and self.limit_price is None:
+            raise ValueError("limit orders require limit_price")
+        if self.order_type == "market" and self.limit_price is not None:
+            raise ValueError("limit_price is only valid for limit orders")
+        return self

@@ -11,13 +11,13 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 
 from ..data.store import ParquetStore
-from ..data.synthetic import SyntheticConfig
+from ..data.synthetic import SyntheticConfig, generate_synthetic_panel
 from ..errors import QuantCoreError
 from ..experiments import ExperimentStore, run_experiment
 from ..ingest import ProviderIngestor
 from ..providers import create_provider, describe_providers
 from ..providers.synthetic import SyntheticProvider
-from ..snapshot.builder import build_snapshot_from_store
+from ..snapshot.builder import build_snapshot, build_snapshot_from_store
 from ..snapshot.reader import list_snapshots
 from ..strategy.spec import StrategySpec
 from .schemas import DataUpdateRequest, OnboardingRequest, SnapshotBuildRequest
@@ -220,11 +220,18 @@ def register_data_routes(app: FastAPI, ctx: Workspace) -> None:
         snapshots_root = ctx.settings.snapshots_root
         snapshots_root.mkdir(parents=True, exist_ok=True)
         store = ParquetStore(data_root / "warehouse", state=ctx.state)
-        ingestor = ProviderIngestor(SyntheticProvider(config), store)
-        ingestor.update(payload.start, payload.end)
-        manifest = build_snapshot_from_store(
-            store, snapshots_root, state=ctx.state, require_qpanel=True
-        )
+        if not store.manifest.datasets:
+            # First run: seed the demo warehouse so the data page has rows to show.
+            ingestor = ProviderIngestor(SyntheticProvider(config), store)
+            ingestor.update(payload.start, payload.end)
+            manifest = build_snapshot_from_store(
+                store, snapshots_root, state=ctx.state, require_qpanel=True
+            )
+        else:
+            # Re-onboarding must honour the requested n_sec/start/end without wiping an
+            # existing (possibly real) warehouse: snapshot the requested synthetic panel.
+            panel = generate_synthetic_panel(config)
+            manifest = build_snapshot(panel, snapshots_root, state=ctx.state, require_qpanel=True)
         snapshot = ctx.snapshot(manifest.snapshot_id)
         experiment_store = ExperimentStore(ctx.settings.experiments_root)
         spec = StrategySpec(

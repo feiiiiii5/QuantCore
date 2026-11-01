@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3, Database, FlaskConical, LineChart, ListFilter, Microscope, Moon, Settings,
-  SlidersHorizontal, Sparkles, Sun,
+  SlidersHorizontal, Sparkles, Sun, Wallet,
 } from "lucide-react";
 import { zhCN as t } from "./i18n/zh-CN";
 import GlobalSearch from "./components/GlobalSearch";
@@ -14,6 +14,7 @@ import ScreenerPage from "./pages/ScreenerPage";
 import BacktestPage from "./pages/BacktestPage";
 import ExperimentPage from "./pages/ExperimentPage";
 import ResearchPage from "./pages/ResearchPage";
+import PaperPage from "./pages/PaperPage";
 import DataPage from "./pages/DataPage";
 import SettingsPage from "./pages/SettingsPage";
 import { useWorkspace } from "./store/workspace";
@@ -27,6 +28,7 @@ const nav = [
   { to: "/backtest", label: t.nav.backtest, icon: BarChart3 },
   { to: "/experiments", label: t.nav.experiments, icon: FlaskConical },
   { to: "/research", label: t.nav.research, icon: Microscope },
+  { to: "/paper", label: t.nav.paper, icon: Wallet },
   { to: "/data", label: t.nav.data, icon: Database },
   { to: "/settings", label: t.nav.settings, icon: Settings },
 ];
@@ -142,6 +144,7 @@ export default function App() {
                 <Route path="/backtest" element={<BacktestPage />} />
                 <Route path="/experiments" element={<ExperimentPage />} />
                 <Route path="/research" element={<ResearchPage />} />
+            <Route path="/paper" element={<PaperPage />} />
                 <Route path="/data" element={<DataPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Routes>

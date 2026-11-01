@@ -212,3 +212,33 @@ test("mobile layout has no horizontal overflow", async ({ page }) => {
   await page.screenshot({ path: "/tmp/qc-mobile.png", fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test("paper trading session creates, steps and renders the virtual account", async ({ page, request }) => {
+  const errors = await prepare(page);
+  const auth = { Authorization: `Bearer ${token}` };
+  const bootstrap = await request.post("/api/onboarding/bootstrap", {
+    headers: auth,
+    data: { n_sec: 30, start: "2023-01-03", end: "2024-12-31", seed: 41 },
+  });
+  expect(bootstrap.ok()).toBeTruthy();
+  await page.goto("/paper");
+  await expect(page.getByRole("heading", { name: "模拟交易" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /创建会话/ })).toBeEnabled();
+  await page.getByRole("button", { name: /创建会话/ }).click();
+  await expect(page.getByText("总权益")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("持仓市值")).toBeVisible();
+  const securitiesResponse = await request.get("/api/market/securities?limit=1", { headers: auth });
+  const securities = await securitiesResponse.json();
+  const firstCode = String(securities[0]?.code || "600000");
+  await page.getByLabel("代码").fill(firstCode);
+  await page.getByLabel("数量").fill("100");
+  await page.getByRole("button", { name: /提交委托/ }).click();
+  await expect(page.getByText(/pending|已提交/).first()).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: /下一交易日/ }).click();
+  await expect(page.getByText("持仓市值")).toBeVisible();
+  await expect(page.getByText("虚拟账户仅用于研究")).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: "/tmp/qc-paper.png", fullPage: true });
+});

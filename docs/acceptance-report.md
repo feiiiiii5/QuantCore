@@ -1,7 +1,7 @@
 # 验收报告 — 对照任务书
 
-> 状态：2026-11-02。M0–M3 核心完成，M5/M6 工作台接通，M7 基础研究能力完成；M8/M9 与部分 M10 未实现。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **80/117**）。
+> 状态：2026-11-02。M0–M3 核心完成，M5/M6 工作台接通，M7 基础研究能力与 M9 基础模拟交易完成；M8、M9 进阶与部分 M10 未实现。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **84/117**）。
 
 ## 里程碑
 | 阶段 | 状态 | 证据 |
@@ -12,10 +12,10 @@
 | M3 回测引擎 | ✅ | ctest 95/95；C++/参考差分 6/6；规则/费用/T+1/手数/涨跌停/停牌/trace/指标 |
 | M4 SDK/CLI/策略 | 🟡 大部分 | DSL 17 用例/309 assertions；7 模板；lookahead/实验/HTML 报告/CLI/replay；C++ 并行 sweep/PDF 未做 |
 | M5 服务层 | ✅ | FastAPI 契约、Bearer/Host/Origin/no-CORS、SQLite 任务队列、WebSocket、取消/崩溃恢复、GZip |
-| M6 UI V1 | ✅ | 七页工作台接通真实 API；Playwright **14** 条；浅/深色、移动端、无横向溢出、性能预算 |
+| M6 UI V1 | ✅ | 八页工作台接通真实 API；Playwright **15** 条；浅/深色、移动端、无横向溢出、性能预算 |
 | M7 研究工具 | 🟡 基础 | IC/RankIC/ICIR、分层、衰减、参数扫描+热力图、滚动验证、行业归因；Deflated Sharpe/PBO/成本敏感性/容量未做 |
 | M8 V2 数据 | ❌ | 未实现 |
-| M9 V3 模拟交易 | ❌ | 未实现；`BrokerGateway` 仍为禁用语义 |
+| M9 V3 模拟交易 | 🟡 基础 | 虚拟账户/逐日历史回放/委托撤单/成交/信号 CSV/持久化；持续模拟/提醒/多策略/插件未做 |
 | M10 发布 | 🟡 部分 | wheel + 静态 UI + 中文文档 + 许可；Electron/安装包/SBOM 未做 |
 
 ## 本轮实际门禁
@@ -24,7 +24,7 @@ make lint
 # ruff check/format 通过；mypy 69 files 无问题
 
 uv run pytest -q -p no:warnings
-# 123 collected；121 passed / 2 skipped
+# 142 collected；140 passed / 2 skipped
 
 pnpm -C ui test
 # 7 passed (4 files)
@@ -34,7 +34,7 @@ pnpm -C ui build
 
 make e2e   # 需要本机 Chrome；会构建 UI、启动隔离 qc serve
 # pytest e2e marker + vitest + Playwright
-# 14 passed: 行情/选股/回测/实验/笔记/数据/策略/设置/研究/onboarding/暗色/性能/全局搜索/移动端
+# 15 passed: 行情/选股/回测/实验/笔记/数据/策略/设置/研究/onboarding/暗色/性能/全局搜索/移动端
 
 make verify-cpp
 # C++ backend、差分 6/6、open/20 factors/engine/ratio 门禁通过
@@ -48,12 +48,12 @@ make verify-cpp
 - [x] 认证：Bearer token、Host/Origin 校验、无 CORS、loopback only；token 从 `qc serve --open` URL 持久化后立即从地址栏移除。
 - [x] 合成数据标 `SYNTHETIC`；Tushare 真实网络需 Token，未验证。
 - [ ] features.json 全 true：**80/117**（未达完成定义）。
-- [ ] M8/M9/M10 完整：未实现（见下）。
+- [ ] M8/M9（进阶）/M10 完整：未实现（见下）。
 - [ ] 真实 Tushare 数据跑通：无 Token，未验证。
 - [ ] 5500×20y / 10000 组 sweep / 峰值 RSS：未测（verify-cpp 为小集）。
 
 ## 已知缺口（按优先级）
-1. **M9 模拟交易**：历史回放、持续模拟、提醒、多组合、插件、信号 CSV、模拟账户未实现；不得声称可实盘。
+1. **M9 模拟交易进阶**：持续实时模拟、提醒、多策略组合、插件、部分成交/公司行为未实现；不得声称可实盘。
 2. **M8 V2 数据**：创业板/科创板/北交所完整规则已按板块设计，但分钟线/ETF/可转债/个股资料扩展未实现。
 3. **M7 进阶**：Deflated Sharpe/PBO、成本敏感性、bootstrap/Monte Carlo、容量估计未实现；当前归因按行业 FIFO 近似。
 4. **M10 发布**：Electron、macOS/Windows 安装包、SBOM/审计、性能回归脚本未完成；Windows 未验证。
@@ -62,7 +62,7 @@ make verify-cpp
 7. **规则 TODO(verify)**：ST 各板块幅度、盘后固定价历史范围、新股/退市整理期、分红个税、部分费率。
 
 ## 下一步
-1. 补 M9 模拟账户/历史回放与 UI，保持无真实下单。
+1. 补 M9 进阶（持续模拟/提醒/多组合/插件），保持无真实下单；再做 M8 V2 数据与 M10 打包。
 2. 补 M8 分钟线、ETF/可转债、板块规则和 PIT 财务视图。
 3. Electron/打包/SBOM/Windows CI，补全 M10。
 4. 真实 Tushare 小样本验证；全市场基准与内存测量。

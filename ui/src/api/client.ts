@@ -1,6 +1,7 @@
 import type {
   AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, Experiment, ExperimentDetail,
   FactorResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
+  PaperOrder, PaperSessionDetail, PaperSessionSummary,
   ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
   Template, ValidationResult, WalkForwardResult,
 } from "./types";
@@ -140,6 +141,20 @@ export const api = {
   buildSnapshot: () => request<{ job_id: string; status: string }>("/api/data/snapshot", { method: "POST", body: JSON.stringify({ require_qpanel: true }) }),
   bootstrap: (payload: Record<string, unknown>) => request<Record<string, unknown>>("/api/onboarding/bootstrap", { method: "POST", body: JSON.stringify(payload) }),
 
+  paperSessions: () => request<PaperSessionSummary[]>("/api/paper/sessions"),
+  createPaperSession: (payload: Record<string, unknown>) =>
+    request<PaperSessionSummary>("/api/paper/sessions", { method: "POST", body: JSON.stringify(payload) }),
+  paperSession: (id: string) => request<PaperSessionDetail>(`/api/paper/sessions/${id}`),
+  stepPaper: (id: string, days = 1) =>
+    request<PaperSessionDetail>(`/api/paper/sessions/${id}/step`, { method: "POST", body: JSON.stringify({ days }) }),
+  resetPaper: (id: string) =>
+    request<PaperSessionDetail>(`/api/paper/sessions/${id}/reset`, { method: "POST" }),
+  submitPaperOrder: (id: string, payload: Record<string, unknown>) =>
+    request<{ order: PaperOrder }>(`/api/paper/sessions/${id}/orders`, { method: "POST", body: JSON.stringify(payload) }),
+  cancelPaperOrder: (id: string, orderId: string) =>
+    request<{ order: PaperOrder; cancelled: boolean }>(`/api/paper/sessions/${id}/orders/${orderId}/cancel`, { method: "POST" }),
+  deletePaperSession: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/api/paper/sessions/${id}`, { method: "DELETE" }),
   factor: (payload: Record<string, unknown>) => request<FactorResult>("/api/research/factor", { method: "POST", body: JSON.stringify(payload) }),
   sweep: (payload: Record<string, unknown>) => request<SweepResult>("/api/research/sweep", { method: "POST", body: JSON.stringify(payload) }),
   walkForward: (payload: Record<string, unknown>) => request<WalkForwardResult>("/api/research/walk_forward", { method: "POST", body: JSON.stringify(payload) }),

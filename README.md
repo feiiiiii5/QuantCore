@@ -46,9 +46,13 @@ uv run qc serve --port 8000 --open
 |---|---|
 | ![行情](docs/screenshots/market.png) | ![回测](docs/screenshots/backtest.png) |
 
-| 研究 | 暗色 |
+| 研究 | 模拟 |
 |---|---|
-| ![研究](docs/screenshots/research.png) | ![暗色](docs/screenshots/dark.png) |
+| ![研究](docs/screenshots/research.png) | ![模拟](docs/screenshots/paper.png) |
+
+| 暗色 | 移动端 |
+|---|---|
+| ![暗色](docs/screenshots/dark.png) | ![移动端](docs/screenshots/mobile.png) |
 
 更多页面截图见 `docs/screenshots/`。UI 支持浅/深色、舒适/紧凑密度、红涨绿跌/绿涨红跌/色盲友好、移动端侧栏折叠。
 
@@ -64,7 +68,7 @@ make ci-local     # 本地完整门禁
 make e2e          # 隔离 qc serve + Playwright（需要本机 Chrome）
 ```
 
-本轮实测：pytest **123 collected / 121 passed / 2 skipped**；UI vitest **7 passed**；Playwright **14 passed**；
+本轮实测：pytest **142 collected / 140 passed / 2 skipped**；UI vitest **7 passed**；Playwright **15 passed**；
 ctest **95/95**；ruff/mypy 全绿。`make e2e` 会构建 UI，使用临时 data/experiments 启动 `qc serve`，不污染工作区。
 
 ## API 与文档
@@ -78,11 +82,11 @@ ctest **95/95**；ruff/mypy 全绿。`make e2e` 会构建 UI，使用临时 data
 ## 当前状态（2026-11-02）
 
 - C++ core：panel/kernels/expression/engine，ctest **95/95**；`make verify-cpp` 差分/基准通过。
-- Python：121 passed / 2 skipped；ruff/mypy 全绿；数据→快照→C++ 回测→实验/HTML 报告 CLI 端到端。
+- Python：140 passed / 2 skipped；ruff/mypy 全绿；数据→快照→C++ 回测→实验/HTML 报告 CLI 端到端。
 - 服务端：FastAPI 契约、任务队列/取消/崩溃恢复、WebSocket、安全头、GZip；`qc serve` 同源托管构建后的 UI。
-- 前端：七页工作台真实接线；行情 K 线/涨跌分布、选股 DSL/导出、策略 Monaco/校验、回测任务/指标/交易解释、
-  实验复现/报告/导出/对比、数据中心/onboarding、研究因子/扫描/滚动/归因；Playwright 14 条。
-- 诚实状态：`docs/features.json` **80/117**。M0–M3 核心完成，M5/M6 完成，M7 基础完成；M8/M9 与部分 M10 仍未实现。
+- 前端：八页工作台真实接线；行情 K 线/涨跌分布、选股 DSL/导出、策略 Monaco/校验、回测任务/指标/交易解释、
+  实验复现/报告/导出/对比、数据中心/onboarding、研究因子/扫描/滚动/归因、本地模拟账户/逐日回放；Playwright 15 条。
+- 诚实状态：`docs/features.json` **84/117**。M0–M3 核心完成，M5/M6 完成，M7 基础与 M9 基础（模拟账户/历史回放/信号 CSV）完成；M8、M9 进阶与部分 M10 仍未实现。
   完整缺口与证据见 [验收报告](docs/acceptance-report.md)；不要据本 README 声称可实盘或已 100% 完成。
 - 仅研究与模拟；合成数据标 `SYNTHETIC`；真实 Tushare 需 Token，未在本次验证。
 

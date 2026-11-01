@@ -32,6 +32,7 @@ from .routes_data import register_data_routes
 from .routes_experiments import register_experiment_routes
 from .routes_jobs import register_job_routes
 from .routes_market import register_market_routes
+from .routes_paper import register_paper_routes
 from .routes_research import register_research_routes
 from .routes_screener import register_screener_routes
 from .routes_strategies import register_strategy_routes
@@ -184,6 +185,7 @@ def create_app(
     register_experiment_routes(app, workspace)
     register_data_routes(app, workspace)
     register_research_routes(app, workspace)
+    register_paper_routes(app, workspace)
 
     # -- built UI (same origin): assets mount + SPA fallback; API routes always win -----
     ui_root = settings.ui_dir.resolve()
