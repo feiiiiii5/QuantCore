@@ -24,6 +24,7 @@ test("market page renders indices, breadth and K-line", async ({ page }) => {
   await expect(page.locator(".breadth")).toContainText("上涨");
   await expect(page.locator(".profile-strip")).toContainText("交易所");
   await expect(page.locator(".profile-strip")).toContainText("最近成交额");
+  await expect(page.locator(".financial-panel")).toContainText("PIT 财务");
   await page.screenshot({ path: "/tmp/qc-market.png", fullPage: true });
   expect(errors).toEqual([]);
 });

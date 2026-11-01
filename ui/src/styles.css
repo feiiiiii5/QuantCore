@@ -316,3 +316,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .profile-strip span { display: block; color: var(--muted); font-size: 10.5px; }
 .profile-strip strong { display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 900px) { .profile-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* PIT financials */
+.financial-panel { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+.financial-panel .card-head { margin-bottom: 6px; }

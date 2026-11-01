@@ -105,3 +105,6 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 ## Paper portfolio (M9, read-only)
 - `POST /api/paper/portfolio` `{allocations:[{session_id,weight>0}] (2..10), initial_cash?}` → `{allocations,dates,equity,normalized_equity,metrics:{total_return,annualized_return,volatility,sharpe,max_drawdown},contributions,note}`.
 - Strict intersection of session equity-curve dates; each session normalized by starting cash, weighted, rebased to `initial_cash` on the first common date. Read-only: no mutation, no orders, weights must sum to 1 (400 otherwise); unknown/duplicate session 404/400.
+
+## PIT financial view (M2)
+- `GET /api/market/financials/{code}?as_of=YYYY-MM-DD&limit=20` → `{code,sec_id,as_of,latest,rows,note}`; only reports with `ann_date <= as_of` (point-in-time, no restatement reconstruction), newest first.

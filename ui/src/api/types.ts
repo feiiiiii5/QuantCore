@@ -640,3 +640,29 @@ export interface PaperPortfolioResult {
   }>;
   note: string;
 }
+
+export interface FinancialReport {
+  sec_id: string;
+  end_date: number;
+  ann_date: number;
+  f_ann_date: number;
+  report_type: string;
+  revenue: number | null;
+  net_profit: number | null;
+  total_assets: number | null;
+  total_equity: number | null;
+  roe: number | null;
+  eps: number | null;
+  bps: number | null;
+  dividend_per_share: number | null;
+  source: string;
+}
+
+export interface FinancialsResult {
+  code: string;
+  sec_id: string;
+  as_of: string | null;
+  latest: FinancialReport | null;
+  rows: FinancialReport[];
+  note: string;
+}

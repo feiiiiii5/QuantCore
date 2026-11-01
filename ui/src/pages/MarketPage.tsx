@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw, SlidersHorizontal } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useBars, useOverview, useSecurities, useSecurityProfile } from "../api/queries";
+import { useBars, useFinancials, useOverview, useSecurities, useSecurityProfile } from "../api/queries";
 import type { SecurityRow } from "../api/types";
 import KLineChart from "../components/KLineChart";
 import Sparkline from "../components/Sparkline";
@@ -29,6 +29,7 @@ export default function MarketPage() {
   const code = searchParams.get("code") || picked || rows[0]?.code || "";
   const bars = useBars(code || null);
   const profile = useSecurityProfile(code || null);
+  const financials = useFinancials(code || null);
 
   useEffect(() => {
     if (!code && rows[0]) { setPicked(rows[0].code); setMarketCode(rows[0].code); }
@@ -137,6 +138,16 @@ export default function MarketPage() {
                   <div><span>上市日</span><strong>{profile.data.list_date ? String(profile.data.list_date).replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3") : "—"}</strong></div>
                   <div><span>数据源</span><strong>{profile.data.source || "—"}</strong></div>
                   <div><span>最近成交额</span><strong>{compact(profile.data.quote.amount)}</strong></div>
+                </div>
+              ) : null}
+              {financials.data?.latest ? (
+                <div className="financial-panel">
+                  <div className="card-head"><h3>PIT 财务 <span className="muted small">最近公告 {String(financials.data.latest.ann_date)}</span></h3><span className="muted small">{financials.data.note}</span></div>
+                  <div className="table-wrap" style={{ maxHeight: 150 }}>
+                    <table><thead><tr><th>报告期</th><th>公告日</th><th className="num">ROE</th><th className="num">EPS</th><th className="num">营收</th><th className="num">净利润</th></tr></thead>
+                      <tbody>{financials.data.rows.slice(0, 6).map((row) => <tr key={`${row.end_date}-${row.ann_date}`}><td className="mono">{String(row.end_date)}</td><td className="mono">{String(row.ann_date)}</td><td className="num">{row.roe == null ? "—" : `${(row.roe * 100).toFixed(2)}%`}</td><td className="num">{row.eps?.toFixed(2) ?? "—"}</td><td className="num">{row.revenue == null ? "—" : compact(row.revenue)}</td><td className="num">{row.net_profit == null ? "—" : compact(row.net_profit)}</td></tr>)}</tbody>
+                    </table>
+                  </div>
                 </div>
               ) : null}
             </div>

@@ -245,8 +245,8 @@
       "id": "M2-015",
       "milestone": "M2",
       "title": "PIT financial view",
-      "passes": false,
-      "evidence": "partial/not implemented: see docs/acceptance-report.md"
+      "passes": true,
+      "evidence": "GET /api/market/financials/{code}?as_of filters ann_date<=as_of (PIT view, no restatement reconstruction); UI Market PIT panel; tests/test_financials.py"
     },
     {
       "id": "M2-016",

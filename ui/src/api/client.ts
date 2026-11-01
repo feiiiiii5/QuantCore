@@ -1,6 +1,6 @@
 import type {
   AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, Experiment, ExperimentDetail,
-  FactorCorrelationResult, FactorResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
+  FactorCorrelationResult, FactorResult, FinancialsResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
   CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperOrder, PaperPortfolioResult,
   PaperSessionDetail, PaperSessionSummary, PBOResult, PluginBacktestAccepted, PluginInfo, PluginValidation,
   ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityProfile, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
@@ -108,6 +108,7 @@ export const api = {
   overview: (snapshot?: string) => request<MarketOverview>(`/api/market/overview${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),
   bars: (code: string, snapshot?: string) => request<Bars>(`/api/market/bars?code=${encodeURIComponent(code)}${snapshot ? `&snapshot=${encodeURIComponent(snapshot)}` : ""}`),
   securities: (query = "", limit = 300) => request<SecurityRow[]>(`/api/market/securities?query=${encodeURIComponent(query)}&limit=${limit}`),
+  financials: (code: string, asOf?: string) => request<FinancialsResult>(`/api/market/financials/${encodeURIComponent(code)}${asOf ? `?as_of=${encodeURIComponent(asOf)}` : ""}`),
   securityProfile: (code: string, snapshot?: string) => request<SecurityProfile>(`/api/market/securities/${encodeURIComponent(code)}${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),
 
   screenerPresets: () => request<ScreenerPreset[]>("/api/screener/presets"),

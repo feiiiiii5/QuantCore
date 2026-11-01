@@ -285,6 +285,51 @@ def register_market_routes(app: FastAPI, ctx: Workspace) -> None:
             )
         return json_safe(rows)
 
+    @app.get("/api/market/financials/{code}")
+    def financials(
+        code: str,
+        as_of: str | None = Query(default=None),
+        limit: int = Query(default=20, ge=1, le=100),
+    ) -> Any:
+        panel, _ = _latest_panel(ctx, None)
+        meta = panel.securities
+        match = meta[
+            (meta["code"].astype(str) == str(code)) | (meta["sec_id"].astype(str) == str(code))
+        ]
+        if match.empty:
+            raise HTTPException(status_code=404, detail=f"unknown security: {code}")
+        sec_id = str(match.iloc[0]["sec_id"])
+        frame = panel.financials
+        if frame.empty:
+            return {
+                "code": code,
+                "sec_id": sec_id,
+                "as_of": as_of,
+                "rows": [],
+                "latest": None,
+                "note": "no PIT financials in this snapshot",
+            }
+        frame = frame[frame["sec_id"].astype(str) == sec_id].copy()
+        cutoff = None
+        if as_of:
+            from ..calendar import to_date_int
+
+            try:
+                cutoff = to_date_int(as_of)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"invalid as_of date: {as_of}") from exc
+            frame = frame[frame["ann_date"].astype(int) <= cutoff]
+        frame = frame.sort_values(["ann_date", "end_date"], ascending=False).head(limit)
+        rows = frame.where(frame.notna(), None).to_dict(orient="records")
+        return {
+            "code": code,
+            "sec_id": sec_id,
+            "as_of": as_of,
+            "latest": rows[0] if rows else None,
+            "rows": rows,
+            "note": "point-in-time view: only reports announced on/before as_of; no restatement reconstruction",
+        }
+
     @app.get("/api/market/securities/{code}")
     def security_profile(code: str, snapshot: str | None = Query(default=None)) -> Any:
         panel, _ = _latest_panel(ctx, snapshot)

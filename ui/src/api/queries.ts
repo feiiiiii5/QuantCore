@@ -7,6 +7,7 @@ export const qk = {
   overview: (snapshot?: string) => ["market", "overview", snapshot ?? "latest"] as const,
   securities: (query: string) => ["market", "securities", query] as const,
   securityProfile: (code: string) => ["market", "profile", code] as const,
+  financials: (code: string) => ["market", "financials", code] as const,
   bars: (code: string | null, snapshot?: string) => ["market", "bars", code ?? "", snapshot ?? "latest"] as const,
   templates: ["strategies", "templates"] as const,
   plugins: ["strategies", "plugins"] as const,
@@ -34,6 +35,9 @@ export function useSecurities(query = "", limit = 300) {
 }
 export function useBars(code: string | null, snapshot?: string) {
   return useQuery({ queryKey: qk.bars(code, snapshot), queryFn: () => api.bars(code ?? "", snapshot), enabled: Boolean(code) });
+}
+export function useFinancials(code: string | null) {
+  return useQuery({ queryKey: qk.financials(code ?? ""), queryFn: () => api.financials(code ?? ""), enabled: Boolean(code), staleTime: 60_000 });
 }
 export function useSecurityProfile(code: string | null) {
   return useQuery({ queryKey: qk.securityProfile(code ?? ""), queryFn: () => api.securityProfile(code ?? ""), enabled: Boolean(code), staleTime: 60_000 });
