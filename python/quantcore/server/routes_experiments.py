@@ -41,6 +41,7 @@ def _result_payload(result: BacktestResult) -> dict[str, Any]:
             "engine_backend": result.engine_backend,
             "engine_version": result.engine_version,
             "seed": result.seed,
+            "benchmark": result.benchmark,
         }
     )
 

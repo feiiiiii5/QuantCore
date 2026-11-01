@@ -160,9 +160,94 @@ def run_backtest(
             strategy=strategy_metadata or {},
             snapshot=snapshot_info,
         )
+        if cfg.benchmark_code:
+            _attach_benchmark(result, panel, cfg)
     if result.engine_backend != "cpp":  # pragma: no cover - defensive
         raise BacktestError(f"engine_backend must be 'cpp', got {result.engine_backend!r}")
     return result
+
+
+def _attach_benchmark(
+    result: BacktestResult, panel: PanelData | Snapshot | str | Path, config: BacktestConfig
+) -> None:
+    """Attach a buy-and-hold benchmark curve and comparison metrics to ``result``."""
+    code = str(config.benchmark_code or "").strip()
+    if not code:
+        return
+    if isinstance(panel, Snapshot):
+        securities = panel.securities()
+        bars = panel.bars()
+    elif isinstance(panel, PanelData):
+        securities = panel.securities
+        bars = panel.bars
+    else:
+        raise BacktestError("benchmark comparison needs a PanelData or Snapshot")
+    match = securities[
+        (securities["code"].astype(str) == code) | (securities["sec_id"].astype(str) == code)
+    ]
+    if match.empty:
+        raise BacktestError(f"benchmark security not found in panel: {code}")
+    row = match.iloc[0]
+    sec_id = str(row["sec_id"])
+    series = bars[bars["sec_id"].astype(str) == sec_id].sort_values("date")
+    if series.empty:
+        raise BacktestError(f"benchmark security has no bars: {code}")
+    close_by_date = {
+        int(day): float(value)
+        for day, value in zip(series["date"], series["close"], strict=False)
+        if float(value) > 0
+    }
+    base = 0.0
+    equity: list[float | None] = []
+    for day in result.dates.tolist():
+        close = close_by_date.get(int(day))
+        if close is None:
+            equity.append(None)
+            continue
+        if base <= 0.0:
+            base = close
+        equity.append(round(float(result.equity_yuan[0]) * close / base, 4))
+    valid = [(idx, value) for idx, value in enumerate(equity) if value is not None]
+    if len(valid) < 2:
+        raise BacktestError(f"benchmark series is too short: {code}")
+    first = float(valid[0][1])
+    last = float(valid[-1][1])
+    benchmark_return = last / first - 1.0 if first else 0.0
+    benchmark_returns = np.asarray(
+        [float(equity[i]) / float(equity[i - 1]) - 1.0 for i, _ in valid[1:]], dtype=np.float64
+    )
+    strategy_returns = np.asarray(
+        [float(result.returns[i]) for i, _ in valid[1:]], dtype=np.float64
+    )
+    excess = strategy_returns - benchmark_returns
+    tracking_error = (
+        float(np.std(excess, ddof=1) * np.sqrt(config.annual_days)) if excess.size > 1 else 0.0
+    )
+    information_ratio = (
+        float(np.mean(excess) / np.std(excess, ddof=1) * np.sqrt(config.annual_days))
+        if excess.size > 1 and np.std(excess, ddof=1) > 0
+        else 0.0
+    )
+    result.metrics["benchmark_return"] = round(float(benchmark_return), 8)
+    result.metrics["excess_return"] = round(
+        float(result.metrics.get("total_return", 0.0)) - benchmark_return, 8
+    )
+    result.metrics["tracking_error"] = round(tracking_error, 8)
+    result.metrics["information_ratio"] = round(information_ratio, 8)
+    result.benchmark = {
+        "code": str(row.get("code", code)),
+        "sec_id": sec_id,
+        "name": str(row.get("name", "")),
+        "dates": [int(day) for day in result.dates.tolist()],
+        "equity": equity,
+        "total_return": round(float(benchmark_return), 8),
+        "metrics": {
+            "benchmark_return": round(float(benchmark_return), 8),
+            "excess_return": round(float(result.metrics["excess_return"]), 8),
+            "tracking_error": round(tracking_error, 8),
+            "information_ratio": round(information_ratio, 8),
+        },
+    }
 
 
 def run_strategy_backtest(

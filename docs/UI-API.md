@@ -93,3 +93,7 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 - `POST /api/strategies/plugins/{name}/validate` → `{valid,issues,interface,policy}`; path traversal/non-.py → 404.
 - `POST /api/strategies/plugins/{name}/backtest` `{params?,snapshot?,start?,end?,initial_cash?}` → **202** `{job_id,status,plugin}`; job runs through the normal backtest queue and persists experiment metadata `plugin`.
 - Policy: local trusted plugins only, static audit is not a hard security boundary; no network, no real orders. `params` are recorded in the experiment spec but the current loader does not pass them into the plugin body.
+
+## Benchmark comparison (M3)
+- `POST /api/config` / backtest `config.benchmark_code` (optional security code) → buy-and-hold benchmark over the same result dates.
+- Result payloads include `benchmark:{code,sec_id,name,dates,equity,total_return,metrics}` and metrics `benchmark_return/excess_return/tracking_error/information_ratio`; persisted as `result/benchmark.json` and included in job/experiment result payloads.

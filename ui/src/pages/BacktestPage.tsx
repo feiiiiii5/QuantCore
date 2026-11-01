@@ -21,7 +21,7 @@ import { notify } from "../lib/notify";
 const DEFAULTS: BacktestDraft = {
   template: "momentum", paramsText: '{"top_n": 10, "lookback": 60}', start: "2022-01-04", end: "2024-12-31", cash: "1000000",
   exec: "next_open", commissionRate: "0.03", minCommission: "5", stampDutyRate: "0.05", slippageBps: "0", maxParticipation: "1",
-  minRebalanceValue: "0", trace: "summary", seed: "42",
+  minRebalanceValue: "0", trace: "summary", seed: "42", benchmarkCode: "",
 };
 
 function monthlyReturns(result: BacktestResultPayload): Array<{ month: string; value: number }> {
@@ -91,6 +91,7 @@ export default function BacktestPage() {
       if (!params || typeof params !== "object" || Array.isArray(params)) throw new Error("参数必须是 JSON 对象");
       const config = {
         start: draft.start, end: draft.end, initial_cash: Number(draft.cash), trace: draft.trace, seed: Number(draft.seed),
+        benchmark_code: draft.benchmarkCode.trim() || undefined,
         costs: {
           commission_rate: Number(draft.commissionRate) / 100, min_commission: Number(draft.minCommission),
           stamp_duty_rate: Number(draft.stampDutyRate) / 100, transfer_fee_rate: 0.00001, exchange_fee_rate: 0.00001, reg_fee_rate: 0.000002,
@@ -119,8 +120,9 @@ export default function BacktestPage() {
       const peak = Math.max(...result.equity.slice(0, index + 1));
       return peak > 0 ? (value / peak - 1) * 100 : 0;
     });
+    const benchmark = result.benchmark?.equity ?? null;
     return {
-      animation: false, tooltip: { trigger: "axis" }, legend: { data: ["净值", "回撤"], top: 0, textStyle: { fontSize: 11 } },
+      animation: false, tooltip: { trigger: "axis" }, legend: { data: benchmark ? ["净值", "基准", "回撤"] : ["净值", "回撤"], top: 0, textStyle: { fontSize: 11 } },
       grid: [{ left: 70, right: 24, top: 30, height: "55%" }, { left: 70, right: 24, top: "76%", height: "15%" }],
       xAxis: [
         { type: "category", data: result.dates.map(dateInt), axisLabel: { fontSize: 10 } },
@@ -133,6 +135,7 @@ export default function BacktestPage() {
       dataZoom: [{ type: "inside", xAxisIndex: [0, 1] }, { type: "inside", xAxisIndex: [0, 1], orient: "vertical", yAxisIndex: [0] }],
       series: [
         { name: "净值", type: "line", data: result.equity, showSymbol: false, lineStyle: { width: 1.7, color: palette.accent }, areaStyle: { opacity: 0.06 } },
+        ...(benchmark ? [{ name: "基准", type: "line" as const, data: benchmark, showSymbol: false, lineStyle: { width: 1.1, color: palette.text, opacity: 0.65 } }] : []),
         { name: "回撤", type: "line", xAxisIndex: 1, yAxisIndex: 1, data: drawdown, showSymbol: false, lineStyle: { width: 1, color: palette.down }, areaStyle: { opacity: 0.16 } },
       ],
     };

@@ -66,6 +66,7 @@ def _full_result_payload(job: dict[str, Any], workspace: Workspace) -> dict[str,
             "synthetic": bool(stored.get("synthetic", False)),
             "report": stored.get("report"),
             "experiment_dir": stored.get("experiment_dir"),
+            "benchmark": result.benchmark,
         }
     )
 

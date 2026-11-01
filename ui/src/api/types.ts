@@ -245,6 +245,15 @@ export interface BacktestResultPayload {
   engine_backend: string;
   engine_version: string;
   seed: number;
+  benchmark?: {
+    code: string;
+    sec_id: string;
+    name: string;
+    dates: number[];
+    equity: Array<number | null>;
+    total_return: number;
+    metrics: Record<string, number>;
+  } | null;
 }
 
 export interface JobResult {

@@ -93,6 +93,11 @@ class BacktestConfig(BaseModel):
     trace: TraceLevel = TraceLevel.summary
     seed: int = 42
     annual_days: int = Field(default=244, ge=1)
+    benchmark_code: str | None = Field(
+        default=None,
+        max_length=32,
+        description="optional local security code for buy-and-hold benchmark",
+    )
     corporate_actions: list[dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="after")

@@ -357,8 +357,8 @@
       "id": "M3-014",
       "milestone": "M3",
       "title": "benchmark comparison",
-      "passes": false,
-      "evidence": "partial/not implemented: see docs/acceptance-report.md"
+      "passes": true,
+      "evidence": "BacktestConfig.benchmark_code; run_backtest attaches buy-and-hold benchmark curve + benchmark/excess/tracking-error/information-ratio; persisted benchmark.json; API result; UI benchmark line/metrics; tests/test_benchmark.py"
     },
     {
       "id": "M3-015",

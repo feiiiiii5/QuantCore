@@ -140,6 +140,7 @@ class BacktestResult:
     final_positions: pd.DataFrame = field(default_factory=pd.DataFrame)
     strategy: dict[str, Any] = field(default_factory=dict)
     snapshot: dict[str, Any] = field(default_factory=dict)
+    benchmark: dict[str, Any] = field(default_factory=dict)
 
     # -- derived views ----------------------------------------------------
     @property
@@ -193,6 +194,7 @@ class BacktestResult:
             "reasons": self.reasons,
             "strategy": self.strategy,
             "snapshot": self.snapshot,
+            "benchmark": self.benchmark,
         }
         return payload
 
@@ -317,6 +319,10 @@ class BacktestResult:
         (target / "metrics.json").write_text(
             json.dumps(self.metrics, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        if self.benchmark:
+            (target / "benchmark.json").write_text(
+                json.dumps(self.benchmark, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
         (target / "provenance.json").write_text(
             json.dumps(
                 {
@@ -346,6 +352,12 @@ class BacktestResult:
         )
         metrics = json.loads((target / "metrics.json").read_text(encoding="utf-8"))
         provenance = json.loads((target / "provenance.json").read_text(encoding="utf-8"))
+        benchmark_path = target / "benchmark.json"
+        benchmark = (
+            json.loads(benchmark_path.read_text(encoding="utf-8"))
+            if benchmark_path.exists()
+            else {}
+        )
         return cls(
             dates=equity_frame["date"].to_numpy(np.int64),
             equity=np.round(equity_frame["equity"].to_numpy(np.float64) * 10000).astype(np.int64),
@@ -363,4 +375,5 @@ class BacktestResult:
             final_positions=final_positions,
             strategy=provenance.get("strategy", {}),
             snapshot=provenance.get("snapshot", {}),
+            benchmark=benchmark,
         )

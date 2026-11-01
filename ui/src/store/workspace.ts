@@ -16,6 +16,7 @@ export interface BacktestDraft {
   minRebalanceValue: string;
   trace: string;
   seed: string;
+  benchmarkCode: string;
 }
 
 interface WorkspaceState {

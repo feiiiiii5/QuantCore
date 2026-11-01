@@ -1,7 +1,7 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02。M0–M3 核心完成，M5/M6 工作台接通，M7 基础研究能力与 M9 基础模拟交易完成；M8、M9 进阶与部分 M10 未实现。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **100/117**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **101/117**）。
 
 ## 里程碑
 | 阶段 | 状态 | 证据 |
@@ -24,7 +24,7 @@ make lint
 # ruff check/format 通过；mypy 69 files 无问题
 
 uv run pytest -q -p no:warnings
-# 165 collected；163 passed / 2 skipped
+# 168 collected；166 passed / 2 skipped
 
 pnpm -C ui test
 # 7 passed (4 files)
