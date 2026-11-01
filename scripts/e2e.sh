@@ -19,6 +19,7 @@ trap cleanup EXIT
 
 echo "[e2e] building UI..."
 pnpm -C ui build >/dev/null
+cp -R ui/dist "$TMP/ui"
 
 echo "[e2e] starting qc serve on 127.0.0.1:${PORT} (token=${TOKEN})"
 uv run qc serve \
@@ -26,7 +27,7 @@ uv run qc serve \
   --token "$TOKEN" \
   --data-root "$TMP/data" \
   --experiments-root "$TMP/experiments" \
-  --ui-dir ui/dist \
+  --ui-dir "$TMP/ui" \
   --no-open >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 

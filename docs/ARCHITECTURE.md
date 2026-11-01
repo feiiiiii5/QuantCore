@@ -27,7 +27,7 @@
 ## 进程与边界
 - UI 与 API 同源：`qc serve` 托管 `ui/dist`（SPA fallback），开发时 Vite proxy `/api`、`/ws`、`/health` 到 127.0.0.1。
 - API 仅绑定 127.0.0.1；每次启动随机 Bearer token（可 `QC_SERVER_TOKEN` 固定）；校验 Host/Origin；无通配 CORS。
-- WebSocket `/ws/jobs/{id}?token=` 推送任务进度；其余 HTTP 轮询有相同 JobView。
+- WebSocket `/ws/jobs/{id}?token=` 推送任务进度；HTTP 轮询有相同 JobView；当前 Backtest 页面以轮询为主，WS 后端已测试。
 - 任务执行在独立 worker 线程；C++ 崩溃/异常通过 job status + error 回传，不带走 API/UI；启动时恢复 running→failed（或取消）。
 - 策略/自定义脚本运行于受控 loader；沙箱目标防误操作，不是对抗恶意代码；默认无网络/写工作区外（TODO：子进程资源限制，M9/M10）。
 
@@ -40,13 +40,13 @@
 6. 实验目录保存 metadata/summary/result parquet/report.html/strategy.yaml；replay 逐位对比 equity/trades/metrics。
 
 ## 前端信息架构
-- 壳：六导航 + 设置；全局搜索（离线索引/本地过滤）；命令面板 ⌘K；状态栏；工作区 auto-save。
+- 壳：七导航（行情/选股/策略/回测/实验/研究/数据）+ 设置；搜索框预留；底部状态栏；主题/密度。
 - 行情：overview 指数/宽度/行业；K 线（轻量图表 + ECharts 指标）；证券搜索/表格。
 - 选股：表达式/预设 → 结果表 → CSV 导出/localStorage 方案。
 - 策略：模板 + JSON Schema 表单 + Monaco + validate/运行。
-- 回测：表单 → job → WS 进度/取消 → 指标/净值回撤/月度/持仓/逐笔/费用/reasons → replay/报告。
-- 实验：列表/详情/对比/replay/导出/删除。
-- 数据：源状态、更新、快照、质量、存储、导入导出、首次向导。
+- 回测：表单 → job → 轮询/WS 进度/取消 → 指标/净值回撤/逐笔/费用/交易解释 → replay/报告。
+- 实验：列表/详情/对比/replay/报告/导出（删除仅在 API 层）。
+- 数据：源状态、更新、快照、质量、存储、onboarding。
 - 研究：因子分析/参数 sweep/样本外；M7 后续归因/容量/过拟合。
 - 所有页面 loading/error/empty/retry；免责声明固定；无 CDN/远程字体。
 
@@ -54,7 +54,7 @@
 - 后端：结构化错误 `{detail}`、请求日志（脱敏）、job error 堆栈摘要、OpenAPI。
 - 前端：ErrorBoundary、请求错误 toast、空态、骨架屏；E2E 截图 + console error 检查。
 - 测试：C++ Catch2（95）、Python pytest（差分/属性/黄金/API/WS）、UI Vitest、Playwright E2E、`make ci-local` / `verify-cpp`。
-- CI：GitHub Actions macOS+Ubuntu core；UI job（build/test）与 E2E 在本地/后续加入。
+- CI：GitHub Actions macOS+Ubuntu core + UI build/test；Playwright E2E 在本地 `make e2e`（需 Chrome），未纳入 GitHub CI。
 
 ## 失败模式
 | 场景 | 行为 |

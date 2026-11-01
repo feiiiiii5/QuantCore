@@ -39,15 +39,32 @@ print(result.metrics)
 - 策略：声明式条件 / 面板目标权重 / 事件回调；7 个模板；参数 JSON Schema。
 - 实验：元数据含策略 hash、参数、快照 hash、引擎版本、seed；`qc replay <pack>` 可复现。
 
+## HTTP / WebSocket（本地工作台）
+启动：`uv run qc serve --port 8000 --open`（loopback + Bearer + Host/Origin 校验，无 CORS）。
+完整契约见 [UI-API.md](UI-API.md)。摘要：
+
+```
+GET  /health, /api/meta
+GET  /api/market/{overview,bars,securities}
+GET  /api/screener/presets; POST /api/screener/run
+GET  /api/strategies/templates[/id]; POST /api/strategies/validate
+POST /api/backtest -> 202 job_id; GET /api/jobs[/id|/result]; POST /api/jobs/{id}/cancel
+WS   /ws/jobs/{id}?token=...
+GET  /api/experiments[/id|/result|/report|/export|/compare]; POST /{id}/replay; DELETE /{id}
+GET  /api/data/{status,providers,snapshots,quality}; POST /api/data/{update,snapshot}
+POST /api/onboarding/bootstrap
+POST /api/research/{factor,sweep,walk_forward,attribution}
+```
+
 ## CLI
 ```
 qc data update --provider synthetic|tushare|local
 qc snapshot build --dataset NAME
-qc backtest run --strategy NAME --start YYYY-MM-DD --end YYYY-MM-DD
-qc sweep run --strategy NAME --grid grid.json
+qc backtest run --template NAME --start YYYY-MM-DD --end YYYY-MM-DD
+qc sweep run --template NAME --grid grid.json
 qc check lookahead --strategy NAME
-qc replay <experiment-pack>
-qc serve [--port 0]
+qc replay <experiment>
+qc serve [--port 8000] [--ui-dir ui/dist] [--open]
 qc bench
 ```
 所有命令输出 JSON 时字段稳定；`--json` 便于脚本。

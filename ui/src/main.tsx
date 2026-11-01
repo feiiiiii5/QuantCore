@@ -5,6 +5,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import "./styles.css";
 
+// `qc serve --open` appends ?token=...; persist it and remove it from the URL/referrer.
+const initial = new URLSearchParams(window.location.search);
+const urlToken = initial.get("token");
+if (urlToken) {
+  localStorage.setItem("qc_token", urlToken);
+  initial.delete("token");
+  const query = initial.toString();
+  window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+}
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 0, refetchOnWindowFocus: false } },
 });

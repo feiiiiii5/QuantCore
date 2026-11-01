@@ -8,6 +8,7 @@ export const zhCN = {
     strategy: "策略",
     backtest: "回测",
     experiments: "实验",
+    research: "研究",
     data: "数据",
     settings: "设置",
   },

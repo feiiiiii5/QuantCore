@@ -1,4 +1,4 @@
-"""API request/response schemas (M5 minimal research API)."""
+"""Pydantic request/response models for the local research API (contract v2)."""
 
 from __future__ import annotations
 
@@ -14,13 +14,11 @@ class BacktestRequest(BaseModel):
     template: str | None = None
     params: dict[str, Any] = Field(default_factory=dict)
     strategy: dict[str, Any] | None = None
-    snapshot: str | None = Field(
-        default=None,
-        description="snapshot id/prefix under snapshots_root; omit to use a quick synthetic panel",
-    )
+    snapshot: str | None = Field(default=None, description="snapshot id/prefix; omit for synthetic")
     snapshots_root: str | None = None
-    config: dict[str, Any] = Field(default_factory=dict)
     experiments_root: str | None = None
+    config: dict[str, Any] = Field(default_factory=dict)
+    synthetic: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _one_strategy_source(self) -> BacktestRequest:
@@ -54,3 +52,100 @@ class HealthView(BaseModel):
 class JobAcceptedView(BaseModel):
     job_id: str
     status: str = "pending"
+
+
+class DataUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    provider: str = "synthetic"
+    start: str | int = "2020-01-02"
+    end: str | int = "2024-12-31"
+    n_sec: int = Field(default=40, ge=1, le=5500)
+    seed: int = 42
+    local_dir: str | None = None
+    fixture_dir: str | None = None
+    column_mapping: dict[str, Any] | None = None
+    incremental: bool = True
+    reset: bool = False
+
+
+class SnapshotBuildRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    data_root: str | None = None
+    snapshots_root: str | None = None
+    require_qpanel: bool = True
+
+
+class ScreenerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    snapshot: str | None = None
+    expression: str = Field(min_length=1, max_length=4000)
+    universe: dict[str, Any] = Field(default_factory=dict)
+    limit: int = Field(default=200, ge=1, le=2000)
+
+
+class SavedScreenerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=80)
+    expression: str = Field(min_length=1, max_length=4000)
+
+
+class FactorRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    snapshot: str | None = None
+    expression: str = Field(min_length=1, max_length=4000)
+    forward_days: int = Field(default=5, ge=1, le=60)
+    quantiles: int = Field(default=5, ge=2, le=20)
+    name: str | None = Field(default=None, max_length=120)
+
+
+class SweepRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    template: str
+    param_grid: dict[str, list[Any]] = Field(min_length=1)
+    snapshot: str | None = None
+    start: str | None = None
+    end: str | None = None
+    initial_cash: float = Field(default=1_000_000.0, gt=0)
+    workers: int = Field(default=1, ge=1, le=8)
+
+
+class WalkForwardRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    template: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    snapshot: str | None = None
+    folds: int = Field(default=3, ge=2, le=10)
+    initial_cash: float = Field(default=1_000_000.0, gt=0)
+
+
+class TemplateValidateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    template: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class StrategyFileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    content: str = Field(min_length=1, max_length=200_000)
+
+
+class AttributionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str = Field(min_length=1, max_length=120)
+
+
+class ReplayRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str = Field(min_length=1, max_length=120)
+
+
+class OnboardingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    n_sec: int = Field(default=40, ge=10, le=500)
+    start: str = "2022-01-04"
+    end: str = "2024-12-31"
+    seed: int = 42
+
+
+JOB_STATUSES = ("pending", "running", "done", "failed", "cancelled")
+TERMINAL_JOB_STATUSES = ("done", "failed", "cancelled")

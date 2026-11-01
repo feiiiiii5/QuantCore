@@ -50,6 +50,13 @@ FUNCTIONS: dict[str, int] = {
     "std": 2,
     "ret": 2,
     "shift": 2,
+    "ts_mean": 2,
+    "ts_std": 2,
+    "ts_sum": 2,
+    "ts_min": 2,
+    "ts_max": 2,
+    "ts_rank": 2,
+    "delay": 2,
     "rank": 1,
     "zscore": 1,
     "abs": 1,
@@ -170,6 +177,13 @@ def _nanstd(windows: np.ndarray, axis: int) -> np.ndarray:
     return np.where(counts > 1, result, np.nan)
 
 
+def _rank_last(windows: np.ndarray, axis: int) -> np.ndarray:
+    ranks = np.argsort(np.argsort(windows, axis=axis, kind="stable"), axis=axis, kind="stable")
+    # argsort twice gives 0-based average-ish ordinal rank; convert to (rank-1)/(n-1).
+    ordinal = ranks[..., -1].astype(np.float64)
+    return ordinal / max(windows.shape[axis] - 1, 1)
+
+
 def _cross_sectional_rank(values: np.ndarray) -> np.ndarray:
     out = np.full(values.shape, np.nan, dtype=np.float64)
     for row in range(values.shape[0]):
@@ -279,10 +293,29 @@ def _compare(left: np.ndarray, right: np.ndarray, operator: ast.cmpop) -> np.nda
 
 def _call(function: str, args: list[Any]) -> np.ndarray | float:
     values = [np.asarray(arg, dtype=np.float64) for arg in args]
-    if function == "ma":
+    if function in {"ma", "ts_mean"}:
         return _rolling(int(values[1]), _nanmean)(values[0])
-    if function == "std":
+    if function in {"std", "ts_std"}:
         return _rolling(int(values[1]), _nanstd)(values[0])
+    if function == "ts_sum":
+        return _rolling(int(values[1]), lambda windows, axis: np.nansum(windows, axis=axis))(
+            values[0]
+        )
+    if function == "ts_min":
+        return _rolling(int(values[1]), lambda windows, axis: np.nanmin(windows, axis=axis))(
+            values[0]
+        )
+    if function == "ts_max":
+        return _rolling(int(values[1]), lambda windows, axis: np.nanmax(windows, axis=axis))(
+            values[0]
+        )
+    if function == "ts_rank":
+        window = int(values[1])
+        if window < 2:
+            raise StrategyValidationError("ts_rank window must be >= 2")
+        return _rolling(window, _rank_last)(values[0])
+    if function == "delay":
+        return shift(values[0], int(values[1]))
     if function == "ret":
         window = int(values[1])
         if window < 1:

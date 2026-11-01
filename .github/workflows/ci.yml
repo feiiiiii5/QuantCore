@@ -30,6 +30,7 @@ jobs:
       - name: Lint
         run: |
           uv run ruff check python tests
+          uv run ruff format --check python tests
           uv run mypy python/quantcore
       - name: Stage extension in source tree
         run: |
@@ -48,5 +49,25 @@ jobs:
       - name: Verify C++ backend
         run: uv run python scripts/verify_cpp.py
 
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - name: Install UI
+        run: pnpm -C ui install --frozen-lockfile
+      - name: UI test
+        run: pnpm -C ui test
+      - name: UI build
+        run: pnpm -C ui build
+
 # Windows is a target platform but not yet CI-verified (mmap layer + MSVC wide-integer
 # portability); see docs/PROGRESS.md known gaps.  Do not advertise Windows as tested.
+# Playwright E2E is local-only (`make e2e`, needs a Chrome channel); CI runs unit/build.

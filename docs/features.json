@@ -1,7 +1,7 @@
 {
   "project": "QuantCore",
   "version": "0.1.0",
-  "generated": "2026-11-01",
+  "generated": "2026-11-02",
   "features": [
     {
       "id": "M0-001",
@@ -112,8 +112,8 @@
       "id": "M1-008",
       "milestone": "M1",
       "title": "cross-sectional kernels (rank/zscore/MAD/neutralize/quantile)",
-      "passes": true,
-      "evidence": "C++ test_kernels cross rank/zscore/mad_winsor/quantile (no neutralize)"
+      "passes": false,
+      "evidence": "partial: cross rank/zscore/mad_winsor/quantile implemented; neutralize not implemented"
     },
     {
       "id": "M1-009",
@@ -490,8 +490,8 @@
       "id": "M5-002",
       "milestone": "M5",
       "title": "WebSocket progress",
-      "passes": false,
-      "evidence": "partial/not implemented: see docs/acceptance-report.md"
+      "passes": true,
+      "evidence": "WebSocket /ws/jobs/{id}: tests/test_jobs_v2.py + tests/test_api_v2.py::test_websocket_reports_job"
     },
     {
       "id": "M5-003",
@@ -504,8 +504,8 @@
       "id": "M5-004",
       "milestone": "M5",
       "title": "cancel/crash recovery",
-      "passes": false,
-      "evidence": "partial/not implemented: see docs/acceptance-report.md"
+      "passes": true,
+      "evidence": "cancel + crash recovery: tests/test_jobs_v2.py; API cancel test; Playwright job flow"
     },
     {
       "id": "M5-005",
@@ -526,91 +526,91 @@
       "milestone": "M6",
       "title": "UI shell/nav",
       "passes": true,
-      "evidence": "ui/ React19+Vite six-page shell, theme/density, API client; pnpm build/test"
+      "evidence": "React19/Vite shell, 7 pages, theme/density, API client; pnpm build/test"
     },
     {
       "id": "M6-002",
       "milestone": "M6",
       "title": "market page",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Market page: indices/breadth/sectors/securities/K-line/MA; Playwright e2e + /tmp/qc-market.png"
     },
     {
       "id": "M6-003",
       "milestone": "M6",
       "title": "screener page",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Screener DSL presets/universe/run/table/CSV: Playwright e2e; 8 matched rows"
     },
     {
       "id": "M6-004",
       "milestone": "M6",
       "title": "strategy page",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Strategy templates + local Monaco JSON editor + validate + run: Playwright e2e; no CDN"
     },
     {
       "id": "M6-005",
       "milestone": "M6",
       "title": "backtest page",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Backtest submit/poll/cancel/metrics/equity/drawdown/trades: Playwright e2e"
     },
     {
       "id": "M6-006",
       "milestone": "M6",
       "title": "experiment page",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Experiment list/detail/replay/report/export/compare API + UI: tests/test_experiments_v2.py; Playwright e2e"
     },
     {
       "id": "M6-007",
       "milestone": "M6",
       "title": "data page",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Data status/providers/snapshots/quality/update/snapshot/onboarding: tests/test_api_v2.py; Playwright e2e"
     },
     {
       "id": "M6-008",
       "milestone": "M6",
       "title": "trade explainer",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Trade explainer: click trade shows price/qty/amount/fees/reason; Playwright e2e"
     },
     {
       "id": "M6-009",
       "milestone": "M6",
       "title": "onboarding wizard",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Onboarding modal -> synthetic snapshot + demo experiment: Playwright e2e"
     },
     {
       "id": "M6-010",
       "milestone": "M6",
       "title": "UI perf budget",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Initial UI chunks < 2MB raw, first screen < 5s, editor lazy; Playwright perf test"
     },
     {
       "id": "M6-011",
       "milestone": "M6",
       "title": "Playwright e2e",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Playwright 12 tests: market/screener/backtest/experiments/data/strategy/settings/research/onboarding/dark/mobile/perf"
     },
     {
       "id": "M7-001",
       "milestone": "M7",
       "title": "factor analysis IC/RankIC/ICIR",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Factor IC/RankIC/ICIR/coverage: tests/test_research_v2.py; UI factor diagnostics"
     },
     {
       "id": "M7-002",
       "milestone": "M7",
       "title": "layered returns",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Quantile layered returns: tests/test_research_v2.py; UI bar/table"
     },
     {
       "id": "M7-003",
@@ -630,15 +630,15 @@
       "id": "M7-005",
       "milestone": "M7",
       "title": "parameter stability heatmap",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Sweep stability heatmap: UI ResearchPage heatmap; Playwright sweep test"
     },
     {
       "id": "M7-006",
       "milestone": "M7",
       "title": "walk-forward/out-of-sample",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Walk-forward folds: tests/test_research_v2.py; UI fold table/bar"
     },
     {
       "id": "M7-007",
@@ -665,8 +665,8 @@
       "id": "M7-010",
       "milestone": "M7",
       "title": "industry/style attribution",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Industry attribution FIFO realized/unrealized: tests/test_research_v2.py; UI pie/table"
     },
     {
       "id": "M7-011",
@@ -791,8 +791,8 @@
       "id": "M10-004",
       "milestone": "M10",
       "title": "Chinese docs",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Chinese quickstart/UI/API/architecture docs in docs/ + README"
     },
     {
       "id": "M10-005",
@@ -819,11 +819,11 @@
       "id": "M10-008",
       "milestone": "M10",
       "title": "licenses",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Apache-2.0 + docs/DATA-LICENSES.md"
     }
   ],
-  "verified_at": "2026-11-01",
-  "verified_by": "make setup/test/lint/verify-cpp + npm/pnpm build; features only marked true when a command/test was actually run",
-  "note": "M0-M4 core, M5 partial API/jobs/security, M6 shell only; M7-M10 and remaining items are still false. Do not claim full completion."
+  "verified_at": "2026-11-02",
+  "verified_by": "pytest 123 collected; Playwright 12; pnpm build/test; ruff/mypy; ctest 95/95",
+  "note": "M0-M3 core; M5 API/WS/jobs/security; M6 full workbench; M7 factor/sweep/heatmap/walk-forward/attribution. M8/M9 and remaining M10 items are still false; neutralize, benchmark comparison, sandbox worker, PDF, C++ parallel sweep, Windows and real Tushare remain open."
 }

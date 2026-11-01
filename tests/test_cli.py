@@ -175,3 +175,10 @@ def test_bench_command() -> None:
     assert payload["engine_backend"] == "cpp"
     assert "qpanel_write_ms" in payload
     assert payload["checks"]["engine_run_under_1000ms"] is True
+
+
+def test_serve_help_documents_security_and_ui_options() -> None:
+    result = runner.invoke(app, ["serve", "--help"])
+    assert result.exit_code == 0, result.output
+    for option in ("--token", "--ui-dir", "--open", "--port", "--data-root"):
+        assert option in result.output

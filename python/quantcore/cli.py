@@ -47,6 +47,9 @@ app.add_typer(sweep_app, name="sweep")
 app.add_typer(check_app, name="check")
 
 
+from .cli_serve import serve_command  # noqa: E402
+
+
 def _emit(payload: dict[str, Any], json_output: bool = True) -> None:
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
@@ -425,26 +428,7 @@ def replay_command(
         raise typer.Exit(code=1)
 
 
-@app.command("serve")
-def serve_command(
-    port: int = typer.Option(8000, min=1, max=65535),
-    state_path: Path = typer.Option(DATA_ROOT / "state.sqlite"),
-    start_worker: bool = typer.Option(True),
-) -> None:
-    """Run the local research API on 127.0.0.1 (loopback only)."""
-    import uvicorn
-
-    from quantcore.server import SecurityMiddleware, create_app, resolve_token
-
-    token, generated = resolve_token()
-    application = create_app(
-        token=token, port=port, state_path=state_path, start_worker=start_worker
-    )
-    security = SecurityMiddleware(application, application.state.security).summary()
-    if generated:
-        typer.echo(f"qc serve: generated API token (set QC_SERVER_TOKEN to pin it): {token}")
-    typer.echo(json.dumps({"listen": f"127.0.0.1:{port}", "security": security}))
-    uvicorn.run(application, host="127.0.0.1", port=port, log_level="info")
+app.command("serve")(serve_command)
 
 
 @app.command("bench")

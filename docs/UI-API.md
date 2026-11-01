@@ -2,7 +2,7 @@
 
 All routes are loopback-only, Bearer-authenticated (`Authorization: Bearer <token>`), JSON.
 The built UI is served by `qc serve` from the same origin, so no CORS is needed. For Vite dev,
-`vite.config.ts` proxies `/api`, `/ws`, `/health` to `http://127.0.0.1:8765`.
+`vite.config.ts` proxies `/api`, `/ws`, `/health` to `http://127.0.0.1:8000`.
 
 WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>`; server validates Origin/Host/token.
 
@@ -61,10 +61,10 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 - `POST /api/onboarding/bootstrap` body `{n_sec?,start?,end?,seed?}` → `{snapshot,snapshot_dir,run_id,report,message}` (synchronous)
 
 ## Research (M7)
-- `POST /api/research/factor` body `{snapshot?,expression,forward_days=5,quantiles=5}` → `{name,ic_mean,rank_ic_mean,icir,ic_series:[{date,ic,rank_ic}],quantile_returns:[{bucket,mean_return}],decay:[{days,ic}],coverage,observations}`
-- `POST /api/research/sweep` body `{template,param_grid,snapshot?,start?,end?,initial_cash?,workers?}` → `{points:[{params,metrics}],best,heatmap?}` (bounded; sync for ≤200 combos)
-- `POST /api/research/walk_forward` body `{template,params,snapshot?,folds?}` → folds metrics (basic)
-- `POST /api/research/attribution` body `{run_id}` → factor/industry contribution (basic; 501 until implemented if not)
+- `POST /api/research/factor` body `{snapshot?,expression,forward_days=5,quantiles=5}` → `{name,expression,forward_days,quantiles,ic_mean,rank_ic_mean,icir,rank_icir,ic_series:[{date,ic,rank_ic}],quantile_returns:[{bucket,mean_return(小数),observations}],decay:[{days,ic,rank_ic}],coverage,observations,synthetic}`
+- `POST /api/research/sweep` body `{template,param_grid,snapshot?,start?,end?,initial_cash?,workers?}` → `{template,points:[{params,metrics,error}],best,engine_backend,bounded_points,synthetic}` (bounded; sync for ≤200 combos)
+- `POST /api/research/walk_forward` body `{template,params,snapshot?,folds?}` → `{template,params,folds:[{fold,start,end,trading_days,trade_count,metrics}],engine_backend,synthetic}`
+- `POST /api/research/attribution` body `{run_id}` → `{run_id,strategy_name,industries:[{industry,pnl,realized,unrealized,market_value,weight,securities}],synthetic}`
 
 ## Errors
-`{detail:string}`; 400 validation, 401/403 auth, 404, 409 conflict, 422 pydantic, 500 internal.
+`{detail:string|object}`; 400 validation, 401/403 auth, 404, 409 conflict, 422 pydantic/template validation, 500 internal (no stack in body).

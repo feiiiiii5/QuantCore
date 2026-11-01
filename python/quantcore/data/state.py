@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 MIGRATIONS: tuple[tuple[int, str], ...] = (
     (
@@ -81,6 +81,12 @@ MIGRATIONS: tuple[tuple[int, str], ...] = (
             message TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, id);
+        """,
+    ),
+    (
+        4,
+        """
+        ALTER TABLE jobs ADD COLUMN cancel_requested INTEGER NOT NULL DEFAULT 0;
         """,
     ),
 )
@@ -273,15 +279,11 @@ class SQLiteState:
                 jobs.append(job)
         return jobs
 
-    def update_job_progress(self, job_id: str, progress: float) -> None:
-        with self.connect() as connection:
-            connection.execute("UPDATE jobs SET progress=? WHERE id=?", (float(progress), job_id))
-            connection.commit()
-
     def complete_job(self, job_id: str, result: dict[str, Any]) -> None:
         with self.connect() as connection:
             connection.execute(
-                "UPDATE jobs SET status='done', result=?, progress=1.0, finished_at=? WHERE id=?",
+                "UPDATE jobs SET status='done', result=?, progress=1.0, finished_at=? "
+                "WHERE id=? AND status IN ('pending','running')",
                 (json.dumps(result, ensure_ascii=False, sort_keys=True), _now(), job_id),
             )
             connection.commit()
@@ -290,6 +292,65 @@ class SQLiteState:
         with self.connect() as connection:
             connection.execute(
                 "UPDATE jobs SET status='failed', error=?, finished_at=? WHERE id=?",
+                (error, _now(), job_id),
+            )
+            connection.commit()
+
+    def cancel_job(self, job_id: str, reason: str = "cancelled by user") -> bool:
+        """Mark a pending/running job as cancelled; returns True if it changed state."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE jobs SET status='cancelled', error=?, finished_at=? "
+                "WHERE id=? AND status IN ('pending', 'running')",
+                (reason, _now(), job_id),
+            )
+            connection.commit()
+        return bool(cursor.rowcount)
+
+    def update_job_progress(self, job_id: str, progress: float) -> None:
+        value = max(0.0, min(1.0, float(progress)))
+        with self.connect() as connection:
+            connection.execute("UPDATE jobs SET progress=? WHERE id=?", (value, job_id))
+            connection.commit()
+
+    def request_cancel(self, job_id: str) -> dict[str, Any] | None:
+        """Cancel a job: queued jobs finish immediately, running jobs are flagged.
+
+        Returns the updated job row (``None`` when the id is unknown).  A running job keeps
+        ``status='running'`` plus ``cancel_requested=1`` until the worker observes the flag
+        and transitions it to ``cancelled``; terminal jobs are left untouched.
+        """
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+            if row is None:
+                connection.rollback()
+                return None
+            status = str(row["status"])
+            if status in {"pending"}:
+                connection.execute(
+                    "UPDATE jobs SET status='cancelled', cancel_requested=1, finished_at=? "
+                    "WHERE id=?",
+                    (_now(), job_id),
+                )
+            elif status == "running":
+                connection.execute("UPDATE jobs SET cancel_requested=1 WHERE id=?", (job_id,))
+            connection.commit()
+            updated = connection.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        return _job_row(updated)
+
+    def is_cancel_requested(self, job_id: str) -> bool:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT cancel_requested FROM jobs WHERE id=?", (job_id,)
+            ).fetchone()
+        return bool(row and row["cancel_requested"])
+
+    def mark_cancelled(self, job_id: str, error: str | None = None) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE jobs SET status='cancelled', error=COALESCE(?, error), "
+                "cancel_requested=1, finished_at=? WHERE id=? AND status IN ('pending','running')",
                 (error, _now(), job_id),
             )
             connection.commit()
@@ -310,10 +371,18 @@ class SQLiteState:
             connection.commit()
 
 
+TERMINAL_JOB_STATUSES: frozenset[str] = frozenset({"done", "failed", "cancelled"})
+VALID_JOB_STATUSES: frozenset[str] = frozenset(
+    {"pending", "running", "done", "failed", "cancelled"}
+)
+
+
 def _job_row(row: sqlite3.Row | None) -> dict[str, Any] | None:
     if row is None:
         return None
     payload = dict(row)
     payload["payload"] = json.loads(payload["payload"]) if payload.get("payload") else {}
     payload["result"] = json.loads(payload["result"]) if payload.get("result") else None
+    payload["cancel_requested"] = bool(payload.get("cancel_requested"))
+    payload["progress"] = float(payload.get("progress") or 0.0)
     return payload

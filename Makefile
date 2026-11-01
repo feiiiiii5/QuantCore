@@ -8,7 +8,7 @@ export UV_DEFAULT_INDEX ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export PIP_INDEX_URL ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export UV_HTTP_TIMEOUT ?= 120
 
-.PHONY: setup build test bench lint verify-cpp e2e ci-local package fmt clean cmake configure
+.PHONY: setup setup-ui build test bench lint verify-cpp ui-check e2e ci-local package fmt clean cmake configure
 
 setup:
 	$(UV) python install $(PYTHON_VERSION)
@@ -48,7 +48,11 @@ e2e:
 	pnpm -C ui test
 	bash scripts/e2e.sh
 
-ci-local: setup lint test verify-cpp
+ui-check:
+	pnpm -C ui test
+	pnpm -C ui build
+
+ci-local: setup lint test verify-cpp ui-check
 	@echo "ci-local passed"
 
 package:

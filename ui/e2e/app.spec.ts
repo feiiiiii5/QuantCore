@@ -1,0 +1,174 @@
+import { expect, test, type Page } from "@playwright/test";
+
+const token = process.env.QC_E2E_TOKEN || "test-token";
+
+async function prepare(page: Page) {
+  await page.addInitScript((value: string) => {
+    localStorage.setItem("qc_token", value);
+    localStorage.removeItem("qc_api");
+    localStorage.setItem("qc_theme", "light");
+    localStorage.setItem("qc_density", "comfortable");
+  }, token);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
+  page.on("console", (message) => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
+  return errors;
+}
+
+test("market page renders indices, breadth and K-line", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "行情" })).toBeVisible();
+  await expect(page.locator(".index-card")).toHaveCount(4);
+  await expect(page.locator("canvas")).toHaveCount(1);
+  await expect(page.locator(".breadth")).toContainText("上涨");
+  await page.screenshot({ path: "/tmp/qc-market.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("screener runs and shows matched rows", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/screener");
+  await expect(page.getByRole("heading", { name: "选股" })).toBeVisible();
+  await page.getByRole("button", { name: /运行选股/ }).click();
+  await expect(page.locator("tbody tr").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".card-head").last()).toContainText("只");
+  await page.screenshot({ path: "/tmp/qc-screener.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("backtest submits a job and renders equity/trades", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/backtest?template=momentum&params=%7B%22top_n%22%3A5%2C%22lookback%22%3A60%7D");
+  await expect(page.getByRole("heading", { name: "回测" })).toBeVisible();
+  await page.getByRole("button", { name: /运行回测/ }).click();
+  await expect(page.getByText("总收益")).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator(".chart-block canvas")).toBeVisible();
+  await expect(page.locator(".table-wrap.trades tbody tr").first()).toBeVisible();
+  await page.locator(".table-wrap.trades tbody tr").first().click();
+  await expect(page.getByRole("heading", { name: "交易解释" })).toBeVisible();
+  await page.screenshot({ path: "/tmp/qc-backtest.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("experiments and data pages connect to the local service", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/experiments");
+  await expect(page.getByRole("heading", { name: "实验" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("运行记录");
+  await page.screenshot({ path: "/tmp/qc-experiments.png", fullPage: true });
+  await page.goto("/data");
+  await expect(page.getByRole("heading", { name: "数据", exact: true })).toBeVisible();
+  await expect(page.getByText("数据仓库")).toBeVisible();
+  await page.screenshot({ path: "/tmp/qc-data.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("strategy and settings pages render without overflow", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/strategy");
+  await expect(page.getByRole("heading", { name: "策略", level: 1 })).toBeVisible();
+  await expect(page.getByText("内置模板")).toBeVisible();
+  await page.screenshot({ path: "/tmp/qc-strategy.png", fullPage: true });
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "设置" })).toBeVisible();
+  await page.getByRole("button", { name: /测试连接/ }).click();
+  await expect(page.getByText(/已连接/)).toBeVisible({ timeout: 15000 });
+  await page.screenshot({ path: "/tmp/qc-settings.png", fullPage: true });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+});
+
+test("research factor analysis renders IC, quantiles and decay", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/research");
+  await expect(page.getByRole("heading", { name: "研究", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /运行诊断/ }).click();
+  await expect(page.getByRole("heading", { name: "IC 均值", exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "分层平均收益" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "因子衰减（RankIC）" })).toBeVisible();
+  await expect(page.locator(".grid.kpis .card")).toHaveCount(4);
+  await page.screenshot({ path: "/tmp/qc-research.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("research sweep, walk-forward and attribution tabs run", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/research");
+  await page.getByRole("tab", { name: /参数扫描/ }).click();
+  await page.getByRole("button", { name: /运行扫描/ }).click();
+  await expect(page.getByRole("heading", { name: /扫描结果/ })).toBeVisible({ timeout: 60_000 });
+  await page.screenshot({ path: "/tmp/qc-sweep.png", fullPage: true });
+  await page.getByRole("tab", { name: /滚动验证/ }).click();
+  await page.getByRole("button", { name: /运行滚动验证/ }).click();
+  await expect(page.getByRole("heading", { name: /4 折/ })).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("tab", { name: /归因/ }).click();
+  await page.getByRole("button", { name: /运行行业归因/ }).click();
+  await expect(page.getByRole("heading", { name: /行业贡献/ })).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: "/tmp/qc-attribution.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("dark theme renders without overflow", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/");
+  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30000 });
+  await page.getByRole("button", { name: "切换主题" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: "/tmp/qc-dark.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("onboarding creates a demo snapshot and experiment", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "行情", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /一键示例/ }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "三步开始" })).toBeVisible();
+  await page.getByRole("button", { name: /生成示例数据并回测/ }).click();
+  await expect(page).toHaveURL(/\/experiments/, { timeout: 90_000 });
+  await expect(page.getByRole("heading", { name: "实验", exact: true })).toBeVisible();
+  await page.screenshot({ path: "/tmp/qc-onboarding.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("qc serve --open token URL bootstraps auth and is cleaned", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(`/?token=${encodeURIComponent(token)}`);
+  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30000 });
+  expect(new URL(page.url()).searchParams.get("token")).toBeNull();
+  const stored = await page.evaluate(() => localStorage.getItem("qc_token"));
+  expect(stored).toBe(token);
+  expect(errors).toEqual([]);
+});
+
+test("initial UI load meets the local performance budget", async ({ page }) => {
+  const errors = await prepare(page);
+  const started = Date.now();
+  await page.goto("/");
+  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 15000 });
+  const elapsed = Date.now() - started;
+  const encoded = await page.evaluate(() => performance.getEntriesByType("resource")
+    .filter((entry) => (entry as PerformanceResourceTiming).name.endsWith(".js"))
+    .reduce((sum, entry) => sum + ((entry as PerformanceResourceTiming).encodedBodySize || 0), 0));
+  expect(elapsed).toBeLessThan(5000);
+  expect(encoded).toBeLessThan(2_000_000);
+  expect(errors).toEqual([]);
+});
+
+test("mobile layout has no horizontal overflow", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "行情" })).toBeVisible();
+  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30000 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: "/tmp/qc-mobile.png", fullPage: true });
+  expect(errors).toEqual([]);
+});

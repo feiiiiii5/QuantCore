@@ -1,91 +1,70 @@
-"""Local FastAPI research server (M5 minimal): loopback-only, bearer-token protected.
+"""Local FastAPI research server (M5/M6): loopback-only, bearer-token protected.
 
-Only research backtests are exposed.  There is no real order routing, no broker gateway
-endpoint and no market-data network access from the server process.
+Serves the built UI from the same origin (no CORS), exposes the UI-API v2 contract and
+runs research jobs on a single worker.  There is no order routing or broker gateway.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 
 import quantcore
 
-from ..backtest.config import BacktestConfig
-from ..backtest.engine import run_backtest
 from ..data.state import SQLiteState
-from ..data.synthetic import SyntheticConfig, generate_synthetic_panel
-from ..jobs.queue import JobQueue, JobRunner
-from ..snapshot.reader import find_snapshot
-from ..strategy.spec import StrategySpec
-from .schemas import BacktestRequest, HealthView, JobAcceptedView, JobView
+from ..errors import (
+    CppUnavailableError,
+    ExperimentError,
+    QuantCoreError,
+    SnapshotError,
+    StrategyValidationError,
+)
+from ..jobs.queue import JobQueue
+from .routes_data import register_data_routes
+from .routes_experiments import register_experiment_routes
+from .routes_jobs import register_job_routes
+from .routes_market import register_market_routes
+from .routes_research import register_research_routes
+from .routes_screener import register_screener_routes
+from .routes_strategies import register_strategy_routes
+from .runner import run_job
+from .schemas import HealthView
 from .security import SecurityMiddleware, ServerSecurity, resolve_token
+from .workspace import Settings, Workspace, json_safe
+
+LOGGER = logging.getLogger(__name__)
 
 DEFAULT_STATE_PATH = "data/state.sqlite"
 DEFAULT_SNAPSHOTS_ROOT = "data/snapshots"
+API_PREFIXES = ("api/", "ws/", "docs", "openapi", "redoc")
+
+# Bootstrap the bearer token from the `?token=` URL printed by `qc serve --open`; the token
+# is moved to localStorage and stripped from the address bar, so reloads stay authorised.
+TOKEN_BOOTSTRAP = (
+    "<script>/* qc_token_boot */"
+    "(function(){try{var q=new URLSearchParams(location.search);"
+    "var t=q.get('token');if(t){localStorage.setItem('qc_token',t);q.delete('token');"
+    "history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:''));}"
+    "}catch(e){}})();</script>"
+)
 
 
 def default_job_runner(payload: dict[str, Any]) -> dict[str, Any]:
-    """Run a research backtest payload; used by the default API worker."""
-    config = BacktestConfig.model_validate(payload.get("config") or {})
-    snapshot_ref = payload.get("snapshot")
-    if snapshot_ref:
-        root = str(payload.get("snapshots_root") or DEFAULT_SNAPSHOTS_ROOT)
-        snapshot = find_snapshot(root, str(snapshot_ref))
-        panel = snapshot.to_panel_data()
-        target: Any = snapshot
-        snapshot_meta = snapshot.describe()
-    else:
-        synthetic = payload.get("synthetic") or {}
-        panel = generate_synthetic_panel(
-            SyntheticConfig(
-                n_sec=int(synthetic.get("n_sec", 40)),
-                start=str(synthetic.get("start", "2023-01-03")),
-                end=str(synthetic.get("end", "2024-12-29")),
-                seed=int(synthetic.get("seed", 42)),
-            )
-        )
-        target = panel
-        snapshot_meta = {
-            "synthetic": True,
-            "source": "SYNTHETIC",
-            "n_sec": panel.n_sec,
-            "n_time": panel.n_time,
-        }
-    if payload.get("strategy") is not None:
-        spec = StrategySpec.model_validate(payload["strategy"])
-    else:
-        spec = StrategySpec(
-            name=str(payload.get("template")),
-            template=str(payload["template"]),
-            params=dict(payload.get("params") or {}),
-        )
-    strategy = spec.load()
-    weights = strategy.generate_targets(panel)
-    result = run_backtest(
-        target,
-        weights,
-        config,
-        strategy_metadata=strategy.metadata(),
-        snapshot_metadata=snapshot_meta,
-    )
-    return {
-        "engine_backend": result.engine_backend,
-        "engine_version": result.engine_version,
-        "seed": result.seed,
-        "trade_count": len(result.trades),
-        "metrics": result.metrics,
-        "reasons": result.reasons,
-        "final_equity": float(result.equity_yuan[-1]) if len(result.equity) else 0.0,
-        "snapshot": snapshot_meta,
-        "synthetic": bool(snapshot_meta.get("synthetic", False)),
-        "disclaimer": quantcore.INVESTMENT_DISCLAIMER,
-    }
+    """Backward-compatible alias for the default job dispatcher."""
+    return run_job(payload)
+
+
+def _synthetic_only(workspace: Workspace) -> bool:
+    manifests = workspace.list_snapshot_manifests()
+    return True if not manifests else all(bool(item.synthetic) for item in manifests)
 
 
 def create_app(
@@ -93,16 +72,29 @@ def create_app(
     token: str | None = None,
     port: int = 8000,
     state_path: str | Path = DEFAULT_STATE_PATH,
-    runner: JobRunner | None = None,
+    runner: Any = None,
     start_worker: bool = True,
     security: ServerSecurity | None = None,
+    data_root: str | Path | None = None,
+    snapshots_root: str | Path | None = None,
+    experiments_root: str | Path | None = None,
+    ui_dir: str | Path | None = None,
+    serve_ui: bool = True,
 ) -> FastAPI:
     """Build the FastAPI application (no CORS middleware, loopback security)."""
     if security is None:
         resolved_token, generated = resolve_token(token)
         security = ServerSecurity(token=resolved_token, port=port, token_generated=generated)
-    state = SQLiteState(Path(state_path))
-    queue = JobQueue(state, runner or default_job_runner)
+    settings = Settings.create(
+        data_root=data_root,
+        snapshots_root=snapshots_root,
+        experiments_root=experiments_root,
+        state_path=state_path,
+        ui_dir=ui_dir,
+    )
+    state = SQLiteState(settings.state_path)
+    queue = JobQueue(state, runner or run_job)
+    workspace = Workspace(settings=settings, state=state, queue=queue)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -123,7 +115,37 @@ def create_app(
     app.state.security = security
     app.state.jobs = queue
     app.state.state = state
+    app.state.workspace = workspace
+    app.state.settings = settings
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.add_middleware(SecurityMiddleware, security=security)
+
+    # -- error contract: {"detail": ...}; 400/401/403/404/409/422/500 -------------------
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+
+    @app.exception_handler(SnapshotError)
+    @app.exception_handler(ExperimentError)
+    async def not_found(_request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse({"detail": str(exc)}, status_code=404)
+
+    @app.exception_handler(StrategyValidationError)
+    async def invalid_strategy(_request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    @app.exception_handler(CppUnavailableError)
+    async def engine_unavailable(_request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse({"detail": f"engine unavailable: {exc}"}, status_code=503)
+
+    @app.exception_handler(QuantCoreError)
+    async def quantcore_error(_request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    @app.exception_handler(Exception)
+    async def internal_error(_request: Request, exc: Exception) -> JSONResponse:
+        LOGGER.exception("unhandled API error: %s", exc)
+        return JSONResponse({"detail": "internal server error"}, status_code=500)
 
     @app.get("/health", response_model=HealthView)
     def health() -> HealthView:
@@ -132,62 +154,86 @@ def create_app(
             engine_backend=quantcore.engine_backend(),
             engine_available=quantcore.engine_available(),
             panel_available=quantcore.panel_available(),
-            synthetic_only=True,
+            synthetic_only=_synthetic_only(workspace),
             cors=False,
         )
 
-    @app.post("/api/backtest", status_code=202, response_model=JobAcceptedView)
-    def submit_backtest(payload: BacktestRequest, request: Request) -> JobAcceptedView:
-        job_payload = payload.model_dump()
-        if payload.snapshots_root is None:
-            job_payload["snapshots_root"] = str(request.app.state.settings_snapshots_root)
-        job_id = queue.submit("backtest", job_payload)
-        return JobAcceptedView(job_id=job_id)
+    @app.get("/api/meta")
+    def meta() -> Any:
+        index_path = settings.ui_dir / "index.html"
+        return json_safe(
+            {
+                "version": quantcore.__version__,
+                "engine_backend": quantcore.engine_backend(),
+                "engine_available": quantcore.engine_available(),
+                "synthetic_only": _synthetic_only(workspace),
+                "data_root": str(settings.data_root),
+                "snapshots_root": str(settings.snapshots_root),
+                "experiments_root": str(settings.experiments_root),
+                "token_required": True,
+                "ui_served": bool(index_path.exists()),
+                "cors": False,
+                "api_version": "v2",
+            }
+        )
 
-    @app.get("/api/jobs", response_model=list[JobView])
-    def list_jobs(
-        status: str | None = Query(default=None, pattern="^(pending|running|done|failed)$"),
-        limit: int = Query(default=50, ge=1, le=500),
-    ) -> list[JobView]:
-        return [_job_view(job) for job in queue.list(status=status, limit=limit)]
+    register_job_routes(app, workspace, security)
+    register_market_routes(app, workspace)
+    register_screener_routes(app, workspace)
+    register_strategy_routes(app, workspace)
+    register_experiment_routes(app, workspace)
+    register_data_routes(app, workspace)
+    register_research_routes(app, workspace)
 
-    @app.get("/api/jobs/{job_id}", response_model=JobView)
-    def get_job(job_id: str) -> JobView:
-        job = queue.status(job_id)
-        if job is None:
-            raise HTTPException(status_code=404, detail="job not found")
-        return _job_view(job)
+    # -- built UI (same origin): assets mount + SPA fallback; API routes always win -----
+    ui_root = settings.ui_dir.resolve()
+    index_path = ui_root / "index.html"
+    assets_dir = ui_root / "assets"
+    if serve_ui and assets_dir.exists():
+        from fastapi.staticfiles import StaticFiles
 
-    @app.get("/api/jobs/{job_id}/result")
-    def get_job_result(job_id: str) -> Any:
-        job = queue.status(job_id)
-        if job is None:
-            raise HTTPException(status_code=404, detail="job not found")
-        if job["status"] in {"pending", "running"}:
-            return JSONResponse({"job_id": job_id, "status": job["status"]}, status_code=202)
-        if job["status"] == "failed":
-            return JSONResponse(
-                {"job_id": job_id, "status": "failed", "error": job.get("error")},
-                status_code=409,
-            )
-        return {"job_id": job_id, "status": "done", "result": job.get("result")}
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="ui-assets")
 
-    app.state.settings_snapshots_root = DEFAULT_SNAPSHOTS_ROOT
+    def _ui_missing() -> JSONResponse:
+        return JSONResponse(
+            {"detail": "UI build not found; run `pnpm -C ui build`"},
+            status_code=404,
+        )
+
+    def serve_index() -> Any:
+        if not (serve_ui and index_path.exists()):
+            return _ui_missing()
+        html = index_path.read_text(encoding="utf-8")
+        if "qc_token_boot" not in html:
+            html = html.replace("</head>", TOKEN_BOOTSTRAP + "</head>")
+        return HTMLResponse(html)
+
+    @app.get("/", include_in_schema=False)
+    def ui_index() -> Any:
+        return serve_index()
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def ui_fallback(full_path: str) -> Any:
+        path = full_path.strip("/")
+        if not path:
+            return serve_index()
+        if path.startswith(API_PREFIXES):
+            raise HTTPException(status_code=404, detail="not found")
+        if not serve_ui:
+            return _ui_missing()
+        candidate = (ui_root / path).resolve()
+        try:
+            candidate.relative_to(ui_root)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="not found") from None
+        if candidate.is_file():
+            return FileResponse(candidate)
+        if Path(path).suffix:
+            # A missing asset (js/css/png/...) must 404, not masquerade as index.html.
+            raise HTTPException(status_code=404, detail="not found")
+        return serve_index()
+
     return app
-
-
-def _job_view(job: dict[str, Any]) -> JobView:
-    return JobView(
-        id=str(job["id"]),
-        kind=str(job["kind"]),
-        status=str(job["status"]),
-        progress=float(job.get("progress") or 0.0),
-        created_at=str(job.get("created_at") or ""),
-        started_at=job.get("started_at"),
-        finished_at=job.get("finished_at"),
-        error=job.get("error"),
-        result=job.get("result"),
-    )
 
 
 __all__ = ["create_app", "default_job_runner"]

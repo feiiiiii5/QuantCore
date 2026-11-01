@@ -76,9 +76,9 @@ def test_request_validation(tmp_path: Path) -> None:
             == 422
         )
         assert client.post("/api/backtest", json={}, headers=AUTH).status_code == 422
-        assert client.post(
-            "/api/backtest", json={"template": "nope"}, headers=AUTH
-        ).status_code in {200, 202}
+        assert (
+            client.post("/api/backtest", json={"template": "nope"}, headers=AUTH).status_code == 422
+        )
 
 
 def test_job_lifecycle_with_fake_runner(tmp_path: Path) -> None:

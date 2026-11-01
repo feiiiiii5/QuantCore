@@ -75,3 +75,99 @@ def warehouse(tmp_path: Path) -> ParquetStore:
 def require_engine() -> None:
     if not quantcore.engine_available():
         pytest.skip("C++ backtest engine is unavailable")
+
+
+# ---------------------------------------------------------------------------
+# API v2 fixtures: real synthetic snapshot + experiment workspace (no network)
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="session")
+def experiments_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return tmp_path_factory.mktemp("experiments")
+
+
+@pytest.fixture(scope="session")
+def seeded_experiment(synthetic_snapshot: Snapshot, experiments_root: Path) -> object:
+    """One real persistent backtest used by experiment/replay/attribution tests."""
+    if not quantcore.engine_available():
+        pytest.skip("C++ backtest engine is unavailable")
+    from quantcore.experiments import ExperimentStore, run_experiment
+    from quantcore.strategy.spec import StrategySpec
+
+    spec = StrategySpec(
+        name="api_momentum", template="momentum", params={"top_n": 5, "lookback": 60}
+    )
+    return run_experiment(
+        ExperimentStore(experiments_root), spec, snapshot=synthetic_snapshot, report=True
+    )
+
+
+@pytest.fixture(scope="session")
+def fake_ui_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Minimal built-UI tree so static serving can be tested without the real frontend."""
+    root = tmp_path_factory.mktemp("ui-dist")
+    (root / "assets").mkdir()
+    (root / "index.html").write_text(
+        "<!doctype html><html><head><title>QuantCore</title></head>"
+        "<body><div id='root'>QuantCore UI</div>"
+        "<script type='module' src='./assets/app.js'></script></body></html>",
+        encoding="utf-8",
+    )
+    (root / "assets" / "app.js").write_text("console.log('quantcore ui');", encoding="utf-8")
+    return root
+
+
+@pytest.fixture()
+def api_app(
+    tmp_path: Path,
+    snapshot_root: Path,
+    experiments_root: Path,
+    seeded_experiment: object,
+    fake_ui_dir: Path,
+):
+    from quantcore.server import create_app
+
+    return create_app(
+        token="test-token",
+        port=8000,
+        state_path=tmp_path / "state.sqlite",
+        data_root=tmp_path,
+        snapshots_root=snapshot_root,
+        experiments_root=experiments_root,
+        ui_dir=fake_ui_dir,
+        start_worker=True,
+    )
+
+
+@pytest.fixture()
+def api_client(api_app: object):
+    from fastapi.testclient import TestClient
+
+    with TestClient(api_app, base_url="http://127.0.0.1:8000") as client:
+        client.headers.update({"Authorization": "Bearer test-token"})
+        yield client
+
+
+def api_headers() -> dict[str, str]:
+    return {"Authorization": "Bearer test-token"}
+
+
+def ws_headers() -> dict[str, str]:
+    """The Starlette TestClient sends ``Host: testserver`` for WebSockets; pin loopback."""
+    return {"host": "127.0.0.1:8000"}
+
+
+def local_app(tmp_path: Path, **kwargs: object):
+    """Isolated app whose data/snapshots/experiments roots all live under ``tmp_path``."""
+    from quantcore.server import create_app
+
+    return create_app(
+        token="test-token",
+        port=8000,
+        state_path=tmp_path / "state.sqlite",
+        data_root=tmp_path / "data",
+        snapshots_root=tmp_path / "snapshots",
+        experiments_root=tmp_path / "experiments",
+        ui_dir=kwargs.pop("ui_dir", None),
+        start_worker=True,
+        **kwargs,
+    )
