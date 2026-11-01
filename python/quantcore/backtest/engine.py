@@ -196,6 +196,76 @@ def _apply_risk_limits(matrix: np.ndarray, config: BacktestConfig) -> np.ndarray
     return output
 
 
+def run_backtest_batch(
+    panel: PanelData | Snapshot,
+    weights_list: list[np.ndarray],
+    config: BacktestConfig | None = None,
+    *,
+    threads: int = 0,
+    strategy_metadata: dict[str, Any] | None = None,
+    snapshot_metadata: dict[str, Any] | None = None,
+) -> list[BacktestResult]:
+    """Run several target-weight matrices through the C++ engine's batch entry point.
+
+    The C++ ``qc::parallel_sweep`` thread pool runs independent engines; this is the
+    parameter-sweep path (M4-011). Callers should chunk very large grids to bound memory.
+    """
+    if not engine_available():
+        raise CppUnavailableError(
+            "QuantCore C++ backtest engine is not available; build the extension first"
+        )
+    if not weights_list:
+        raise BacktestError("run_backtest_batch needs at least one weight matrix")
+    module = require_engine()
+    cfg = config or BacktestConfig()
+    if isinstance(panel, Snapshot):
+        calendar = panel.calendar()
+        manifest_meta = panel.manifest.metadata
+        n_time = int(manifest_meta.get("n_time") or 0)
+        n_sec = int(manifest_meta.get("n_sec") or 0)
+        sec_ids = [str(value) for value in panel.securities()["sec_id"].tolist()]
+        snapshot_info = snapshot_metadata or panel.describe()
+    elif isinstance(panel, PanelData):
+        calendar = panel.calendar
+        n_time, n_sec = panel.n_time, panel.n_sec
+        sec_ids = panel.sec_id_list
+        snapshot_info = snapshot_metadata or {}
+    else:  # pragma: no cover - defensive
+        raise BacktestError("run_backtest_batch needs a PanelData or Snapshot")
+    matrices = []
+    for weights in weights_list:
+        matrix = np.ascontiguousarray(np.asarray(weights, dtype=np.float64))
+        if matrix.shape != (n_time, n_sec):
+            raise BacktestError(
+                f"weights shape {matrix.shape} does not match the panel {(n_time, n_sec)}"
+            )
+        matrices.append(_apply_risk_limits(matrix, cfg))
+    batch = np.stack(matrices, axis=0)
+    with _PanelHandle(panel) as panel_object:
+        cpp_config = _cpp_config(module, cfg, calendar)
+        engine = module.Engine(panel_object, cpp_config)
+        try:
+            raw_results = engine.run_batch(batch, int(threads or 0))
+        except TypeError as exc:  # pragma: no cover - old binding
+            raise BacktestError(f"_qcore.Engine.run_batch signature mismatch: {exc}") from exc
+        results = [
+            BacktestResult.from_cpp(
+                raw,
+                cfg,
+                sec_ids=sec_ids,
+                strategy=strategy_metadata or {},
+                snapshot=snapshot_info,
+            )
+            for raw in raw_results
+        ]
+    for result in results:
+        if cfg.benchmark_code:
+            _attach_benchmark(result, panel, cfg)
+        if result.engine_backend != "cpp":  # pragma: no cover - defensive
+            raise BacktestError(f"engine_backend must be 'cpp', got {result.engine_backend!r}")
+    return results
+
+
 def _attach_benchmark(
     result: BacktestResult, panel: PanelData | Snapshot | str | Path, config: BacktestConfig
 ) -> None:

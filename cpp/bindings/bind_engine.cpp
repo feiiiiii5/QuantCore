@@ -7,17 +7,20 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
 #include "qcore/engine.h"
 #include "qcore/panel.h"
+#include "qcore/sweep.h"
 #include "qcore/types.h"
 
 namespace py = pybind11;
@@ -25,6 +28,7 @@ namespace py = pybind11;
 namespace {
 
 using DoubleMatrix = py::array_t<double, py::array::c_style | py::array::forcecast>;
+using DoubleTensor3 = py::array_t<double, py::array::c_style | py::array::forcecast>;
 
 qc::Date cast_date(py::handle value) {
   const int64_t raw = py::cast<int64_t>(value);
@@ -246,6 +250,40 @@ class PyEngine {
     return panel_->n_time();
   }
 
+  // Batch of independent weight matrices; C++ thread pool, one fresh Engine per run.
+  std::vector<qc::BacktestResult> run_batch(const DoubleTensor3& batches, size_t threads) {
+    const auto info = batches.request();
+    if (info.ndim != 3)
+      throw py::value_error("weights batch must be a 3-D (runs, n_time, n_sec) array");
+    const size_t runs = static_cast<size_t>(info.shape[0]);
+    const size_t n_time = static_cast<size_t>(info.shape[1]);
+    const size_t n_sec = static_cast<size_t>(info.shape[2]);
+    if (n_time != panel_->n_time() || n_sec != panel_->n_sec())
+      throw py::value_error(
+          "weights batch shape must be (runs, n_time=" + std::to_string(panel_->n_time()) +
+          ", n_sec=" + std::to_string(panel_->n_sec()) + "), got (" + std::to_string(n_time) +
+          ", " + std::to_string(n_sec) + ")");
+    const auto* data = static_cast<const double*>(info.ptr);
+    std::vector<qc::BacktestResult> results(runs);
+    const size_t workers =
+        threads > 0 ? threads : std::max<size_t>(1, std::thread::hardware_concurrency());
+    {
+      py::gil_scoped_release release;
+      qc::parallel_sweep(runs, workers, [&](size_t run) {
+        std::vector<std::vector<double>> rows(n_time, std::vector<double>(n_sec));
+        for (size_t t = 0; t < n_time; ++t) {
+          const double* source = data + (run * n_time + t) * n_sec;
+          std::copy(source, source + n_sec, rows[t].begin());
+        }
+        qc::MatrixTargetSource targets(std::move(rows), n_sec);
+        qc::CancelToken cancel;
+        qc::Engine engine(*panel_, config_);
+        results[run] = engine.run(targets, cancel);
+      });
+    }
+    return results;
+  }
+
   // weights: (n_time, n_sec) float64; an all-NaN row means "no rebalance that day".
   qc::BacktestResult run_weights(const DoubleMatrix& matrix, qc::CancelToken& cancel,
                                  BacktestProgress* progress) {
@@ -444,6 +482,13 @@ void bind_engine(py::module_& m) {
            py::keep_alive<1, 2>())
       .def_property_readonly("n_sec", &PyEngine::n_sec)
       .def_property_readonly("n_time", &PyEngine::n_time)
+      .def(
+          "run_batch",
+          [](PyEngine& engine, const DoubleTensor3& batches, size_t threads) {
+            return engine.run_batch(batches, threads);
+          },
+          py::arg("weights"), py::arg("threads") = 0,
+          "Run a 3-D batch of target-weight matrices with the C++ thread pool.")
       .def(
           "run",
           [](PyEngine& engine, const DoubleMatrix& weights) {

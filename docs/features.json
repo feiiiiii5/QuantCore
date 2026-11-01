@@ -476,8 +476,8 @@
       "id": "M4-011",
       "milestone": "M4",
       "title": "parameter sweep C++ parallel",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ Engine.run_batch backed by qc::parallel_sweep (fresh Engine per run, no GIL during batch); run_backtest_batch + run_sweep(cpp_parallel=True) used by API sweep when workers>1; tests/test_cpp_sweep.py"
     },
     {
       "id": "M5-001",

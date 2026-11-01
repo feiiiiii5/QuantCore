@@ -1,7 +1,7 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02。M0–M7 基本完成，M9 大部分完成；M8 仅完成证券资料扩展，M10 完成发布工具/审计/性能门禁但未做 Electron/安装包。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **107/117**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **108/117**）。
 
 ## 里程碑
 | 阶段 | 状态 | 证据 |
@@ -10,7 +10,7 @@
 | M1 C++ 基础 | ✅ | ctest 95/95；roll/cross 内核（含 neutralize）/指标/线程/面板/差分 |
 | M2 数据中心 | ✅ 基本 | Synthetic/LocalFile/Tushare fixture/AKShare/mootdx；Parquet+DuckDB+SQLite；快照/质量/PIT 财务视图；实时 Tushare 未验证 |
 | M3 回测引擎 | ✅ | ctest 95/95；C++/参考差分 6/6；规则/费用/T+1/手数/涨跌停/停牌/trace/指标/风险限制/基准比较 |
-| M4 SDK/CLI/策略 | 🟡 大部分 | DSL/模板/实验/HTML+可选 PDF/子进程 sandbox worker/CLI/replay；C++ 并行 sweep 未做 |
+| M4 SDK/CLI/策略 | ✅ 大部分 | DSL/模板/实验/HTML+可选 PDF/子进程 sandbox worker/C++ parallel sweep/CLI/replay |
 | M5 服务层 | ✅ | FastAPI 契约、Bearer/Host/Origin/no-CORS、SQLite 任务队列、WebSocket、取消/崩溃恢复、GZip、本地通知 |
 | M6 UI V1 | ✅ | 八页工作台接通真实 API；Playwright **18** 条；浅/深色、移动端、无横向溢出、性能预算、全局搜索、插件/模拟/组合视图 |
 | M7 研究工具 | ✅ | IC/RankIC/ICIR、分层、衰减、因子相关、grid/random 扫描、滚动、归因、DSR/PBO、成本敏感性、Monte Carlo、容量 |
@@ -24,7 +24,7 @@ make lint
 # ruff check/format 通过；mypy 69 files 无问题
 
 uv run pytest -q -p no:warnings
-# 185 collected；183 passed / 2 skipped
+# 187 collected；185 passed / 2 skipped
 
 pnpm -C ui test
 # 7 passed (4 files)

@@ -78,6 +78,7 @@ export default function ResearchPage() {
         mode: sweepMode,
         sample_size: sweepMode === "random" ? Number(sampleSize) : 0,
         seed: Number(sweepSeed),
+        workers: 2,
       });
     } catch (reason) { setFormError(reason instanceof Error ? reason.message : "参数网格 JSON 无效"); }
   };

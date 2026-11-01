@@ -22,7 +22,7 @@ from ..errors import BacktestError
 from ..snapshot.reader import Snapshot
 from ..strategy.spec import StrategySpec
 from .config import BacktestConfig
-from .engine import run_backtest
+from .engine import run_backtest, run_backtest_batch
 from .result import BacktestResult
 
 
@@ -133,6 +133,7 @@ def run_sweep(
     base_dir: str | Path | None = None,
     max_workers: int = 1,
     keep_results: bool = False,
+    cpp_parallel: bool = False,
     progress: Callable[[int, int], None] | None = None,
 ) -> SweepResult:
     """Run one backtest per grid point through the C++ engine.
@@ -144,7 +145,11 @@ def run_sweep(
     combinations = expand_grid(grid)
     cfg = config or BacktestConfig()
     points: list[SweepPoint] = []
-    if max_workers <= 1:
+    if cpp_parallel and max_workers > 1 and combinations:
+        points = _run_cpp_batch(
+            combinations, spec, panel_data, cfg, base_dir, keep_results, max_workers, progress
+        )
+    elif max_workers <= 1:
         for index, params in enumerate(combinations):
             points.append(_run_point(index, params, spec, panel_data, cfg, base_dir, keep_results))
             if progress is not None:
@@ -172,6 +177,57 @@ def run_sweep(
     if "index" in table.columns and len(table) > 1:
         table = table.sort_values("index").reset_index(drop=True)
     return SweepResult(points=points, table=table)
+
+
+def _run_cpp_batch(
+    combinations: list[dict[str, Any]],
+    spec: StrategySpec,
+    panel: PanelData,
+    config: BacktestConfig,
+    base_dir: str | Path | None,
+    keep_results: bool,
+    workers: int,
+    progress: Callable[[int, int], None] | None,
+) -> list[SweepPoint]:
+    """Generate weights in Python, execute groups of runs through C++ ``parallel_sweep``."""
+    points: list[SweepPoint] = []
+    entries: list[tuple[int, dict[str, Any], Any]] = []
+    for index, params in enumerate(combinations):
+        point = SweepPoint(index=index, params=dict(params))
+        points.append(point)
+        try:
+            strategy = _strategy_from_spec(spec, params, base_dir)
+            entries.append((index, dict(params), strategy.generate_targets(panel)))
+        except Exception as exc:
+            point.error = f"{type(exc).__name__}: {exc}"
+    chunk_size = max(1, int(workers))
+    for start in range(0, len(entries), chunk_size):
+        chunk = entries[start : start + chunk_size]
+        try:
+            results = run_backtest_batch(
+                panel,
+                [entry[2] for entry in chunk],
+                config,
+                threads=chunk_size,
+                strategy_metadata=spec.specification(base_dir),
+                snapshot_metadata={"synthetic": bool(panel.meta.get("synthetic", False))},
+            )
+        except Exception as exc:
+            for index, _, _ in chunk:
+                points[index].error = f"{type(exc).__name__}: {exc}"
+            continue
+        for (index, _, _), result in zip(chunk, results, strict=True):
+            point = points[index]
+            point.metrics = {
+                key: (float(value) if isinstance(value, (int, float)) else value)
+                for key, value in result.metrics.items()
+            }
+            point.metrics["total_fees"] = float(result.metrics.get("total_fees", 0))
+            if keep_results:
+                point.result = result
+        if progress is not None:
+            progress(min(start + chunk_size, len(combinations)), len(combinations))
+    return points
 
 
 def sweep_metric_columns(table: pd.DataFrame) -> list[str]:

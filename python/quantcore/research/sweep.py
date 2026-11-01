@@ -110,7 +110,9 @@ def _run_grid(
     workers: int,
 ) -> tuple[list[dict[str, Any]], str]:
     spec = StrategySpec(name=template, template=template)
-    result = run_sweep(panel, spec, param_grid, config, max_workers=workers)
+    result = run_sweep(
+        panel, spec, param_grid, config, max_workers=workers, cpp_parallel=workers > 1
+    )
     points = [
         {"params": point.params, "metrics": point.metrics, "error": point.error}
         for point in result.points
