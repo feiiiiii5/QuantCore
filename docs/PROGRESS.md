@@ -4,7 +4,7 @@
 > 更新时间：2026-11-02。
 
 ## 当前状态
-- M0：完成。`make setup/test`、wheel、macOS/Ubuntu CI；Windows 未纳入。
+- M0：完成。`make setup/test`、wheel、macOS/Ubuntu 全量 CI + Windows pure-Python smoke；C++ Windows 未支持。
 - M1：C++ types/calendar/tpool/.qpanel/内核/指标/零拷贝绑定；ctest 95/95；cross-sectional neutralize 已实现并绑定。
 - M2：Synthetic/LocalFile/Tushare(fixture+live API 代码路径)/AKShare/mootdx；摄取/质量/快照(内容寻址+PIT 元数据)/Parquet+DuckDB+SQLite；PIT 财务视图；真实 Tushare Token 未验证。
 - M3：event-driven 引擎，规则/费用/T+1/手数/涨跌停/停牌/除权除息/trace/指标；差分 6/6；风险限制/基准比较；引擎 300×965 月度调仓约 2.6ms。

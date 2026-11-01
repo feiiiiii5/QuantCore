@@ -28,8 +28,8 @@
       "id": "M0-004",
       "milestone": "M0",
       "title": "CI matrix",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "GitHub Actions matrix: macOS+Ubuntu full C++/engine tests, UI job, Windows pure-Python providers/strategy/synthetic tests (C++ mmap Windows still unsupported/documented)"
     },
     {
       "id": "M0-005",
