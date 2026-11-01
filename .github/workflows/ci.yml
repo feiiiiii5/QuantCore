@@ -49,6 +49,25 @@ jobs:
       - name: Verify C++ backend
         run: uv run python scripts/verify_cpp.py
 
+  windows-smoke:
+    # C++/mmap remains unsupported on Windows; this job keeps the pure-Python control plane
+    # (providers, strategy DSL/templates, synthetic panel) covered in the CI matrix.
+    runs-on: windows-latest
+    env:
+      UV_DEFAULT_INDEX: https://pypi.tuna.tsinghua.edu.cn/simple
+      PIP_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
+      PYTHONPATH: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v4
+      - name: Install pure-Python dependencies
+        run: uv sync --all-extras --no-install-project --python 3.12
+      - name: Pure-Python contract tests
+        run: uv run --no-sync pytest -q tests/test_strategy.py tests/test_synthetic_data.py tests/test_providers.py
+
   ui:
     runs-on: ubuntu-latest
     steps:
