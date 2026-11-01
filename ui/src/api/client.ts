@@ -1,6 +1,6 @@
 import type {
   AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, Experiment, ExperimentDetail,
-  FactorResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
+  FactorCorrelationResult, FactorResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
   CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperOrder,
   PaperSessionDetail, PaperSessionSummary, PBOResult,
   ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityProfile, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
@@ -163,6 +163,7 @@ export const api = {
   monteCarlo: (payload: Record<string, unknown>) => request<MonteCarloResult>("/api/research/monte_carlo", { method: "POST", body: JSON.stringify(payload) }),
   capacity: (payload: Record<string, unknown>) => request<CapacityResult>("/api/research/capacity", { method: "POST", body: JSON.stringify(payload) }),
   factor: (payload: Record<string, unknown>) => request<FactorResult>("/api/research/factor", { method: "POST", body: JSON.stringify(payload) }),
+  factorCorrelation: (payload: Record<string, unknown>) => request<FactorCorrelationResult>("/api/research/factor_correlation", { method: "POST", body: JSON.stringify(payload) }),
   sweep: (payload: Record<string, unknown>) => request<SweepResult>("/api/research/sweep", { method: "POST", body: JSON.stringify(payload) }),
   walkForward: (payload: Record<string, unknown>) => request<WalkForwardResult>("/api/research/walk_forward", { method: "POST", body: JSON.stringify(payload) }),
   attribution: (runId: string) => request<AttributionResult>("/api/research/attribution", { method: "POST", body: JSON.stringify({ run_id: runId }) }),

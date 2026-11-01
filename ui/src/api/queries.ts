@@ -98,6 +98,9 @@ export function useFactor() {
 export function useSweep() {
   return useMutation({ mutationFn: api.sweep });
 }
+export function useFactorCorrelation() {
+  return useMutation({ mutationFn: api.factorCorrelation });
+}
 export function useWalkForward() {
   return useMutation({ mutationFn: api.walkForward });
 }

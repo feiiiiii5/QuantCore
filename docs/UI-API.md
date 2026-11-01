@@ -83,3 +83,7 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 - `POST /api/research/cost_sensitivity` `{run_id,multipliers?:[0,0.5,1,2,3]}` → `{points:[{multiplier,total_return,annualized_return,sharpe,max_drawdown,total_fees}],breakeven_multiplier?}`; original experiment is never modified
 - `POST /api/research/monte_carlo` `{run_id,n_paths?:500,horizon?:250}` → `{terminal_return:{p05,p25,p50,p75,p95},max_drawdown:{p05,p50,p95},paths?}` (block=20, deterministic seed)
 - `POST /api/research/capacity` `{run_id,adv_participation?:0.1}` → `{capacity_cny,participation,avg_turnover,avg_adv_cny,limiting_sec,notes}`; approximate, 400 when data is missing
+
+## M7 factor correlation / random sweep
+- `POST /api/research/factor_correlation` `{expressions:[2..10], snapshot?, start?, end?, method?:"pearson"|"spearman"}` → `{expressions,labels,matrix, average_abs_correlation, observations, periods, dates, method, note}`; daily cross-sectional mean correlation over common tradable support.
+- `POST /api/research/sweep` now accepts `{mode?:"grid"|"random", sample_size?:0..200, seed?:42}`; random mode samples without replacement and returns `sampling:{mode,requested,returned,seed}`; grid mode semantics unchanged (max 200).

@@ -107,6 +107,18 @@ class SweepRequest(BaseModel):
     end: str | None = None
     initial_cash: float = Field(default=1_000_000.0, gt=0)
     workers: int = Field(default=1, ge=1, le=8)
+    mode: Literal["grid", "random"] = "grid"
+    sample_size: int = Field(default=0, ge=0, le=200)
+    seed: int = Field(default=42, ge=0, le=2_147_483_647)
+
+
+class FactorCorrelationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expressions: list[str] = Field(min_length=1, max_length=10)
+    snapshot: str | None = None
+    start: str | None = None
+    end: str | None = None
+    method: Literal["pearson", "spearman"] = "pearson"
 
 
 class WalkForwardRequest(BaseModel):

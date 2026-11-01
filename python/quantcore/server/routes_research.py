@@ -11,7 +11,7 @@ from ..errors import CppUnavailableError, ExperimentError, QuantCoreError, Strat
 from ..experiments import ExperimentStore
 from ..research.attribution import attribute_by_industry
 from ..research.experiment_data import ResearchDataError
-from ..research.factors import analyze_factor
+from ..research.factors import analyze_factor, analyze_factor_correlation
 from ..research.robustness import (
     compute_capacity,
     compute_cost_sensitivity,
@@ -26,6 +26,7 @@ from .schemas import (
     AttributionRequest,
     CapacityRequest,
     CostSensitivityRequest,
+    FactorCorrelationRequest,
     FactorRequest,
     MonteCarloRequest,
     OverfittingRequest,
@@ -74,6 +75,23 @@ def register_research_routes(app: FastAPI, ctx: Workspace) -> None:
         report["synthetic"] = bool(meta.get("synthetic", False))
         return json_safe(report)
 
+    @app.post("/api/research/factor_correlation")
+    def factor_correlation(payload: FactorCorrelationRequest) -> Any:
+        panel, meta, _ = _panel_with_snapshot(ctx, payload.snapshot)
+        try:
+            report = analyze_factor_correlation(
+                panel,
+                list(payload.expressions),
+                method=payload.method,
+                start=payload.start,
+                end=payload.end,
+            )
+        except (StrategyValidationError, ValueError) as exc:
+            raise _bad_request(exc) from exc
+        report["snapshot"] = meta.get("snapshot_id")
+        report["synthetic"] = bool(meta.get("synthetic", False))
+        return json_safe(report)
+
     @app.post("/api/research/sweep")
     def sweep(payload: SweepRequest) -> Any:
         panel, meta, _ = _panel_with_snapshot(ctx, payload.snapshot)
@@ -87,6 +105,9 @@ def register_research_routes(app: FastAPI, ctx: Workspace) -> None:
                 payload.param_grid,
                 config=config,
                 workers=payload.workers,
+                sample_size=payload.sample_size,
+                mode=payload.mode,
+                seed=payload.seed,
             )
         except (QuantCoreError, StrategyValidationError, ValueError) as exc:
             raise _bad_request(exc) from exc

@@ -380,7 +380,21 @@ export interface SweepResult {
   best: { params: Record<string, unknown>; metrics: Metrics } | null;
   engine_backend: string;
   bounded_points?: number;
+  grid_size?: number;
+  sampling?: { mode: "grid" | "random"; requested: number; returned: number; seed: number };
   synthetic?: boolean;
+}
+
+export interface FactorCorrelationResult {
+  expressions: string[];
+  labels: string[];
+  matrix: number[][];
+  average_abs_correlation: number;
+  observations: number;
+  periods: number;
+  dates: number[];
+  method: "pearson" | "spearman";
+  note: string;
 }
 
 export interface WalkForwardFold {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Grid3X3, Layers, PieChart, Play, ShieldCheck, Sigma } from "lucide-react";
 import type { EChartsOption } from "echarts";
 import { isApiError } from "../api/client";
-import { useAttribution, useExperiments, useFactor, useSweep, useWalkForward } from "../api/queries";
+import { useAttribution, useExperiments, useFactor, useFactorCorrelation, useSweep, useWalkForward } from "../api/queries";
 import Chart from "../components/Chart";
 import RobustnessPanel from "../components/RobustnessPanel";
 import StatePanel from "../components/StatePanel";
@@ -31,9 +31,16 @@ export default function ResearchPage() {
   const [quantiles, setQuantiles] = useState("5");
   const factorMutation = useFactor();
   const factor = factorMutation.data ?? null;
+  const [correlationText, setCorrelationText] = useState("rank(ret(close,20))\nrank(std(ret(close,20),20))");
+  const [correlationMethod, setCorrelationMethod] = useState<"pearson" | "spearman">("pearson");
+  const correlationMutation = useFactorCorrelation();
+  const correlation = correlationMutation.data ?? null;
 
   const [sweepTemplate, setSweepTemplate] = useState("momentum");
   const [gridText, setGridText] = useState('{"top_n": [5, 10, 20], "lookback": [20, 60, 120]}');
+  const [sweepMode, setSweepMode] = useState<"grid" | "random">("grid");
+  const [sampleSize, setSampleSize] = useState("24");
+  const [sweepSeed, setSweepSeed] = useState("42");
   const sweepMutation = useSweep();
   const sweep = sweepMutation.data ?? null;
 
@@ -48,8 +55,8 @@ export default function ResearchPage() {
   const [runId, setRunId] = useState("");
   const attributionMutation = useAttribution();
   const attribution = attributionMutation.data ?? null;
-  const busy = factorMutation.isPending || sweepMutation.isPending || walkMutation.isPending || attributionMutation.isPending;
-  const activeError = tab === "factor" ? factorMutation.error : tab === "sweep" ? sweepMutation.error : tab === "walk" ? walkMutation.error : attributionMutation.error;
+  const busy = factorMutation.isPending || correlationMutation.isPending || sweepMutation.isPending || walkMutation.isPending || attributionMutation.isPending;
+  const activeError = tab === "factor" ? factorMutation.error || correlationMutation.error : tab === "sweep" ? sweepMutation.error : tab === "walk" ? walkMutation.error : attributionMutation.error;
   const unimplemented = isApiError(activeError) && activeError.status === 404;
   const errorText = formError || (activeError && !unimplemented ? activeError.message : "");
 
@@ -64,8 +71,21 @@ export default function ResearchPage() {
   };
   const runSweep = () => {
     setFormError("");
-    try { sweepMutation.mutate({ template: sweepTemplate, param_grid: JSON.parse(gridText) as Record<string, unknown> }); }
-    catch (reason) { setFormError(reason instanceof Error ? reason.message : "参数网格 JSON 无效"); }
+    try {
+      sweepMutation.mutate({
+        template: sweepTemplate,
+        param_grid: JSON.parse(gridText) as Record<string, unknown>,
+        mode: sweepMode,
+        sample_size: sweepMode === "random" ? Number(sampleSize) : 0,
+        seed: Number(sweepSeed),
+      });
+    } catch (reason) { setFormError(reason instanceof Error ? reason.message : "参数网格 JSON 无效"); }
+  };
+  const runCorrelation = () => {
+    setFormError("");
+    const expressions = correlationText.split("\n").map((line) => line.trim()).filter(Boolean);
+    if (expressions.length < 2) { setFormError("因子相关性至少需要两行表达式"); return; }
+    correlationMutation.mutate({ expressions, method: correlationMethod });
   };
   const runWalk = () => {
     setFormError("");
@@ -175,6 +195,12 @@ export default function ResearchPage() {
             </div>
             <button className="btn primary" disabled={busy} onClick={runFactor}><Play size={15} /> {busy ? "计算中…" : "运行诊断"}</button>
             <p className="muted small">IC 使用未来收益做评价，不参与建仓，避免前视偏差。</p>
+            <h3 style={{ marginTop: 16 }}>因子相关性</h3>
+            <textarea className="code-input" rows={3} value={correlationText} onChange={(e) => setCorrelationText(e.target.value)} spellCheck={false} aria-label="因子相关性表达式" />
+            <div className="form-grid two" style={{ marginTop: 8 }}>
+              <label>相关方法<select value={correlationMethod} onChange={(e) => setCorrelationMethod(e.target.value as "pearson" | "spearman")}><option value="pearson">Pearson</option><option value="spearman">Spearman</option></select></label>
+              <label>&nbsp;<button className="btn" disabled={busy} onClick={runCorrelation} aria-label="计算相关性">计算相关性</button></label>
+            </div>
           </div>
           <div className="card">
             {!factor ? <StatePanel empty emptyHint="运行因子诊断查看 IC/分层/衰减" /> : (
@@ -186,6 +212,13 @@ export default function ResearchPage() {
               </div>
             )}
           </div>
+          {correlation ? (
+            <div className="card" style={{ gridColumn: "1 / -1" }}>
+              <div className="card-head"><h3>因子相关性矩阵</h3><span className="badge">平均 |ρ| {correlation.average_abs_correlation.toFixed(3)} · {correlation.periods} 日</span></div>
+              <div className="table-wrap"><table><thead><tr><th>因子</th>{correlation.labels.map((label, index) => <th key={index} title={label}>F{index + 1}</th>)}</tr></thead><tbody>{correlation.matrix.map((row, rowIndex) => <tr key={rowIndex}><td className="mono" title={correlation.labels[rowIndex]}>F{rowIndex + 1}</td>{row.map((value, colIndex) => <td key={colIndex} className={`num ${Math.abs(value) > 0.7 && rowIndex !== colIndex ? "down" : ""}`}>{value.toFixed(3)}</td>)}</tr>)}</tbody></table></div>
+              <p className="muted small">{correlation.note}。标签：{correlation.labels.map((label, index) => `F${index + 1}=${label}`).join("；")}</p>
+            </div>
+          ) : null}
           {factor ? (
             <>
               <div className="card"><h3>IC 时间序列</h3>{icOption ? <Chart option={icOption} height={260} /> : null}</div>
@@ -203,13 +236,18 @@ export default function ResearchPage() {
             <select value={sweepTemplate} onChange={(e) => setSweepTemplate(e.target.value)}><option value="momentum">动量</option><option value="dual_ma">双均线</option><option value="low_vol">低波动</option><option value="multi_factor">多因子</option></select>
             <label className="field-label">参数网格 JSON</label>
             <textarea className="code-input" rows={5} value={gridText} onChange={(e) => setGridText(e.target.value)} spellCheck={false} />
+            <div className="form-grid two" style={{ marginTop: 8 }}>
+              <label>模式<select value={sweepMode} onChange={(e) => setSweepMode(e.target.value as "grid" | "random")}><option value="grid">全网格</option><option value="random">随机抽样</option></select></label>
+              {sweepMode === "random" ? <label>抽样数<input value={sampleSize} onChange={(e) => setSampleSize(e.target.value)} inputMode="numeric" /></label> : <label>种子<input value={sweepSeed} onChange={(e) => setSweepSeed(e.target.value)} inputMode="numeric" /></label>}
+            </div>
+            {sweepMode === "random" ? <label className="field-label">随机种子<input value={sweepSeed} onChange={(e) => setSweepSeed(e.target.value)} inputMode="numeric" /></label> : null}
             <button className="btn primary" disabled={busy} onClick={runSweep}><Play size={15} /> {busy ? "扫描中…" : "运行扫描"}</button>
             <p className="muted small">服务端限制最多 200 个组合；结果用于研究，不代表未来收益。</p>
           </div>
           <div className="card">
             {!sweep ? <StatePanel empty emptyHint="运行参数扫描" /> : (
               <>
-                <div className="card-head"><h3>扫描结果 <span className="muted small">{sweep.points.length} 组</span></h3>{sweep.best ? <span className="badge success">最佳 Sharpe {sweep.best.metrics.sharpe.toFixed(2)}</span> : null}</div>
+                <div className="card-head"><h3>扫描结果 <span className="muted small">{sweep.points.length} 组</span></h3><span className="button-row">{sweep.sampling ? <span className="badge">{sweep.sampling.mode === "random" ? `随机 ${sweep.sampling.returned}/${sweep.sampling.requested} seed=${sweep.sampling.seed}` : "全网格"}</span> : null}{sweep.best ? <span className="badge success">最佳 Sharpe {sweep.best.metrics.sharpe.toFixed(2)}</span> : null}</span></div>
                 {sweepOption ? <Chart option={sweepOption} height={300} /> : null}
                 <div className="table-wrap" style={{ marginTop: 8 }}><table><thead><tr><th>参数</th><th className="num">总收益</th><th className="num">Sharpe</th><th className="num">最大回撤</th><th className="num">交易</th></tr></thead><tbody>{sweep.points.slice(0, 60).map((point, index) => <tr key={index}><td className="mono">{JSON.stringify(point.params)}</td><td className={`num ${point.metrics.total_return >= 0 ? "up" : "down"}`}>{pct(point.metrics.total_return)}</td><td className="num">{point.metrics.sharpe.toFixed(2)}</td><td className="num">{pct(point.metrics.max_drawdown)}</td><td className="num">{point.metrics.trade_count ?? "—"}</td></tr>)}</tbody></table></div>
               </>

@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from ..calendar import to_date_int
 from ..data.panel import PanelData
 from ..strategy.base import PanelView
 from ..strategy.expr import evaluate_expression
@@ -221,3 +222,98 @@ __all__ = [
     "forward_returns",
     "tradable_mask",
 ]
+
+
+def _range_bounds(
+    panel: PanelData, start: int | str | None, end: int | str | None
+) -> tuple[int, int]:
+    dates = list(panel.calendar.dates)
+    low, high = 0, len(dates) - 1
+    if start is not None:
+        target = to_date_int(start)
+        low = max(low, int(np.searchsorted(dates, target, side="left")))
+    if end is not None:
+        target = to_date_int(end)
+        high = min(high, int(np.searchsorted(dates, target, side="right")) - 1)
+    if low > high:
+        raise ValueError("start date must not be after end date (or range has no trading days)")
+    return low, high
+
+
+def analyze_factor_correlation(
+    panel: PanelData,
+    expressions: list[str],
+    *,
+    method: str = "pearson",
+    start: int | str | None = None,
+    end: int | str | None = None,
+) -> dict[str, Any]:
+    """Average pairwise factor correlation over daily cross-sections.
+
+    Each trading day takes the common tradable support where every expression is finite and
+    computes the cross-sectional (Pearson/Spearman) correlation of each factor pair; the
+    reported matrix entry is the mean over days.  This avoids spurious full-sample correlation
+    from time-series level shifts.
+    """
+    if len(expressions) < 2:
+        raise ValueError("at least two factor expressions are required")
+    if len(expressions) > 10:
+        raise ValueError("at most ten factor expressions are supported")
+    method = str(method).lower()
+    if method not in {"pearson", "spearman"}:
+        raise ValueError("method must be 'pearson' or 'spearman'")
+    matrices = [factor_matrix(panel, expression) for expression in expressions]
+    base = tradable_mask(panel)
+    low, high = _range_bounds(panel, start, end)
+    count = len(expressions)
+    sums = np.zeros((count, count), dtype=np.float64)
+    counts = np.zeros((count, count), dtype=np.int64)
+    used_dates: list[int] = []
+    observations = 0
+    for day in range(low, high + 1):
+        mask = base[day].copy()
+        for matrix in matrices:
+            mask &= np.isfinite(matrix[day])
+        if int(mask.sum()) < MIN_CROSS_SECTION:
+            continue
+        used_dates.append(int(panel.calendar.dates[day]))
+        observations += int(mask.sum())
+        rows = [matrix[day][mask] for matrix in matrices]
+        for left in range(count):
+            for right in range(left + 1, count):
+                value = (
+                    _pearson(rows[left], rows[right])
+                    if method == "pearson"
+                    else _spearman(rows[left], rows[right])
+                )
+                if value is not None:
+                    sums[left, right] += value
+                    counts[left, right] += 1
+    if not used_dates:
+        raise ValueError(
+            "no overlapping factor observations across expressions; "
+            "check fields/causality or widen the date range"
+        )
+    matrix = np.eye(count, dtype=np.float64)
+    absolute: list[float] = []
+    for left in range(count):
+        for right in range(left + 1, count):
+            if counts[left, right] > 0:
+                value = float(sums[left, right] / counts[left, right])
+                matrix[left, right] = matrix[right, left] = value
+                absolute.append(abs(value))
+    average_abs = float(np.mean(absolute)) if absolute else 0.0
+    return {
+        "expressions": list(expressions),
+        "labels": list(expressions),
+        "matrix": [[round(float(value), 6) for value in row] for row in matrix],
+        "average_abs_correlation": round(average_abs, 6),
+        "observations": observations,
+        "periods": len(used_dates),
+        "dates": used_dates,
+        "method": method,
+        "note": (
+            "mean of daily cross-sectional correlations over the common tradable support "
+            "of all expressions"
+        ),
+    }

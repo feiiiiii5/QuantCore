@@ -113,6 +113,9 @@ test("research factor analysis renders IC, quantiles and decay", async ({ page }
   await expect(page.getByRole("heading", { name: "分层平均收益" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "因子衰减（RankIC）" })).toBeVisible();
   await expect(page.locator(".grid.kpis .card")).toHaveCount(4);
+  await page.getByRole("button", { name: "计算相关性" }).click();
+  await expect(page.getByRole("heading", { name: "因子相关性矩阵" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/平均 \|ρ\|/)).toBeVisible();
   await page.screenshot({ path: "/tmp/qc-research.png", fullPage: true });
   expect(errors).toEqual([]);
 });
@@ -123,6 +126,10 @@ test("research sweep, walk-forward and attribution tabs run", async ({ page }) =
   await page.getByRole("tab", { name: /参数扫描/ }).click();
   await page.getByRole("button", { name: /运行扫描/ }).click();
   await expect(page.getByRole("heading", { name: /扫描结果/ })).toBeVisible({ timeout: 60_000 });
+  await page.getByLabel("模式").selectOption("random");
+  await page.getByLabel("抽样数").fill("4");
+  await page.getByRole("button", { name: /运行扫描/ }).click();
+  await expect(page.getByText(/随机 4\/4/)).toBeVisible({ timeout: 60_000 });
   await page.screenshot({ path: "/tmp/qc-sweep.png", fullPage: true });
   await page.getByRole("tab", { name: /滚动验证/ }).click();
   await page.getByRole("button", { name: /运行滚动验证/ }).click();

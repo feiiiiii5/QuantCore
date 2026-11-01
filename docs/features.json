@@ -616,15 +616,15 @@
       "id": "M7-003",
       "milestone": "M7",
       "title": "factor decay/correlation",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Factor decay already in /api/research/factor; factor_correlation daily cross-sectional Pearson/Spearman matrix + average |rho|, tests/test_research_v4.py, UI Research factor tab"
     },
     {
       "id": "M7-004",
       "milestone": "M7",
       "title": "grid/random sweep UI",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "SweepRequest mode=grid|random, sample_size/seed; deterministic sampling for large grids; UI grid/random selector + sampling badge; tests/test_research_v4.py + Playwright"
     },
     {
       "id": "M7-005",
