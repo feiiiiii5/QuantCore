@@ -108,3 +108,6 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 
 ## PIT financial view (M2)
 - `GET /api/market/financials/{code}?as_of=YYYY-MM-DD&limit=20` → `{code,sec_id,as_of,latest,rows,note}`; only reports with `ann_date <= as_of` (point-in-time, no restatement reconstruction), newest first.
+
+## Report export (M4)
+- `GET /api/experiments/{run_id}/report` → HTML; `GET /api/experiments/{run_id}/report.pdf` → PDF via local Chrome/Chromium print-to-pdf (503 with `{detail}` when no browser is installed; optional, not required for research runs).

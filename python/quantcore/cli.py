@@ -263,6 +263,7 @@ def backtest_run(
     seed: int = typer.Option(42),
     n_sec: int = typer.Option(60, help="synthetic universe size when no snapshot is given"),
     report: bool = typer.Option(True, help="write an HTML report"),
+    pdf: bool = typer.Option(False, help="also export PDF (requires local Chrome/Chromium)"),
     json_output: bool = typer.Option(True),
 ) -> None:
     """Run one backtest through the C++ engine and persist an experiment."""
@@ -286,6 +287,15 @@ def backtest_run(
     summary["run_id"] = record.run_id
     summary["experiment_dir"] = str(record.directory)
     summary["report"] = str(record.directory / "report.html") if report else None
+    summary["report_pdf"] = None
+    if report and pdf:
+        from quantcore.report_pdf import PdfReportError, render_pdf
+
+        try:
+            target = render_pdf(record.directory / "report.html", record.directory / "report.pdf")
+            summary["report_pdf"] = str(target)
+        except PdfReportError as exc:
+            raise typer.BadParameter(str(exc)) from exc
     _emit(summary, json_output)
 
 

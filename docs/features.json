@@ -462,8 +462,8 @@
       "id": "M4-009",
       "milestone": "M4",
       "title": "HTML/PDF report",
-      "passes": false,
-      "evidence": "partial/not verified: see docs/PROGRESS.md known gaps"
+      "passes": true,
+      "evidence": "HTML report exists; optional PDF via local Chrome/Chromium (report_pdf.py), GET /api/experiments/{id}/report.pdf, UI PDF button, `qc backtest run --pdf`; tests/test_pdf_report.py (skip when browser missing)"
     },
     {
       "id": "M4-010",

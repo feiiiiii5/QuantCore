@@ -131,6 +131,30 @@ def register_experiment_routes(app: FastAPI, ctx: Any) -> None:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return _result_payload(result)
 
+    @app.get("/api/experiments/{run_id}/report.pdf")
+    def report_pdf(run_id: str) -> Any:
+        store = _store(ctx)
+        try:
+            record = store.get(run_id)
+        except ExperimentError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        html = record.directory / "report.html"
+        if not html.exists():
+            raise HTTPException(status_code=404, detail="HTML report not found for this experiment")
+        from ..report_pdf import PdfReportError, render_pdf
+
+        pdf = record.directory / "report.pdf"
+        if not pdf.exists():
+            try:
+                render_pdf(html, pdf)
+            except PdfReportError as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return FileResponse(
+            pdf,
+            media_type="application/pdf",
+            filename=f"{run_id}.pdf",
+        )
+
     @app.post("/api/experiments/{run_id}/replay")
     def replay(run_id: str) -> Any:
         store = _store(ctx)

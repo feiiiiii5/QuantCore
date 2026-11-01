@@ -179,6 +179,7 @@ export default function BacktestPage() {
         <div className="button-row">
           <button className="btn" onClick={() => void onReplay()} disabled={!experimentId}><RotateCcw size={15} /> 复现</button>
           <button className="btn" onClick={() => experimentId && void downloadWithAuth(`/api/experiments/${experimentId}/report`, `${experimentId}.html`)} disabled={!experimentId}><Download size={15} /> 报告</button>
+          <button className="btn" onClick={() => experimentId && void downloadWithAuth(`/api/experiments/${experimentId}/report.pdf`, `${experimentId}.pdf`)} disabled={!experimentId} title="需要本机 Chrome/Chromium；无可用浏览器时后端返回 503"><Download size={15} /> PDF</button>
           {running ? <button className="btn danger" onClick={() => void onCancel()}><Square size={15} /> 取消</button> : <button className="btn primary" onClick={run} disabled={submit.isPending}><Play size={15} /> 运行回测</button>}
         </div>
       </div>
