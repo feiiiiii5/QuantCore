@@ -378,15 +378,15 @@
       "id": "M3-017",
       "milestone": "M3",
       "title": "property tests",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "tests/test_property_fuzz.py: Hypothesis random target weights preserve reference ledger invariants/cash/equity identity/fees/lots"
     },
     {
       "id": "M3-018",
       "milestone": "M3",
       "title": "fuzz rules/ledger/parser",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "tests/test_property_fuzz.py: Hypothesis fuzz DSL parser, price-limit/fee rules and board-lot validation (25 examples each)"
     },
     {
       "id": "M3-019",
