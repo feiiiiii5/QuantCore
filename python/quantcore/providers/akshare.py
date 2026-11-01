@@ -85,13 +85,17 @@ def normalize_akshare_daily(frame: pd.DataFrame, code: str) -> pd.DataFrame:
         out["amount"] = (out["close"] * out["volume"]).round(2)
     out = out.sort_values("date", kind="stable").reset_index(drop=True)
     out["pre_close"] = out["close"].shift(1)
+    out["pre_close"] = out["pre_close"].fillna(out["open"]).fillna(out["close"])
     pct = board_limit_pct(code)
     out["limit_up"] = np.round(out["pre_close"] * (1.0 + pct), 2)
     out["limit_down"] = np.round(out["pre_close"] * (1.0 - pct), 2)
     out["adj_factor"] = 1.0
     out["suspended"] = False
     out["st"] = False
-    out["turnover"] = pd.to_numeric(out.get("turnover", 0.0), errors="coerce").fillna(0.0) / 100.0
+    turnover_source = (
+        out["turnover"] if "turnover" in out.columns else pd.Series(0.0, index=out.index)
+    )
+    out["turnover"] = pd.to_numeric(turnover_source, errors="coerce").fillna(0.0) / 100.0
     out["total_shares"] = 0
     out["float_shares"] = 0
     out["mktcap"] = 0.0
@@ -131,7 +135,7 @@ class AKShareProvider(DataProvider):
                 "or inject a module for contract tests"
             )
         try:  # lazy import: akshare is an optional dependency
-            import akshare
+            import akshare  # type: ignore[import-not-found]
         except ImportError as exc:
             raise ProviderUnavailableError(
                 "akshare is not installed; install it to use the AKShare adapter"

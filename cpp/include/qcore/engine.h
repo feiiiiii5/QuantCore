@@ -16,10 +16,24 @@ enum class TraceLevel : uint32_t { Off = 0, Summary = 1, Full = 2 };
 enum class Side : uint32_t { Buy = 0, Sell = 1 };
 
 enum class RejectReason : uint16_t {
-  None = 0, Suspended = 1, LimitUp = 2, LimitDown = 3, LotSize = 4, TPlusOne = 5,
-  InsufficientCash = 6, NoQuote = 7, PriceOutOfRange = 8, MinRebalance = 9,
-  Canceled = 10, MaxPositions = 11, MaxWeight = 12, IndustryLimit = 13,
-  StopLoss = 14, StopTakeProfit = 15, CorporateAction = 16, Unknown = 255
+  None = 0,
+  Suspended = 1,
+  LimitUp = 2,
+  LimitDown = 3,
+  LotSize = 4,
+  TPlusOne = 5,
+  InsufficientCash = 6,
+  NoQuote = 7,
+  PriceOutOfRange = 8,
+  MinRebalance = 9,
+  Canceled = 10,
+  MaxPositions = 11,
+  MaxWeight = 12,
+  IndustryLimit = 13,
+  StopLoss = 14,
+  StopTakeProfit = 15,
+  CorporateAction = 16,
+  Unknown = 255
 };
 
 struct RuleSet {
@@ -41,11 +55,11 @@ struct RuleSet {
 
 struct CostModel {
   double commission_rate = 0.0003;
-  Money min_commission = 50000;  // 5 CNY in 1e-4
-  double stamp_duty_rate = 0.0005;  // sell only; TODO(verify)
+  Money min_commission = 50000;        // 5 CNY in 1e-4
+  double stamp_duty_rate = 0.0005;     // sell only; TODO(verify)
   double transfer_fee_rate = 0.00001;  // TODO(verify)
   double exchange_fee_rate = 0.00001;  // TODO(verify)
-  double reg_fee_rate = 0.000002;  // TODO(verify)
+  double reg_fee_rate = 0.000002;      // TODO(verify)
   bool transfer_fee_shanghai_only = true;
   bool enable_dividend_tax = false;
 };
@@ -89,8 +103,13 @@ struct BacktestConfig {
 
 class CancelToken {
  public:
-  void cancel() { flag_.store(true, std::memory_order_relaxed); }
-  bool cancelled() const { return flag_.load(std::memory_order_relaxed); }
+  void cancel() {
+    flag_.store(true, std::memory_order_relaxed);
+  }
+  bool cancelled() const {
+    return flag_.load(std::memory_order_relaxed);
+  }
+
  private:
   std::atomic<bool> flag_{false};
 };
@@ -106,6 +125,7 @@ class MatrixTargetSource : public TargetSource {
  public:
   MatrixTargetSource(std::vector<std::vector<double>> rows, size_t n_sec);
   const std::vector<double>& weights(size_t date_index) override;
+
  private:
   std::vector<std::vector<double>> rows_;
   std::vector<double> empty_;
@@ -142,7 +162,10 @@ struct Metrics {
   int64_t trading_days = 0;
 };
 
-struct ReasonCount { RejectReason reason = RejectReason::None; uint64_t count = 0; };
+struct ReasonCount {
+  RejectReason reason = RejectReason::None;
+  uint64_t count = 0;
+};
 
 struct BacktestResult {
   std::vector<Date> dates;
@@ -162,6 +185,7 @@ class Engine {
  public:
   Engine(const Panel& panel, BacktestConfig config);
   BacktestResult run(TargetSource& targets, CancelToken& cancel);
+
  private:
   const Panel& panel_;
   BacktestConfig cfg_;

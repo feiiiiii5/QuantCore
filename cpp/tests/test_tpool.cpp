@@ -28,8 +28,7 @@ TEST_CASE("parallel_for is deterministic across thread counts and grains", "[tpo
   const auto run = [&compute](std::size_t threads, std::size_t min_grain) {
     std::vector<double> out(kCount, -1.0);
     qc::ThreadPool pool(threads);
-    pool.parallel_for(
-        kCount, [&out, &compute](std::size_t i) { out[i] = compute(i); }, min_grain);
+    pool.parallel_for(kCount, [&out, &compute](std::size_t i) { out[i] = compute(i); }, min_grain);
     return out;
   };
   const std::vector<double> single = run(1, 1);
@@ -38,7 +37,8 @@ TEST_CASE("parallel_for is deterministic across thread counts and grains", "[tpo
   REQUIRE(single.size() == kCount);
   CHECK(single == multi);
   CHECK(single == coarse);
-  for (std::size_t i = 0; i < kCount; ++i) CHECK(single[i] == compute(i));
+  for (std::size_t i = 0; i < kCount; ++i)
+    CHECK(single[i] == compute(i));
 }
 
 TEST_CASE("parallel_for visits every index exactly once", "[tpool]") {
@@ -54,7 +54,8 @@ TEST_CASE("parallel_for visits every index exactly once", "[tpool]") {
         },
         2);
   }
-  for (std::size_t i = 0; i < kCount; ++i) CHECK(visits[i] == 5);
+  for (std::size_t i = 0; i < kCount; ++i)
+    CHECK(visits[i] == 5);
   // n == 0 is a no-op.
   bool called = false;
   pool.parallel_for(0, [&called](std::size_t) { called = true; });
@@ -65,7 +66,8 @@ TEST_CASE("parallel_for propagates exceptions and keeps the pool usable", "[tpoo
   qc::ThreadPool pool(4);
   CHECK_THROWS_AS(pool.parallel_for(64,
                                     [](std::size_t i) {
-                                      if (i == 7) throw std::runtime_error("boom");
+                                      if (i == 7)
+                                        throw std::runtime_error("boom");
                                     }),
                   std::runtime_error);
   std::atomic<int> done{0};
@@ -87,7 +89,8 @@ TEST_CASE("submit futures and wait_idle", "[tpool]") {
   }
   pool.wait_idle();
   CHECK(counter.load() == 64);
-  for (int i = 0; i < 64; ++i) CHECK(futures[static_cast<std::size_t>(i)].get() == i * 2);
+  for (int i = 0; i < 64; ++i)
+    CHECK(futures[static_cast<std::size_t>(i)].get() == i * 2);
   pool.wait_idle();  // idempotent when there is nothing to do
 }
 
@@ -95,8 +98,10 @@ TEST_CASE("destructor drains queued tasks", "[tpool]") {
   std::vector<std::future<int>> futures;
   {
     qc::ThreadPool pool(2);
-    for (int i = 0; i < 50; ++i) futures.push_back(pool.submit([i]() { return i; }));
+    for (int i = 0; i < 50; ++i)
+      futures.push_back(pool.submit([i]() { return i; }));
   }  // destructor must run every queued task before joining
   REQUIRE(futures.size() == 50);
-  for (int i = 0; i < 50; ++i) CHECK(futures[static_cast<std::size_t>(i)].get() == i);
+  for (int i = 0; i < 50; ++i)
+    CHECK(futures[static_cast<std::size_t>(i)].get() == i);
 }

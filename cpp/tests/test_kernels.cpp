@@ -67,7 +67,8 @@ std::vector<double> rolling2(Rolling2 fn, const std::vector<double>& x,
 }
 
 void expect_all_nan(const std::vector<double>& values) {
-  for (const double value : values) CHECK(std::isnan(value));
+  for (const double value : values)
+    CHECK(std::isnan(value));
 }
 
 }  // namespace
@@ -76,16 +77,37 @@ TEST_CASE("rolling kernels match fixed reference values", "[kernels][rolling]") 
   const std::vector<double> x = {1, 2, 3, 4, 5, 6, 7, 8, kNaN, 10};
   const std::vector<double> y = {2, 4, 6, 8, 10, 12, 14, 16, 18, 20};
   const std::size_t w = 4;
-  const std::vector<double> rolling_sum4 = {kNaN, kNaN, kNaN, 10.0, 14.0, 18.0, 22.0, 26.0, kNaN, kNaN};
+  const std::vector<double> rolling_sum4 = {kNaN, kNaN, kNaN, 10.0, 14.0,
+                                            18.0, 22.0, 26.0, kNaN, kNaN};
   const std::vector<double> rolling_mean4 = {kNaN, kNaN, kNaN, 2.5, 3.5, 4.5, 5.5, 6.5, kNaN, kNaN};
-  const std::vector<double> rolling_std4 = {kNaN, kNaN, kNaN, 1.2909944487358056, 1.2909944487358056, 1.2909944487358056, 1.2909944487358056, 1.2909944487358056, kNaN, kNaN};
+  const std::vector<double> rolling_std4 = {kNaN,
+                                            kNaN,
+                                            kNaN,
+                                            1.2909944487358056,
+                                            1.2909944487358056,
+                                            1.2909944487358056,
+                                            1.2909944487358056,
+                                            1.2909944487358056,
+                                            kNaN,
+                                            kNaN};
   const std::vector<double> rolling_min4 = {kNaN, kNaN, kNaN, 1.0, 2.0, 3.0, 4.0, 5.0, kNaN, kNaN};
   const std::vector<double> rolling_max4 = {kNaN, kNaN, kNaN, 4.0, 5.0, 6.0, 7.0, 8.0, kNaN, kNaN};
-  const std::vector<double> rolling_argmax4 = {kNaN, kNaN, kNaN, 3.0, 3.0, 3.0, 3.0, 3.0, kNaN, kNaN};
+  const std::vector<double> rolling_argmax4 = {kNaN, kNaN, kNaN, 3.0,  3.0,
+                                               3.0,  3.0,  3.0,  kNaN, kNaN};
   const std::vector<double> rolling_rank4 = {kNaN, kNaN, kNaN, 1.0, 1.0, 1.0, 1.0, 1.0, kNaN, kNaN};
-  const std::vector<double> rolling_decay4 = {kNaN, kNaN, kNaN, 3.0, 4.0, 5.0, 6.0, 7.0, kNaN, kNaN};
+  const std::vector<double> rolling_decay4 = {kNaN, kNaN, kNaN, 3.0,  4.0,
+                                              5.0,  6.0,  7.0,  kNaN, kNaN};
   const std::vector<double> rolling_corr4 = {kNaN, kNaN, kNaN, 1.0, 1.0, 1.0, 1.0, 1.0, kNaN, kNaN};
-  const std::vector<double> rolling_cov4 = {kNaN, kNaN, kNaN, 3.3333333333333335, 3.3333333333333335, 3.3333333333333335, 3.3333333333333335, 3.3333333333333335, kNaN, kNaN};
+  const std::vector<double> rolling_cov4 = {kNaN,
+                                            kNaN,
+                                            kNaN,
+                                            3.3333333333333335,
+                                            3.3333333333333335,
+                                            3.3333333333333335,
+                                            3.3333333333333335,
+                                            3.3333333333333335,
+                                            kNaN,
+                                            kNaN};
   expect_series(rolling1(qc::kernels::rolling_sum, x, w), rolling_sum4);
   expect_series(rolling1(qc::kernels::rolling_mean, x, w), rolling_mean4);
   expect_series(rolling1(qc::kernels::rolling_std, x, w), rolling_std4);
@@ -112,30 +134,24 @@ TEST_CASE("rolling kernels handle warm-up, missing values and boundaries", "[ker
   expect_series(rolling1(qc::kernels::rolling_decay_linear, short_series, w),
                 std::vector<double>{kNaN, 5.0 / 3.0, 8.0 / 3.0});
   // window == 1: sum/mean/min/max/argmax/rank/decay pass through; std/corr/cov undefined.
-  expect_series(rolling1(qc::kernels::rolling_sum, short_series, 1),
-                std::vector<double>{1, 2, 3});
+  expect_series(rolling1(qc::kernels::rolling_sum, short_series, 1), std::vector<double>{1, 2, 3});
   expect_series(rolling1(qc::kernels::rolling_argmax, short_series, 1),
                 std::vector<double>{0, 0, 0});
-  expect_series(rolling1(qc::kernels::rolling_rank, short_series, 1),
-                std::vector<double>{1, 1, 1});
+  expect_series(rolling1(qc::kernels::rolling_rank, short_series, 1), std::vector<double>{1, 1, 1});
   expect_all_nan(rolling1(qc::kernels::rolling_std, short_series, 1));
   expect_all_nan(rolling1(qc::kernels::rolling_std, short_series, 4));  // window > n
   expect_all_nan(rolling1(qc::kernels::rolling_sum, short_series, 4));
   expect_all_nan(rolling2(qc::kernels::rolling_corr, short_series, short_series, 1));
-  expect_all_nan(rolling1(qc::kernels::rolling_mean,
-                          std::vector<double>{kNaN, kNaN, kNaN}, 2));
-  expect_series(rolling1(qc::kernels::rolling_mean,
-                         std::vector<double>{1, 2, kNaN, 4, 5}, 2),
+  expect_all_nan(rolling1(qc::kernels::rolling_mean, std::vector<double>{kNaN, kNaN, kNaN}, 2));
+  expect_series(rolling1(qc::kernels::rolling_mean, std::vector<double>{1, 2, kNaN, 4, 5}, 2),
                 std::vector<double>{kNaN, 1.5, kNaN, kNaN, 4.5});
   // A missing value invalidates a whole window only; windows after it recover.
-  expect_series(rolling1(qc::kernels::rolling_mean,
-                         std::vector<double>{1, 2, kNaN, 4, 5, 6}, 2),
+  expect_series(rolling1(qc::kernels::rolling_mean, std::vector<double>{1, 2, kNaN, 4, 5, 6}, 2),
                 std::vector<double>{kNaN, 1.5, kNaN, kNaN, 4.5, 5.5});
   // Parameter validation.
   const std::vector<double> tiny = {1, 2};
   std::vector<double> out(2, kNaN);
-  CHECK_THROWS_AS(qc::kernels::rolling_sum(tiny.data(), 2, 0, out.data()),
-                  std::invalid_argument);
+  CHECK_THROWS_AS(qc::kernels::rolling_sum(tiny.data(), 2, 0, out.data()), std::invalid_argument);
   CHECK_THROWS_AS(qc::kernels::rolling_mean(nullptr, 2, 2, out.data()), std::invalid_argument);
   CHECK_THROWS_AS(qc::kernels::rolling_mean(tiny.data(), 2, 2, nullptr), std::invalid_argument);
   CHECK_NOTHROW(qc::kernels::rolling_mean(nullptr, 0, 2, nullptr));  // n == 0 is a no-op
@@ -154,10 +170,13 @@ TEST_CASE("corr/cov edge cases", "[kernels][rolling]") {
 TEST_CASE("cross-sectional kernels match fixed reference values", "[kernels][cross]") {
   const std::vector<double> x = {3, 1, 2, kNaN, 2, 10};
   const std::vector<double> cross_rank = {0.75, 0.0, 0.375, kNaN, 0.375, 1.0};
-  const std::vector<double> cross_zscore = {-0.16452254913212455, -0.71293104623920633, -0.43872679768566542, kNaN, -0.43872679768566542, 1.7549071907426617};
+  const std::vector<double> cross_zscore = {-0.16452254913212455, -0.71293104623920633,
+                                            -0.43872679768566542, kNaN,
+                                            -0.43872679768566542, 1.7549071907426617};
   const std::vector<double> cross_mad_winsor3 = {3.0, 1.0, 2.0, kNaN, 2.0, 5.0};
   const std::vector<double> cross_quantile4 = {2.0, 0.0, 1.0, kNaN, 1.0, 3.0};
-  const std::vector<double> cross_quantile5_1to10 = {0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0};
+  const std::vector<double> cross_quantile5_1to10 = {0.0, 0.0, 1.0, 1.0, 2.0,
+                                                     2.0, 3.0, 3.0, 4.0, 4.0};
   std::vector<double> out(x.size(), kNaN);
   qc::kernels::cross_rank(x.data(), x.size(), out.data());
   expect_series(out, cross_rank);
@@ -209,26 +228,151 @@ TEST_CASE("technical indicators match fixed reference values", "[kernels][indica
   const std::vector<double> close = {10, 11, 12, 11, 10, 11, 12, 13, 12, 11, 10, 11};
   const std::vector<double> high = {10.5, 11.5, 12.5, 11.5, 10.5, 11.5,
                                     12.5, 13.5, 12.5, 11.5, 10.5, 11.5};
-  const std::vector<double> low = {9.5, 10.5, 11.5, 10.5, 9.5, 10.5,
+  const std::vector<double> low = {9.5,  10.5, 11.5, 10.5, 9.5, 10.5,
                                    11.5, 12.5, 11.5, 10.5, 9.5, 10.5};
-  const std::vector<double> volume = {100, 200, 300, 400, 500, 600,
+  const std::vector<double> volume = {100, 200, 300, 400,  500,  600,
                                       700, 800, 900, 1000, 1100, 1200};
   const std::size_t n = close.size();
-  const std::vector<double> ma3 = {kNaN, kNaN, 11.0, 11.333333333333334, 11.0, 10.666666666666666, 11.0, 12.0, 12.333333333333334, 12.0, 11.0, 10.666666666666666};
-  const std::vector<double> ema3 = {10.0, 10.5, 11.25, 11.125, 10.5625, 10.78125, 11.390625, 12.1953125, 12.09765625, 11.548828125, 10.7744140625, 10.88720703125};
-  const std::vector<double> macd_dif_3_5_2 = {0.0, 0.16666666666666607, 0.36111111111111072, 0.1990740740740744, -0.054783950617283139, 0.036394032921810648, 0.22738768861453984, 0.4198209590763593, 0.2473285560509062, -0.018057004299395274, -0.27017602369959626, -0.14251969288306476};
-  const std::vector<double> macd_dea_3_5_2 = {0.0, 0.11111111111111072, 0.27777777777777735, 0.22530864197530873, 0.038580246913580807, 0.03712277091906737, 0.16396604938271567, 0.3345359891784781, 0.27639770042676348, 0.080094563942657654, -0.1534191611521783, -0.14615284897276928};
-  const std::vector<double> macd_hist_3_5_2 = {0.0, 0.055555555555555358, 0.08333333333333337, -0.026234567901234324, -0.093364197530863946, -0.00072873799725672178, 0.063421639231824173, 0.085284969897881202, -0.029069144375857281, -0.098151568242052928, -0.11675686254741796, 0.0036331560897045201};
-  const std::vector<double> rsi3 = {kNaN, kNaN, kNaN, 66.666666666666657, 44.444444444444443, 62.962962962962962, 75.308641975308646, 83.539094650205769, 55.692729766803843, 37.128486511202567, 24.752324340801707, 49.834882893867807};
-  const std::vector<double> kdj_k = {kNaN, kNaN, 61.111111111111114, 49.074074074074076, 38.271604938271608, 50.514403292181072, 61.454046639231827, 68.747142203932327, 54.164761469288223, 41.665396535081044, 33.33248657894292, 47.22165771929528};
-  const std::vector<double> kdj_d = {kNaN, kNaN, 53.703703703703709, 52.160493827160501, 47.530864197530875, 48.525377229080945, 52.834933699131241, 58.139003200731608, 56.814255956917151, 51.764636149638456, 45.620586292739951, 46.154276768258399};
-  const std::vector<double> kdj_j = {kNaN, kNaN, 75.925925925925924, 42.901234567901227, 19.753086419753075, 54.492455418381326, 78.692272519433004, 89.963420210333766, 48.865772494030367, 21.46691730596622, 8.7562871513488574, 49.356419621369042};
-  const std::vector<double> boll_mid4 = {kNaN, kNaN, kNaN, 11.0, 11.0, 11.0, 11.0, 11.5, 12.0, 12.0, 11.5, 11.0};
-  const std::vector<double> boll_upper4 = {kNaN, kNaN, kNaN, 12.632993161855453, 12.632993161855453, 12.632993161855453, 12.632993161855453, 14.081988897471611, 13.632993161855453, 13.632993161855453, 14.081988897471611, 12.632993161855453};
-  const std::vector<double> boll_lower4 = {kNaN, kNaN, kNaN, 9.3670068381445475, 9.3670068381445475, 9.3670068381445475, 9.3670068381445475, 8.9180111025283892, 10.367006838144547, 10.367006838144547, 8.9180111025283892, 9.3670068381445475};
+  const std::vector<double> ma3 = {kNaN,
+                                   kNaN,
+                                   11.0,
+                                   11.333333333333334,
+                                   11.0,
+                                   10.666666666666666,
+                                   11.0,
+                                   12.0,
+                                   12.333333333333334,
+                                   12.0,
+                                   11.0,
+                                   10.666666666666666};
+  const std::vector<double> ema3 = {10.0,        10.5,         11.25,         11.125,
+                                    10.5625,     10.78125,     11.390625,     12.1953125,
+                                    12.09765625, 11.548828125, 10.7744140625, 10.88720703125};
+  const std::vector<double> macd_dif_3_5_2 = {0.0,
+                                              0.16666666666666607,
+                                              0.36111111111111072,
+                                              0.1990740740740744,
+                                              -0.054783950617283139,
+                                              0.036394032921810648,
+                                              0.22738768861453984,
+                                              0.4198209590763593,
+                                              0.2473285560509062,
+                                              -0.018057004299395274,
+                                              -0.27017602369959626,
+                                              -0.14251969288306476};
+  const std::vector<double> macd_dea_3_5_2 = {0.0,
+                                              0.11111111111111072,
+                                              0.27777777777777735,
+                                              0.22530864197530873,
+                                              0.038580246913580807,
+                                              0.03712277091906737,
+                                              0.16396604938271567,
+                                              0.3345359891784781,
+                                              0.27639770042676348,
+                                              0.080094563942657654,
+                                              -0.1534191611521783,
+                                              -0.14615284897276928};
+  const std::vector<double> macd_hist_3_5_2 = {0.0,
+                                               0.055555555555555358,
+                                               0.08333333333333337,
+                                               -0.026234567901234324,
+                                               -0.093364197530863946,
+                                               -0.00072873799725672178,
+                                               0.063421639231824173,
+                                               0.085284969897881202,
+                                               -0.029069144375857281,
+                                               -0.098151568242052928,
+                                               -0.11675686254741796,
+                                               0.0036331560897045201};
+  const std::vector<double> rsi3 = {kNaN,
+                                    kNaN,
+                                    kNaN,
+                                    66.666666666666657,
+                                    44.444444444444443,
+                                    62.962962962962962,
+                                    75.308641975308646,
+                                    83.539094650205769,
+                                    55.692729766803843,
+                                    37.128486511202567,
+                                    24.752324340801707,
+                                    49.834882893867807};
+  const std::vector<double> kdj_k = {kNaN,
+                                     kNaN,
+                                     61.111111111111114,
+                                     49.074074074074076,
+                                     38.271604938271608,
+                                     50.514403292181072,
+                                     61.454046639231827,
+                                     68.747142203932327,
+                                     54.164761469288223,
+                                     41.665396535081044,
+                                     33.33248657894292,
+                                     47.22165771929528};
+  const std::vector<double> kdj_d = {kNaN,
+                                     kNaN,
+                                     53.703703703703709,
+                                     52.160493827160501,
+                                     47.530864197530875,
+                                     48.525377229080945,
+                                     52.834933699131241,
+                                     58.139003200731608,
+                                     56.814255956917151,
+                                     51.764636149638456,
+                                     45.620586292739951,
+                                     46.154276768258399};
+  const std::vector<double> kdj_j = {kNaN,
+                                     kNaN,
+                                     75.925925925925924,
+                                     42.901234567901227,
+                                     19.753086419753075,
+                                     54.492455418381326,
+                                     78.692272519433004,
+                                     89.963420210333766,
+                                     48.865772494030367,
+                                     21.46691730596622,
+                                     8.7562871513488574,
+                                     49.356419621369042};
+  const std::vector<double> boll_mid4 = {kNaN, kNaN, kNaN, 11.0, 11.0, 11.0,
+                                         11.0, 11.5, 12.0, 12.0, 11.5, 11.0};
+  const std::vector<double> boll_upper4 = {kNaN,
+                                           kNaN,
+                                           kNaN,
+                                           12.632993161855453,
+                                           12.632993161855453,
+                                           12.632993161855453,
+                                           12.632993161855453,
+                                           14.081988897471611,
+                                           13.632993161855453,
+                                           13.632993161855453,
+                                           14.081988897471611,
+                                           12.632993161855453};
+  const std::vector<double> boll_lower4 = {kNaN,
+                                           kNaN,
+                                           kNaN,
+                                           9.3670068381445475,
+                                           9.3670068381445475,
+                                           9.3670068381445475,
+                                           9.3670068381445475,
+                                           8.9180111025283892,
+                                           10.367006838144547,
+                                           10.367006838144547,
+                                           8.9180111025283892,
+                                           9.3670068381445475};
   const std::vector<double> atr3 = {kNaN, kNaN, kNaN, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5};
-  const std::vector<double> obv = {0.0, 200.0, 500.0, 100.0, -400.0, 200.0, 900.0, 1700.0, 800.0, -200.0, -1300.0, -100.0};
-  const std::vector<double> cci4 = {kNaN, kNaN, kNaN, 0.0, -133.33333333333334, 0.0, 133.33333333333334, 100.0, 0.0, -133.33333333333334, -100.0, 0.0};
+  const std::vector<double> obv = {0.0,   200.0,  500.0, 100.0,  -400.0,  200.0,
+                                   900.0, 1700.0, 800.0, -200.0, -1300.0, -100.0};
+  const std::vector<double> cci4 = {kNaN,
+                                    kNaN,
+                                    kNaN,
+                                    0.0,
+                                    -133.33333333333334,
+                                    0.0,
+                                    133.33333333333334,
+                                    100.0,
+                                    0.0,
+                                    -133.33333333333334,
+                                    -100.0,
+                                    0.0};
   std::vector<double> a(n, kNaN), b(n, kNaN), c(n, kNaN);
   qc::kernels::ma(close.data(), n, 3, a.data());
   expect_series(a, ma3);
@@ -240,8 +384,7 @@ TEST_CASE("technical indicators match fixed reference values", "[kernels][indica
   expect_series(c, macd_hist_3_5_2);
   qc::kernels::rsi(close.data(), n, 3, a.data());
   expect_series(a, rsi3);
-  qc::kernels::kdj(high.data(), low.data(), close.data(), n, 3, 3, 3, a.data(), b.data(),
-                   c.data());
+  qc::kernels::kdj(high.data(), low.data(), close.data(), n, 3, 3, 3, a.data(), b.data(), c.data());
   expect_series(a, kdj_k);
   expect_series(b, kdj_d);
   expect_series(c, kdj_j);
@@ -286,9 +429,9 @@ TEST_CASE("indicator missing values and parameter semantics", "[kernels][indicat
   CHECK_THROWS_AS(
       qc::kernels::macd(up.data(), 5, 0, 5, 2, macd_out.data(), macd_out.data(), macd_out.data()),
       std::invalid_argument);
-  CHECK_THROWS_AS(qc::kernels::boll(up.data(), 5, 2, -1.0, macd_out.data(), macd_out.data(),
-                                    macd_out.data()),
-                  std::invalid_argument);
+  CHECK_THROWS_AS(
+      qc::kernels::boll(up.data(), 5, 2, -1.0, macd_out.data(), macd_out.data(), macd_out.data()),
+      std::invalid_argument);
   CHECK_THROWS_AS(qc::kernels::ma(up.data(), 5, 0, macd_out.data()), std::invalid_argument);
 }
 
@@ -327,7 +470,8 @@ TEST_CASE("panel wrappers flatten rolling and cross-sectional kernels", "[kernel
   REQUIRE(out.size() == st.size());
   expect_series(out, std::vector<double>{0, 0, 0, 0, 0, 1, 1, 1, 1, 1});
   qc::kernels::cross_panel(panel, "close", "zscore", out, qc::Layout::SecTime);
-  for (const double value : out) CHECK(std::isfinite(value));
+  for (const double value : out)
+    CHECK(std::isfinite(value));
   CHECK_THROWS_AS(qc::kernels::rolling_panel(panel, "nope", 2, "mean", out, qc::Layout::SecTime),
                   std::runtime_error);
   CHECK_THROWS_AS(qc::kernels::rolling_panel(panel, "close", 2, "corr", out, qc::Layout::SecTime),

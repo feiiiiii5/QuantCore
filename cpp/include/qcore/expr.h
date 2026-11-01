@@ -17,6 +17,7 @@ class Expression {
   ~Expression();
   Expression(Expression&&) noexcept;
   Expression& operator=(Expression&&) noexcept;
+
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;

@@ -24,8 +24,12 @@ BacktestResult run(Panel& panel, BacktestConfig cfg, std::vector<std::vector<dou
   return engine.run(source, token);
 }
 
-std::vector<Date> dates3() { return {20260105, 20260106, 20260107}; }
-std::vector<Date> dates4() { return {20260105, 20260106, 20260107, 20260108}; }
+std::vector<Date> dates3() {
+  return {20260105, 20260106, 20260107};
+}
+std::vector<Date> dates4() {
+  return {20260105, 20260106, 20260107, 20260108};
+}
 
 }  // namespace
 
@@ -129,7 +133,9 @@ TEST_CASE("suspended securities cannot be traded", "[engine][rules]") {
   auto weights = nan_weights(2, 1);
   weights[0] = {0.5};
   const BacktestResult r = run(panel, base_config(), weights);
-  CHECK(r.trades.empty());
+  REQUIRE(r.trades.size() == 1);  // Full trace: rejected intent with qty 0
+  CHECK(r.trades[0].qty == 0);
+  CHECK(r.trades[0].reason == RejectReason::Suspended);
   REQUIRE(r.reasons.size() == 1);
   CHECK(r.reasons[0].reason == RejectReason::Suspended);
 }
@@ -188,7 +194,9 @@ TEST_CASE("execution models pick the right next-day price", "[engine][exec]") {
     BacktestConfig cfg = base_config();
     cfg.exec.type = ExecType::AfterHoursFixed;
     const BacktestResult r = run(panel, cfg, weights);
-    CHECK(r.trades.empty());
+    REQUIRE(r.trades.size() == 1);  // Full trace: rejected intent with qty 0
+    CHECK(r.trades[0].qty == 0);
+    CHECK(r.trades[0].reason == RejectReason::NoQuote);
     REQUIRE(r.reasons.size() == 1);
     CHECK(r.reasons[0].reason == RejectReason::NoQuote);
   }
@@ -295,12 +303,13 @@ TEST_CASE("slippage is adverse and clamped inside the bar", "[engine][exec]") {
 TEST_CASE("NaN weights hold positions, zero weights exit, T+1 permits next-day sells",
           "[engine][t1]") {
   SynthPanel sp(dates4(), {synth_security("600000", 0)});
-  for (size_t t = 0; t < 4; ++t) sp.bar(0, t, 10.0, 10.2, 9.8, 10.0);
+  for (size_t t = 0; t < 4; ++t)
+    sp.bar(0, t, 10.0, 10.2, 9.8, 10.0);
   Panel panel = sp.build();
   auto weights = nan_weights(4, 1);
-  weights[0] = {0.5};  // buy on day 2
+  weights[0] = {0.5};   // buy on day 2
   weights[1] = {kNaN};  // no instruction on day 2
-  weights[2] = {0.0};  // exit on day 4
+  weights[2] = {0.0};   // exit on day 4
   const BacktestResult r = run(panel, base_config(), weights);
   REQUIRE(r.trades.size() == 2);
   CHECK(r.trades[0].side == Side::Buy);
@@ -316,7 +325,8 @@ TEST_CASE("NaN weights hold positions, zero weights exit, T+1 permits next-day s
 
 TEST_CASE("cancellation returns a partial result with a Canceled reason", "[engine][cancel]") {
   SynthPanel sp(dates3(), {synth_security("600000", 0)});
-  for (size_t t = 0; t < 3; ++t) sp.bar(0, t, 10.0, 10.2, 9.8, 10.0);
+  for (size_t t = 0; t < 3; ++t)
+    sp.bar(0, t, 10.0, 10.2, 9.8, 10.0);
   Panel panel = sp.build();
   auto weights = nan_weights(3, 1);
   weights[0] = {0.5};
@@ -337,7 +347,8 @@ TEST_CASE("cancellation returns a partial result with a Canceled reason", "[engi
 TEST_CASE("engine edge cases: no signals and single-day panel", "[engine][edge]") {
   SECTION("all-NaN weight matrix never rebalances") {
     SynthPanel sp(dates3(), {synth_security("600000", 0)});
-    for (size_t t = 0; t < 3; ++t) sp.bar(0, t, 10.0, 10.2, 9.8, 10.0);
+    for (size_t t = 0; t < 3; ++t)
+      sp.bar(0, t, 10.0, 10.2, 9.8, 10.0);
     Panel panel = sp.build();
     const BacktestResult r = run(panel, base_config(), nan_weights(3, 1));
     CHECK(r.trades.empty());
@@ -347,7 +358,8 @@ TEST_CASE("engine edge cases: no signals and single-day panel", "[engine][edge]"
   }
   SECTION("empty target source rows are ignored") {
     SynthPanel sp(dates3(), {synth_security("600000", 0)});
-    for (size_t t = 0; t < 3; ++t) sp.bar(0, t, 10.0, 10.2, 9.8, 10.0);
+    for (size_t t = 0; t < 3; ++t)
+      sp.bar(0, t, 10.0, 10.2, 9.8, 10.0);
     Panel panel = sp.build();
     const BacktestResult r = run(panel, base_config(), {});
     CHECK(r.trades.empty());

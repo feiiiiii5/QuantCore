@@ -20,16 +20,21 @@ std::string expression_repr(const qc::Expression& expression) {
 }
 
 qc::Layout parse_layout(const py::object& layout) {
-  if (layout.is_none()) return qc::Layout::SecTime;
-  if (py::isinstance<qc::Layout>(layout)) return py::cast<qc::Layout>(layout);
+  if (layout.is_none())
+    return qc::Layout::SecTime;
+  if (py::isinstance<qc::Layout>(layout))
+    return py::cast<qc::Layout>(layout);
   if (py::isinstance<py::str>(layout)) {
     std::string key;
     for (const char c : py::cast<std::string>(layout)) {
-      if (c == '_' || c == '-' || c == ' ') continue;
+      if (c == '_' || c == '-' || c == ' ')
+        continue;
       key.push_back(c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c);
     }
-    if (key == "sectime") return qc::Layout::SecTime;
-    if (key == "timesec") return qc::Layout::TimeSec;
+    if (key == "sectime")
+      return qc::Layout::SecTime;
+    if (key == "timesec")
+      return qc::Layout::TimeSec;
     throw py::value_error("layout must be 'sec_time'/'time_sec' or qc.Layout, got '" +
                           py::cast<std::string>(layout) + "'");
   }
@@ -50,11 +55,13 @@ py::array_t<double> evaluate_panel(const qc::Panel& panel, const qc::Expression&
     shape = {n_time, n_sec};
   }
   py::array_t<double> array(shape);
-  if (panel.n_sec() == 0 || panel.n_time() == 0) return array;
+  if (panel.n_sec() == 0 || panel.n_time() == 0)
+    return array;
   py::buffer_info buffer = array.request();
   auto* data = static_cast<double*>(buffer.ptr);
   qc::expr::Program program;
-  if (!expression.source().empty()) program = qc::expr::compile(expression.source());
+  if (!expression.source().empty())
+    program = qc::expr::compile(expression.source());
   {
     py::gil_scoped_release release;
     qc::expr::eval_panel_values(program, panel, layout, data);

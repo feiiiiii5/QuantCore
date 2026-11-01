@@ -21,8 +21,8 @@ inline std::string temp_panel_path() {
   const auto stamp =
       static_cast<long long>(std::chrono::steady_clock::now().time_since_epoch().count());
   return (std::filesystem::temp_directory_path() /
-          ("qcore_sim_" + std::to_string(stamp) + "_" +
-           std::to_string(counter.fetch_add(1)) + ".qpanel"))
+          ("qcore_sim_" + std::to_string(stamp) + "_" + std::to_string(counter.fetch_add(1)) +
+           ".qpanel"))
       .string();
 }
 
@@ -51,17 +51,23 @@ class SynthPanel {
     }
   }
 
-  size_t n_sec() const { return n_sec_; }
-  size_t n_time() const { return n_time_; }
+  size_t n_sec() const {
+    return n_sec_;
+  }
+  size_t n_time() const {
+    return n_time_;
+  }
 
   std::vector<double>& field(const std::string& name) {
     auto it = fields_.find(name);
-    if (it != fields_.end()) return it->second;
+    if (it != fields_.end())
+      return it->second;
     return fields_.emplace(name, std::vector<double>(n_sec_ * n_time_, kNaN)).first->second;
   }
 
   void set(const std::string& name, size_t sec, size_t time, double value) {
-    if (sec >= n_sec_ || time >= n_time_) throw std::out_of_range("SynthPanel::set");
+    if (sec >= n_sec_ || time >= n_time_)
+      throw std::out_of_range("SynthPanel::set");
     field(name)[sec * n_time_ + time] = value;
   }
 
@@ -77,11 +83,13 @@ class SynthPanel {
 
   void bar_all(size_t sec, double open, double high, double low, double close,
                double volume = 1000000.0) {
-    for (size_t t = 0; t < n_time_; ++t) bar(sec, t, open, high, low, close, volume);
+    for (size_t t = 0; t < n_time_; ++t)
+      bar(sec, t, open, high, low, close, volume);
   }
 
   void flag_all(const std::string& name, size_t sec, double value) {
-    for (size_t t = 0; t < n_time_; ++t) set(name, sec, t, value);
+    for (size_t t = 0; t < n_time_; ++t)
+      set(name, sec, t, value);
   }
 
   // Writes + maps the panel; the backing file is unlinked immediately after mmap.
@@ -118,7 +126,11 @@ inline BacktestConfig base_config() {
   return cfg;
 }
 
-inline Px px(double yuan) { return to_px(yuan); }
-inline Money money(double yuan) { return to_money(yuan); }
+inline Px px(double yuan) {
+  return to_px(yuan);
+}
+inline Money money(double yuan) {
+  return to_money(yuan);
+}
 
 }  // namespace qc::tests

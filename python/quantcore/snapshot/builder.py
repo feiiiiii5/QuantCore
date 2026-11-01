@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from .. import CppUnavailableError, panel_available
@@ -41,7 +42,8 @@ def _frame_digest(frame: pd.DataFrame) -> str:
     hasher.update("|".join(map(str, frame.columns)).encode())
     hasher.update(str(list(frame.dtypes.astype(str))).encode())
     hasher.update(str(len(frame)).encode())
-    hasher.update(pd.util.hash_pandas_object(frame, index=False).values.tobytes())
+    hashes = pd.util.hash_pandas_object(frame, index=False)
+    hasher.update(np.asarray(hashes, dtype=np.uint64).tobytes())
     return hasher.hexdigest()
 
 

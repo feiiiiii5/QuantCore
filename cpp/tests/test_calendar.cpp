@@ -50,7 +50,8 @@ TEST_CASE("weekdays excludes weekends and synthetic holidays", "[calendar]") {
   CHECK(!cal.is_trading_day(20201231));
   // Strictly increasing, all weekdays.
   for (std::size_t i = 0; i < cal.size(); ++i) {
-    if (i > 0) CHECK(cal.at(i) > cal.at(i - 1));
+    if (i > 0)
+      CHECK(cal.at(i) > cal.at(i - 1));
   }
 }
 

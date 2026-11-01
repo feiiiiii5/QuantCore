@@ -12,18 +12,18 @@ make setup
 
 ## 2. 合成数据（三步跑通）
 ```bash
-uv run qc data update --provider synthetic --securities 200 --years 5
-uv run qc snapshot build --dataset synthetic
-uv run qc backtest run --strategy ma_cross --start 2021-01-01 --end 2025-12-31
+uv run qc data update --provider synthetic --n-sec 200 --start 2020-01-02 --end 2024-12-31
+uv run qc snapshot build
+uv run qc backtest run --template dual_ma --start 2021-01-01 --end 2024-12-31
 ```
 输出会写明 `engine_backend == "cpp"`；结果含净值、回撤、指标与逐笔交易。
 
 ## 3. 真实数据（需要 Tushare Token）
 ```bash
 export TUSHARE_TOKEN=...   # 或 uv run qc data config 写入系统钥匙串
-uv run qc data update --provider tushare --start 20100101
-uv run qc snapshot build --dataset tushare
-uv run qc backtest run --strategy multi_factor --start 2020-01-01 --end 2025-12-31
+uv run qc data update --provider tushare --start 2010-01-01 --end 2024-12-31
+uv run qc snapshot build
+uv run qc backtest run --template multi_factor --start 2020-01-01 --end 2024-12-31
 ```
 
 ## 4. 常见问题

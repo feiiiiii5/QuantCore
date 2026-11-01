@@ -14,7 +14,8 @@ namespace {
 constexpr double kNaNValue = std::numeric_limits<double>::quiet_NaN();
 
 void fill_nan(double* out, size_t n) {
-  for (size_t i = 0; i < n; ++i) out[i] = kNaNValue;
+  for (size_t i = 0; i < n; ++i)
+    out[i] = kNaNValue;
 }
 
 void require_rolling(const double* x, size_t n, size_t window, double* out, const char* name) {
@@ -24,7 +25,9 @@ void require_rolling(const double* x, size_t n, size_t window, double* out, cons
 }
 
 // Window [i+1-window, i]; caller guarantees i + 1 >= window.
-std::size_t window_begin(std::size_t i, std::size_t window) { return i + 1 - window; }
+std::size_t window_begin(std::size_t i, std::size_t window) {
+  return i + 1 - window;
+}
 
 }  // namespace
 
@@ -41,7 +44,8 @@ void rolling_sum(const double* x, size_t n, size_t window, double* out) {
       continue;
     }
     double sum = 0.0;
-    for (size_t j = begin; j <= i; ++j) sum += x[j];
+    for (size_t j = begin; j <= i; ++j)
+      sum += x[j];
     out[i] = sum;
   }
 }
@@ -60,7 +64,8 @@ void rolling_mean(const double* x, size_t n, size_t window, double* out) {
       continue;
     }
     double sum = 0.0;
-    for (size_t j = begin; j <= i; ++j) sum += x[j];
+    for (size_t j = begin; j <= i; ++j)
+      sum += x[j];
     out[i] = sum / denominator;
   }
 }
@@ -83,7 +88,8 @@ void rolling_std(const double* x, size_t n, size_t window, double* out) {
       continue;
     }
     double sum = 0.0;
-    for (size_t j = begin; j <= i; ++j) sum += x[j];
+    for (size_t j = begin; j <= i; ++j)
+      sum += x[j];
     const double mean = sum / denominator;
     double squared = 0.0;
     for (size_t j = begin; j <= i; ++j) {
@@ -91,7 +97,8 @@ void rolling_std(const double* x, size_t n, size_t window, double* out) {
       squared += delta * delta;
     }
     double variance = squared / static_cast<double>(window - 1);
-    if (variance < 0.0) variance = 0.0;  // guard against -0 / rounding
+    if (variance < 0.0)
+      variance = 0.0;  // guard against -0 / rounding
     out[i] = std::sqrt(variance);
   }
 }
@@ -109,7 +116,8 @@ void rolling_min(const double* x, size_t n, size_t window, double* out) {
       continue;
     }
     double best = x[begin];
-    for (size_t j = begin + 1; j <= i; ++j) best = std::min(best, x[j]);
+    for (size_t j = begin + 1; j <= i; ++j)
+      best = std::min(best, x[j]);
     out[i] = best;
   }
 }
@@ -127,7 +135,8 @@ void rolling_max(const double* x, size_t n, size_t window, double* out) {
       continue;
     }
     double best = x[begin];
-    for (size_t j = begin + 1; j <= i; ++j) best = std::max(best, x[j]);
+    for (size_t j = begin + 1; j <= i; ++j)
+      best = std::max(best, x[j]);
     out[i] = best;
   }
 }
@@ -146,7 +155,8 @@ void rolling_argmax(const double* x, size_t n, size_t window, double* out) {
     }
     size_t best = 0;  // 0-based offset from the oldest window value; first max wins
     for (size_t k = 1; k < window; ++k) {
-      if (x[begin + k] > x[begin + best]) best = k;
+      if (x[begin + k] > x[begin + best])
+        best = k;
     }
     out[i] = static_cast<double>(best);
   }
@@ -176,8 +186,7 @@ void rolling_rank(const double* x, size_t n, size_t window, double* out) {
       }
     }
     // Average (mid-rank) percentile of the newest value, pandas rank(pct=True) compatible.
-    out[i] = (static_cast<double>(less) + (static_cast<double>(equal) + 1.0) * 0.5) /
-             denominator;
+    out[i] = (static_cast<double>(less) + (static_cast<double>(equal) + 1.0) * 0.5) / denominator;
   }
 }
 
@@ -260,7 +269,8 @@ void rolling_cov(const double* x, const double* y, size_t n, size_t window, doub
     const double mean_x = sum_x / denominator;
     const double mean_y = sum_y / denominator;
     double sxy = 0.0;
-    for (size_t j = begin; j <= i; ++j) sxy += (x[j] - mean_x) * (y[j] - mean_y);
+    for (size_t j = begin; j <= i; ++j)
+      sxy += (x[j] - mean_x) * (y[j] - mean_y);
     out[i] = sxy / static_cast<double>(window - 1);
   }
 }

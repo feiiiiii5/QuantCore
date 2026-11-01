@@ -40,22 +40,23 @@ std::vector<Date> validate_dates(std::vector<Date> dates) {
 
 std::string trim(const std::string& s) {
   const auto first = s.find_first_not_of(" \t\r\n");
-  if (first == std::string::npos) return std::string();
+  if (first == std::string::npos)
+    return std::string();
   const auto last = s.find_last_not_of(" \t\r\n");
   return s.substr(first, last - first + 1);
 }
 
 }  // namespace
 
-TradingCalendar::TradingCalendar(std::vector<Date> dates) : dates_(validate_dates(std::move(dates))) {
+TradingCalendar::TradingCalendar(std::vector<Date> dates)
+    : dates_(validate_dates(std::move(dates))) {
   index_.reserve(dates_.size() * 2 + 8);
   for (std::size_t i = 0; i < dates_.size(); ++i) {
     index_.emplace(dates_[i], static_cast<int>(i));
   }
 }
 
-TradingCalendar TradingCalendar::weekdays(Date start, Date end,
-                                          const std::vector<Date>& holidays) {
+TradingCalendar TradingCalendar::weekdays(Date start, Date end, const std::vector<Date>& holidays) {
   if (!valid_date(start) || !valid_date(end)) {
     throw std::invalid_argument("TradingCalendar::weekdays: start/end must be valid dates");
   }
@@ -77,7 +78,8 @@ TradingCalendar TradingCalendar::weekdays(Date start, Date end,
     if (detail::weekday(d) < 5 && holiday_set.find(d) == holiday_set.end()) {
       out.push_back(d);
     }
-    if (d == end) break;  // also guards against overflow past 99991231
+    if (d == end)
+      break;  // also guards against overflow past 99991231
     d = detail::next_day(d);
   }
   return TradingCalendar(std::move(out));
@@ -94,7 +96,8 @@ TradingCalendar TradingCalendar::from_file(const std::string& path) {
   while (std::getline(in, raw)) {
     ++line_no;
     const std::string line = trim(raw);
-    if (line.empty() || line[0] == '#') continue;
+    if (line.empty() || line[0] == '#')
+      continue;
     try {
       dates.push_back(string_to_date(line));
     } catch (const std::invalid_argument& e) {
@@ -125,32 +128,40 @@ int TradingCalendar::index_of(Date d) const {
   return it == index_.end() ? -1 : it->second;
 }
 
-bool TradingCalendar::is_trading_day(Date d) const { return index_.find(d) != index_.end(); }
+bool TradingCalendar::is_trading_day(Date d) const {
+  return index_.find(d) != index_.end();
+}
 
 std::size_t TradingCalendar::next_index(std::size_t i) const {
   // No successor for the last row (or for an index at/after the end): returns size().
-  if (i >= dates_.size()) return dates_.size();
-  if (i + 1 >= dates_.size()) return dates_.size();
+  if (i >= dates_.size())
+    return dates_.size();
+  if (i + 1 >= dates_.size())
+    return dates_.size();
   return i + 1;
 }
 
 std::size_t TradingCalendar::prev_index(std::size_t i) const {
   // No predecessor for row 0: returns size(). i == size() maps to the last row.
-  if (i == 0) return dates_.size();
-  if (i > dates_.size()) return dates_.size();
+  if (i == 0)
+    return dates_.size();
+  if (i > dates_.size())
+    return dates_.size();
   return i - 1;
 }
 
 Date TradingCalendar::next(Date d) const {
   const int i = index_of(d);
-  if (i < 0) return kInvalidDate;
+  if (i < 0)
+    return kInvalidDate;
   const std::size_t n = next_index(static_cast<std::size_t>(i));
   return n == dates_.size() ? kInvalidDate : dates_[n];
 }
 
 Date TradingCalendar::prev(Date d) const {
   const int i = index_of(d);
-  if (i < 0) return kInvalidDate;
+  if (i < 0)
+    return kInvalidDate;
   const std::size_t p = prev_index(static_cast<std::size_t>(i));
   return p == dates_.size() ? kInvalidDate : dates_[p];
 }
@@ -166,7 +177,8 @@ void TradingCalendar::save(const std::string& path) const {
       throw std::runtime_error("TradingCalendar::save: cannot write '" + temp.string() + "'");
     }
     out << "# qcore-calendar v1\n";
-    for (const Date d : dates_) out << date_to_string(d) << '\n';
+    for (const Date d : dates_)
+      out << date_to_string(d) << '\n';
     out.flush();
     if (!out) {
       std::error_code ignored;

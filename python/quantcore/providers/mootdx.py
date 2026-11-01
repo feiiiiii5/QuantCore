@@ -75,6 +75,7 @@ def normalize_mootdx_daily(
     )
     out = out.sort_values("date", kind="stable").reset_index(drop=True)
     out["pre_close"] = out["close"].shift(1)
+    out["pre_close"] = out["pre_close"].fillna(out["open"]).fillna(out["close"])
     pct = board_limit_pct(code)
     out["limit_up"] = np.round(out["pre_close"] * (1.0 + pct), 2)
     out["limit_down"] = np.round(out["pre_close"] * (1.0 - pct), 2)
@@ -122,7 +123,7 @@ class MootdxProvider(DataProvider):
                 "or inject a module for contract tests"
             )
         try:  # lazy import: mootdx is an optional dependency
-            import mootdx.quotes
+            import mootdx.quotes  # type: ignore[import-not-found]
         except ImportError as exc:
             raise ProviderUnavailableError(
                 "mootdx is not installed; install it to use the mootdx adapter"

@@ -41,13 +41,19 @@ struct FieldView {
 
 class PanelWriter {
  public:
-  PanelWriter(size_t n_sec, size_t n_time, std::vector<Date> dates, std::vector<Security> securities);
+  PanelWriter(size_t n_sec, size_t n_time, std::vector<Date> dates,
+              std::vector<Security> securities);
   // data is row-major according to layout; copied into the file.
   void add_field(const std::string& name, Layout layout, const double* data);
   void set_metadata(const std::string& json);
   void write(const std::string& path);
-  size_t n_sec() const { return n_sec_; }
-  size_t n_time() const { return n_time_; }
+  size_t n_sec() const {
+    return n_sec_;
+  }
+  size_t n_time() const {
+    return n_time_;
+  }
+
  private:
   size_t n_sec_, n_time_;
   std::vector<Date> dates_;
@@ -70,17 +76,36 @@ class Panel {
   Panel& operator=(Panel&&) noexcept;
   Panel(const Panel&) = delete;
   Panel& operator=(const Panel&) = delete;
-  size_t n_sec() const { return n_sec_; }
-  size_t n_time() const { return n_time_; }
-  const std::vector<Date>& dates() const { return dates_; }
-  const std::vector<Security>& securities() const { return securities_; }
-  const std::string& metadata_json() const { return metadata_; }
-  uint64_t content_hash() const { return content_hash_; }
+  size_t n_sec() const {
+    return n_sec_;
+  }
+  size_t n_time() const {
+    return n_time_;
+  }
+  const std::vector<Date>& dates() const {
+    return dates_;
+  }
+  const std::vector<Security>& securities() const {
+    return securities_;
+  }
+  const std::string& metadata_json() const {
+    return metadata_;
+  }
+  uint64_t content_hash() const {
+    return content_hash_;
+  }
   std::vector<std::string> field_names() const;
-  bool has_field(const std::string& name) const { return fields_.count(name) > 0; }
+  bool has_field(const std::string& name) const {
+    return fields_.count(name) > 0;
+  }
   FieldView field(const std::string& name) const;
-  const void* data() const { return map_; }
-  size_t file_size() const { return file_size_; }
+  const void* data() const {
+    return map_;
+  }
+  size_t file_size() const {
+    return file_size_;
+  }
+
  private:
   Panel() = default;
   void* map_ = nullptr;

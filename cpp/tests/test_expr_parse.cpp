@@ -120,9 +120,11 @@ TEST_CASE("invalid expressions throw std::invalid_argument with a position", "[e
 
 TEST_CASE("parser rejects pathologically deep or long input", "[expr][parse][limits]") {
   std::string deep;
-  for (int i = 0; i < 300; ++i) deep += "(";
+  for (int i = 0; i < 300; ++i)
+    deep += "(";
   deep += "close";
-  for (int i = 0; i < 300; ++i) deep += ")";
+  for (int i = 0; i < 300; ++i)
+    deep += ")";
   require_invalid(deep, "nesting too deep");
 
   const std::string huge(70000, '1');

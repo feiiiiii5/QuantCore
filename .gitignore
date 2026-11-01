@@ -34,3 +34,6 @@ experiments/
 !tests/golden/**/*.json
 # OS
 .DS_Store
+
+# TS build cache
+*.tsbuildinfo

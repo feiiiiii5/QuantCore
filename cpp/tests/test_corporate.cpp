@@ -98,8 +98,7 @@ TEST_CASE("ST price limit switches from 5% to 10% on 2026-07-06", "[engine][rule
 }
 
 TEST_CASE("delisted positions are force-liquidated at the last mark", "[engine][delist]") {
-  SynthPanel sp({20260105, 20260106, 20260107},
-                {synth_security("600000", 0, 20200101, 20260107)});
+  SynthPanel sp({20260105, 20260106, 20260107}, {synth_security("600000", 0, 20200101, 20260107)});
   sp.bar(0, 0, 10.0, 10.2, 9.8, 10.0);
   sp.bar(0, 1, 10.0, 10.2, 9.8, 10.0);  // buy 50,000 @ 10.00 on day 2
   // day 3: no quotes at all (delisted); the engine clears at the last mark (10.00).
@@ -122,7 +121,7 @@ TEST_CASE("suspension keeps the last valid mark for valuation", "[engine][corpor
   SynthPanel sp({20260105, 20260106, 20260107}, {synth_security("600000", 0)});
   sp.bar(0, 0, 10.0, 10.2, 9.8, 10.0);
   sp.bar(0, 1, 10.0, 10.2, 9.8, 10.0);  // buy 50,000 @ 10.00 on day 2
-  sp.set("suspended", 0, 2, 1.0);        // day 3 suspended, no quotes
+  sp.set("suspended", 0, 2, 1.0);       // day 3 suspended, no quotes
   Panel panel = sp.build();
   auto weights = nan_weights(3, 1);
   weights[0] = {0.5};

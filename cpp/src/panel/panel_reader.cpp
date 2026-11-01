@@ -91,12 +91,11 @@ void* map_readonly(const std::string& path, std::size_t& out_size) {
   if (fd < 0) {
     throw std::runtime_error("Panel::open: cannot open '" + path + "': " + std::strerror(errno));
   }
-  struct stat st {};
+  struct stat st{};
   if (::fstat(fd, &st) != 0) {
     const int error = errno;
     ::close(fd);
-    throw std::runtime_error("Panel::open: cannot stat '" + path + "': " +
-                             std::strerror(error));
+    throw std::runtime_error("Panel::open: cannot stat '" + path + "': " + std::strerror(error));
   }
   if (st.st_size <= 0 ||
       static_cast<unsigned long long>(st.st_size) >
@@ -109,8 +108,8 @@ void* map_readonly(const std::string& path, std::size_t& out_size) {
   const int error = errno;
   ::close(fd);
   if (view == MAP_FAILED) {
-    throw std::runtime_error("Panel::open: mmap failed for '" + path + "': " +
-                             std::strerror(error));
+    throw std::runtime_error("Panel::open: mmap failed for '" + path +
+                             "': " + std::strerror(error));
   }
   out_size = size;
   return view;
@@ -118,12 +117,14 @@ void* map_readonly(const std::string& path, std::size_t& out_size) {
 }
 
 void unmap_readonly(void* view, std::size_t size) {
-  if (view == nullptr) return;
+  if (view == nullptr)
+    return;
 #ifdef _WIN32
   (void)size;
   ::UnmapViewOfFile(view);
 #else
-  if (size != 0) ::munmap(view, size);
+  if (size != 0)
+    ::munmap(view, size);
 #endif
 }
 
@@ -220,8 +221,8 @@ Panel Panel::open(const std::string& path, bool verify_content) {
         std::string(reinterpret_cast<const char*>(base + header.meta_offset), header.meta_size);
     panel.dates_.reserve(n_time);
     for (std::size_t t = 0; t < n_time; ++t) {
-      const Date date =
-          static_cast<Date>(panel_format::get_u32(base + header.dates_offset + t * sizeof(uint32_t)));
+      const Date date = static_cast<Date>(
+          panel_format::get_u32(base + header.dates_offset + t * sizeof(uint32_t)));
       if (!valid_date(date)) {
         throw std::runtime_error("Panel::open: invalid date " + std::to_string(date) +
                                  " at time row " + std::to_string(t));
@@ -327,7 +328,8 @@ Panel::Panel(Panel&& other) noexcept
 }
 
 Panel& Panel::operator=(Panel&& other) noexcept {
-  if (this == &other) return *this;
+  if (this == &other)
+    return *this;
   if (map_ != nullptr) {
     unmap_readonly(map_, file_size_);
   }
@@ -351,7 +353,8 @@ Panel& Panel::operator=(Panel&& other) noexcept {
 std::vector<std::string> Panel::field_names() const {
   std::vector<std::string> names;
   names.reserve(fields_.size());
-  for (const auto& entry : fields_) names.push_back(entry.first);
+  for (const auto& entry : fields_)
+    names.push_back(entry.first);
   std::sort(names.begin(), names.end());
   return names;
 }

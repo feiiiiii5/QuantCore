@@ -77,7 +77,8 @@ inline void put_u32(uint8_t* p, uint32_t v) {
 }
 
 inline void put_u64(uint8_t* p, uint64_t v) {
-  for (int i = 0; i < 8; ++i) p[i] = static_cast<uint8_t>(v >> (8 * i));
+  for (int i = 0; i < 8; ++i)
+    p[i] = static_cast<uint8_t>(v >> (8 * i));
 }
 
 inline uint32_t get_u32(const uint8_t* p) {
@@ -87,7 +88,8 @@ inline uint32_t get_u32(const uint8_t* p) {
 
 inline uint64_t get_u64(const uint8_t* p) {
   uint64_t v = 0;
-  for (int i = 0; i < 8; ++i) v |= static_cast<uint64_t>(p[i]) << (8 * i);
+  for (int i = 0; i < 8; ++i)
+    v |= static_cast<uint64_t>(p[i]) << (8 * i);
   return v;
 }
 
@@ -100,7 +102,8 @@ inline uint64_t get_u64(const uint8_t* p) {
 //   [120,128) data_offset | [128,256) reserved zero.
 inline std::array<uint8_t, kHeaderSize> encode_header(const Header& h) {
   std::array<uint8_t, kHeaderSize> out{};
-  for (std::size_t i = 0; i < kMagic.size(); ++i) out[i] = static_cast<uint8_t>(kMagic[i]);
+  for (std::size_t i = 0; i < kMagic.size(); ++i)
+    out[i] = static_cast<uint8_t>(kMagic[i]);
   put_u32(out.data() + 8, h.version);
   put_u32(out.data() + 12, h.header_size);
   put_u32(out.data() + 16, h.flags);

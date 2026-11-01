@@ -37,7 +37,8 @@ void require_value(double actual, double expected) {
 struct TemporaryFile {
   explicit TemporaryFile(std::string value) : path(std::move(value)) {}
   ~TemporaryFile() {
-    if (path.empty()) return;
+    if (path.empty())
+      return;
     std::error_code error;
     std::filesystem::remove(path, error);
   }
@@ -84,7 +85,8 @@ qc::Date sequential_date(size_t index) {
 std::vector<qc::Date> sequential_dates(size_t n_time) {
   std::vector<qc::Date> dates;
   dates.reserve(n_time);
-  for (size_t t = 0; t < n_time; ++t) dates.push_back(sequential_date(t));
+  for (size_t t = 0; t < n_time; ++t)
+    dates.push_back(sequential_date(t));
   return dates;
 }
 
@@ -118,16 +120,20 @@ TemporaryFile write_panel(const PanelData& data) {
 
 class TestPanel {
  public:
-  explicit TestPanel(PanelData data) : file_(write_panel(data)), panel_(qc::Panel::open(file_.path)) {}
+  explicit TestPanel(PanelData data)
+      : file_(write_panel(data)), panel_(qc::Panel::open(file_.path)) {}
 
-  const qc::Panel& panel() const { return panel_; }
+  const qc::Panel& panel() const {
+    return panel_;
+  }
 
  private:
   TemporaryFile file_;
   qc::Panel panel_;
 };
 
-std::vector<double> column(const std::vector<std::vector<double>>& rows, double (*transform)(double)) {
+std::vector<double> column(const std::vector<std::vector<double>>& rows,
+                           double (*transform)(double)) {
   std::vector<double> values;
   for (const auto& row : rows) {
     values.reserve(values.size() + row.size());
@@ -165,7 +171,9 @@ PanelData main_panel_data() {
   return data;
 }
 
-qc::Expression parse(const std::string& source) { return qc::Expression::parse(source); }
+qc::Expression parse(const std::string& source) {
+  return qc::Expression::parse(source);
+}
 
 }  // namespace
 
@@ -387,8 +395,7 @@ TEST_CASE("missing fields throw and returns is derived from close", "[expr][eval
 
   // An explicit returns column wins over the derived version.
   PanelData explicit_returns = panel_from_rows({{1.0, 2.0, 3.0}});
-  explicit_returns.fields.emplace_back("returns",
-                                       std::vector<double>{0.25, 0.25, 0.25});
+  explicit_returns.fields.emplace_back("returns", std::vector<double>{0.25, 0.25, 0.25});
   const TestPanel explicit_fixture(explicit_returns);
   require_value(parse("returns").eval(explicit_fixture.panel(), 0, 0), 0.25);
 }

@@ -23,13 +23,27 @@ void append_json_string(std::string& out, const std::string& s) {
   for (const char raw : s) {
     const auto c = static_cast<unsigned char>(raw);
     switch (c) {
-      case '"': out += "\\\""; break;
-      case '\\': out += "\\\\"; break;
-      case '\b': out += "\\b"; break;
-      case '\f': out += "\\f"; break;
-      case '\n': out += "\\n"; break;
-      case '\r': out += "\\r"; break;
-      case '\t': out += "\\t"; break;
+      case '"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\b':
+        out += "\\b";
+        break;
+      case '\f':
+        out += "\\f";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
       default:
         if (c < 0x20U) {
           char buf[8];
@@ -43,7 +57,9 @@ void append_json_string(std::string& out, const std::string& s) {
   out.push_back('"');
 }
 
-void append_json_int(std::string& out, int64_t v) { out += std::to_string(v); }
+void append_json_int(std::string& out, int64_t v) {
+  out += std::to_string(v);
+}
 
 [[noreturn]] void fail(const std::string& message) {
   throw std::runtime_error("securities JSON: " + message);
@@ -88,25 +104,47 @@ class JsonReader {
     std::string out;
     while (pos_ < text_.size()) {
       const char c = text_[pos_++];
-      if (c == '"') return out;
+      if (c == '"')
+        return out;
       if (c != '\\') {
-        if (static_cast<unsigned char>(c) < 0x20U) fail("raw control character in string");
+        if (static_cast<unsigned char>(c) < 0x20U)
+          fail("raw control character in string");
         out.push_back(c);
         continue;
       }
-      if (pos_ >= text_.size()) fail("unterminated escape");
+      if (pos_ >= text_.size())
+        fail("unterminated escape");
       const char esc = text_[pos_++];
       switch (esc) {
-        case '"': out.push_back('"'); break;
-        case '\\': out.push_back('\\'); break;
-        case '/': out.push_back('/'); break;
-        case 'b': out.push_back('\b'); break;
-        case 'f': out.push_back('\f'); break;
-        case 'n': out.push_back('\n'); break;
-        case 'r': out.push_back('\r'); break;
-        case 't': out.push_back('\t'); break;
-        case 'u': append_unicode(out); break;
-        default: fail(std::string("invalid escape '\\") + esc + "'");
+        case '"':
+          out.push_back('"');
+          break;
+        case '\\':
+          out.push_back('\\');
+          break;
+        case '/':
+          out.push_back('/');
+          break;
+        case 'b':
+          out.push_back('\b');
+          break;
+        case 'f':
+          out.push_back('\f');
+          break;
+        case 'n':
+          out.push_back('\n');
+          break;
+        case 'r':
+          out.push_back('\r');
+          break;
+        case 't':
+          out.push_back('\t');
+          break;
+        case 'u':
+          append_unicode(out);
+          break;
+        default:
+          fail(std::string("invalid escape '\\") + esc + "'");
       }
     }
     fail("unterminated string");
@@ -124,19 +162,23 @@ class JsonReader {
     std::size_t digits = 0;
     while (pos_ < text_.size() && text_[pos_] >= '0' && text_[pos_] <= '9') {
       const auto digit = static_cast<std::uint64_t>(text_[pos_] - '0');
-      if (magnitude > (UINT64_MAX - digit) / 10) fail("integer overflow");
+      if (magnitude > (UINT64_MAX - digit) / 10)
+        fail("integer overflow");
       magnitude = magnitude * 10 + digit;
       ++pos_;
       ++digits;
     }
-    if (digits == 0) fail("expected integer at byte " + std::to_string(start));
+    if (digits == 0)
+      fail("expected integer at byte " + std::to_string(start));
     if (negative) {
-      if (magnitude > static_cast<std::uint64_t>(INT64_MAX) + 1U) fail("integer underflow");
+      if (magnitude > static_cast<std::uint64_t>(INT64_MAX) + 1U)
+        fail("integer underflow");
       return magnitude == static_cast<std::uint64_t>(INT64_MAX) + 1U
                  ? INT64_MIN
                  : -static_cast<int64_t>(magnitude);
     }
-    if (magnitude > static_cast<std::uint64_t>(INT64_MAX)) fail("integer overflow");
+    if (magnitude > static_cast<std::uint64_t>(INT64_MAX))
+      fail("integer overflow");
     return static_cast<int64_t>(magnitude);
   }
 
@@ -201,7 +243,8 @@ class JsonReader {
   void skip_number() {
     skip_ws();
     const std::size_t start = pos_;
-    if (pos_ < text_.size() && (text_[pos_] == '-' || text_[pos_] == '+')) ++pos_;
+    if (pos_ < text_.size() && (text_[pos_] == '-' || text_[pos_] == '+'))
+      ++pos_;
     bool saw_digit = false;
     while (pos_ < text_.size()) {
       const char c = text_[pos_];
@@ -214,29 +257,36 @@ class JsonReader {
         break;
       }
     }
-    if (!saw_digit || pos_ == start) fail("expected number at byte " + std::to_string(start));
+    if (!saw_digit || pos_ == start)
+      fail("expected number at byte " + std::to_string(start));
   }
 
   void expect_literal(const char* literal) {
     for (const char* p = literal; *p != '\0'; ++p) {
-      if (pos_ >= text_.size() || text_[pos_] != *p) fail(std::string("expected '") + literal + "'");
+      if (pos_ >= text_.size() || text_[pos_] != *p)
+        fail(std::string("expected '") + literal + "'");
       ++pos_;
     }
   }
 
   static int hex_value(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= '0' && c <= '9')
+      return c - '0';
+    if (c >= 'a' && c <= 'f')
+      return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+      return c - 'A' + 10;
     return -1;
   }
 
   uint32_t parse_hex4() {
-    if (pos_ + 4 > text_.size()) fail("truncated \\u escape");
+    if (pos_ + 4 > text_.size())
+      fail("truncated \\u escape");
     uint32_t value = 0;
     for (int i = 0; i < 4; ++i) {
       const int h = hex_value(text_[pos_ + static_cast<std::size_t>(i)]);
-      if (h < 0) fail("invalid \\u escape");
+      if (h < 0)
+        fail("invalid \\u escape");
       value = value * 16 + static_cast<uint32_t>(h);
     }
     pos_ += 4;
@@ -269,7 +319,8 @@ class JsonReader {
       }
       pos_ += 2;
       const uint32_t low = parse_hex4();
-      if (low < 0xDC00U || low > 0xDFFFU) fail("invalid low surrogate");
+      if (low < 0xDC00U || low > 0xDFFFU)
+        fail("invalid low surrogate");
       cp = 0x10000U + ((cp - 0xD800U) << 10) + (low - 0xDC00U);
     } else if (cp >= 0xDC00U && cp <= 0xDFFFU) {
       fail("unpaired low surrogate");
@@ -300,15 +351,18 @@ Security parse_security_object(JsonReader& reader) {
         sec.name = reader.parse_string();
       } else if (key == "board") {
         const int64_t board = reader.parse_int();
-        if (board < 0 || board > 3) fail("board must be 0..3");
+        if (board < 0 || board > 3)
+          fail("board must be 0..3");
         sec.board = static_cast<int32_t>(board);
       } else if (key == "list_date") {
         const int64_t date = reader.parse_int();
-        if (date < INT32_MIN || date > INT32_MAX) fail("list_date out of int32 range");
+        if (date < INT32_MIN || date > INT32_MAX)
+          fail("list_date out of int32 range");
         sec.list_date = static_cast<Date>(date);
       } else if (key == "delist_date") {
         const int64_t date = reader.parse_int();
-        if (date < INT32_MIN || date > INT32_MAX) fail("delist_date out of int32 range");
+        if (date < INT32_MIN || date > INT32_MAX)
+          fail("delist_date out of int32 range");
         sec.delist_date = static_cast<Date>(date);
       } else {
         reader.skip_value();
@@ -321,10 +375,14 @@ Security parse_security_object(JsonReader& reader) {
     }
   }
   reader.expect('}');
-  if (!has_sec_id || sec.sec_id.empty()) fail("security object missing non-empty sec_id");
-  if (!has_code || sec.code.empty()) fail("security object missing non-empty code");
-  if (sec.list_date != kInvalidDate && !valid_date(sec.list_date)) fail("invalid list_date");
-  if (sec.delist_date != kInvalidDate && !valid_date(sec.delist_date)) fail("invalid delist_date");
+  if (!has_sec_id || sec.sec_id.empty())
+    fail("security object missing non-empty sec_id");
+  if (!has_code || sec.code.empty())
+    fail("security object missing non-empty code");
+  if (sec.list_date != kInvalidDate && !valid_date(sec.list_date))
+    fail("invalid list_date");
+  if (sec.delist_date != kInvalidDate && !valid_date(sec.delist_date))
+    fail("invalid delist_date");
   if (sec.list_date != kInvalidDate && sec.delist_date != kInvalidDate &&
       sec.delist_date < sec.list_date) {
     fail("delist_date precedes list_date for security '" + sec.sec_id + "'");
@@ -356,7 +414,8 @@ std::string securities_to_json(const std::vector<Security>& secs) {
   out.reserve(secs.size() * 96 + 32);
   out += "{\"securities\":[";
   for (std::size_t i = 0; i < secs.size(); ++i) {
-    if (i != 0) out.push_back(',');
+    if (i != 0)
+      out.push_back(',');
     const Security& sec = secs[i];
     out += "{\"sec_id\":";
     append_json_string(out, sec.sec_id);
@@ -378,7 +437,8 @@ std::string securities_to_json(const std::vector<Security>& secs) {
 
 std::vector<Security> securities_from_json(const std::string& json) {
   JsonReader reader(json);
-  if (reader.eof()) fail("empty document");
+  if (reader.eof())
+    fail("empty document");
   std::vector<Security> secs;
   if (reader.peek() == '[') {
     secs = parse_security_array(reader);
@@ -390,7 +450,8 @@ std::vector<Security> securities_from_json(const std::string& json) {
         const std::string key = reader.parse_string();
         reader.expect(':');
         if (key == "securities") {
-          if (found) fail("duplicate 'securities' key");
+          if (found)
+            fail("duplicate 'securities' key");
           secs = parse_security_array(reader);
           found = true;
         } else {
@@ -404,13 +465,16 @@ std::vector<Security> securities_from_json(const std::string& json) {
       }
     }
     reader.expect('}');
-    if (!found) fail("missing 'securities' array");
+    if (!found)
+      fail("missing 'securities' array");
   }
-  if (!reader.eof()) fail("trailing characters after document");
+  if (!reader.eof())
+    fail("trailing characters after document");
   std::unordered_set<std::string> ids;
   ids.reserve(secs.size() * 2 + 8);
   for (const Security& sec : secs) {
-    if (!ids.insert(sec.sec_id).second) fail("duplicate sec_id '" + sec.sec_id + "'");
+    if (!ids.insert(sec.sec_id).second)
+      fail("duplicate sec_id '" + sec.sec_id + "'");
   }
   return secs;
 }

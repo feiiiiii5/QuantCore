@@ -16,7 +16,8 @@ namespace {
 constexpr double kNaNValue = std::numeric_limits<double>::quiet_NaN();
 
 void fill_nan(double* out, size_t n) {
-  for (size_t i = 0; i < n; ++i) out[i] = kNaNValue;
+  for (size_t i = 0; i < n; ++i)
+    out[i] = kNaNValue;
 }
 
 void require_single(const double* x, size_t n, double* out, const char* name) {
@@ -46,11 +47,15 @@ void ema_inplace(const double* x, size_t n, size_t window, double* out) {
 }
 
 double rsi_from_averages(double average_gain, double average_loss) {
-  if (!(average_gain > 0.0) && !(average_loss > 0.0)) return 50.0;  // flat window: neutral
-  if (!(average_loss > 0.0)) return 100.0;
-  if (!(average_gain > 0.0)) return 0.0;
+  if (!(average_gain > 0.0) && !(average_loss > 0.0))
+    return 50.0;  // flat window: neutral
+  if (!(average_loss > 0.0))
+    return 100.0;
+  if (!(average_gain > 0.0))
+    return 0.0;
   const double rs = average_gain / average_loss;
-  if (!std::isfinite(rs)) return 100.0;
+  if (!std::isfinite(rs))
+    return 100.0;
   return 100.0 - 100.0 / (1.0 + rs);
 }
 
@@ -66,8 +71,8 @@ void ema(const double* close, size_t n, size_t window, double* out) {
   ema_inplace(close, n, window, out);
 }
 
-void macd(const double* close, size_t n, int fast, int slow, int signal, double* dif,
-          double* dea, double* hist) {
+void macd(const double* close, size_t n, int fast, int slow, int signal, double* dif, double* dea,
+          double* hist) {
   detail::require_series(close, n, "macd");
   detail::require_positive(fast, "macd", "fast");
   detail::require_positive(slow, "macd", "slow");
@@ -80,9 +85,8 @@ void macd(const double* close, size_t n, int fast, int slow, int signal, double*
   ema_inplace(close, n, static_cast<size_t>(fast), fast_ema.data());
   ema_inplace(close, n, static_cast<size_t>(slow), slow_ema.data());
   for (size_t i = 0; i < n; ++i) {
-    dif[i] = (detail::valid(fast_ema[i]) && detail::valid(slow_ema[i]))
-                 ? fast_ema[i] - slow_ema[i]
-                 : kNaNValue;
+    dif[i] = (detail::valid(fast_ema[i]) && detail::valid(slow_ema[i])) ? fast_ema[i] - slow_ema[i]
+                                                                        : kNaNValue;
   }
   // Signal line is an EMA of DIF; DIF is NaN during warm-up and ema_inplace seeds on the
   // first valid value (index 0 here because both EMAs start at close[0]).
@@ -96,7 +100,8 @@ void rsi(const double* close, size_t n, size_t window, double* out) {
   require_single(close, n, out, "rsi");
   detail::require_window(window, "rsi");
   fill_nan(out, n);
-  if (n <= window) return;  // need window changes => window + 1 closes
+  if (n <= window)
+    return;  // need window changes => window + 1 closes
   // Seed with the first fully valid run of window + 1 closes (simple average of changes).
   std::size_t seed = n;  // sentinel
   for (std::size_t s = 0; s + window < n; ++s) {
@@ -112,7 +117,8 @@ void rsi(const double* close, size_t n, size_t window, double* out) {
       break;
     }
   }
-  if (seed == n) return;
+  if (seed == n)
+    return;
   double average_gain = 0.0;
   double average_loss = 0.0;
   for (std::size_t j = seed + 1; j <= seed + window; ++j) {
@@ -129,7 +135,8 @@ void rsi(const double* close, size_t n, size_t window, double* out) {
   out[seed + window] = rsi_from_averages(average_gain, average_loss);
   // Wilder smoothing afterwards; a missing close yields NaN and preserves the state.
   for (std::size_t i = seed + window + 1; i < n; ++i) {
-    if (!detail::valid(close[i]) || !detail::valid(close[i - 1])) continue;
+    if (!detail::valid(close[i]) || !detail::valid(close[i - 1]))
+      continue;
     const double change = close[i] - close[i - 1];
     const double gain = change > 0.0 ? change : 0.0;
     const double loss = change < 0.0 ? -change : 0.0;
@@ -154,7 +161,8 @@ void kdj(const double* high, const double* low, const double* close, size_t n, i
   fill_nan(d, n);
   fill_nan(j, n);
   const std::size_t window = static_cast<std::size_t>(k_period);
-  if (n < window) return;
+  if (n < window)
+    return;
   const double k_alpha = 1.0 / static_cast<double>(k_period);
   const double d_alpha = 1.0 / static_cast<double>(d_period);
   double k_state = 50.0;
@@ -162,8 +170,8 @@ void kdj(const double* high, const double* low, const double* close, size_t n, i
   bool seeded = false;
   for (size_t i = window - 1; i < n; ++i) {
     const size_t begin = i + 1 - window;
-    if (!detail::window_valid(high, begin, i + 1) ||
-        !detail::window_valid(low, begin, i + 1) || !detail::valid(close[i])) {
+    if (!detail::window_valid(high, begin, i + 1) || !detail::window_valid(low, begin, i + 1) ||
+        !detail::valid(close[i])) {
       continue;  // output stays NaN, K/D state is preserved
     }
     double hh = high[begin];
@@ -182,8 +190,7 @@ void kdj(const double* high, const double* low, const double* close, size_t n, i
     d_state = (1.0 - d_alpha) * d_state + d_alpha * k_state;
     k[i] = k_state;
     d[i] = d_state;
-    j[i] = static_cast<double>(j_period) * k_state -
-           static_cast<double>(j_period - 1) * d_state;
+    j[i] = static_cast<double>(j_period) * k_state - static_cast<double>(j_period - 1) * d_state;
   }
 }
 
@@ -220,7 +227,8 @@ void atr(const double* high, const double* low, const double* close, size_t n, s
   detail::require_window(window, "atr");
   detail::require_output(out, n, "atr");
   fill_nan(out, n);
-  if (n <= window) return;  // needs TR[1..window] for the seed
+  if (n <= window)
+    return;  // needs TR[1..window] for the seed
   auto true_range = [&](size_t index) -> double {
     if (!detail::valid(high[index]) || !detail::valid(low[index]) ||
         !detail::valid(close[index - 1])) {
@@ -248,13 +256,15 @@ void atr(const double* high, const double* low, const double* close, size_t n, s
         }
         sum += candidate;
       }
-      if (!ok) continue;
+      if (!ok)
+        continue;
       atr_state = sum / denominator;
       seeded = true;
       out[i] = atr_state;
       continue;
     }
-    if (!detail::valid(tr)) continue;  // NaN stays, ATR state preserved
+    if (!detail::valid(tr))
+      continue;  // NaN stays, ATR state preserved
     atr_state = (atr_state * (denominator - 1.0) + tr) / denominator;
     out[i] = atr_state;
   }
@@ -264,13 +274,13 @@ void obv(const double* close, const double* volume, size_t n, double* out) {
   detail::require_series(close, n, "obv/close");
   detail::require_series(volume, n, "obv/volume");
   detail::require_output(out, n, "obv");
-  if (n == 0) return;
+  if (n == 0)
+    return;
   // OBV is defined as starting from zero on the first observation.
   double state = 0.0;
   out[0] = 0.0;
   for (size_t i = 1; i < n; ++i) {
-    if (!detail::valid(close[i]) || !detail::valid(close[i - 1]) ||
-        !detail::valid(volume[i])) {
+    if (!detail::valid(close[i]) || !detail::valid(close[i - 1]) || !detail::valid(volume[i])) {
       out[i] = kNaNValue;
       continue;
     }
@@ -291,14 +301,14 @@ void cci(const double* high, const double* low, const double* close, size_t n, s
   detail::require_window(window, "cci");
   detail::require_output(out, n, "cci");
   fill_nan(out, n);
-  if (n < window) return;
+  if (n < window)
+    return;
   const double denominator = static_cast<double>(window);
   std::vector<double> typical;  // reused per window; no cross-window state
   typical.reserve(window);
   for (size_t i = window - 1; i < n; ++i) {
     const size_t begin = i + 1 - window;
-    if (!detail::window_valid(high, begin, i + 1) ||
-        !detail::window_valid(low, begin, i + 1) ||
+    if (!detail::window_valid(high, begin, i + 1) || !detail::window_valid(low, begin, i + 1) ||
         !detail::window_valid(close, begin, i + 1)) {
       continue;
     }
@@ -311,9 +321,11 @@ void cci(const double* high, const double* low, const double* close, size_t n, s
     }
     const double mean = sum / denominator;
     double mean_deviation = 0.0;
-    for (const double tp : typical) mean_deviation += std::abs(tp - mean);
+    for (const double tp : typical)
+      mean_deviation += std::abs(tp - mean);
     mean_deviation /= denominator;
-    if (!(mean_deviation > 0.0) || !std::isfinite(mean_deviation)) continue;
+    if (!(mean_deviation > 0.0) || !std::isfinite(mean_deviation))
+      continue;
     out[i] = (typical.back() - mean) / (0.015 * mean_deviation);
   }
 }

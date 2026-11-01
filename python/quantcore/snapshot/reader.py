@@ -81,7 +81,7 @@ class Snapshot:
                 "seed": self.manifest.seed,
                 "disclaimer": self.manifest.disclaimer,
                 "snapshot_id": self.manifest.snapshot_id,
-                "snapshot_content_hash": self.manifest.content_hash,
+                "content_hash": self.manifest.content_hash,
                 "config": self.manifest.metadata.get("config"),
                 "scenarios": self.manifest.metadata.get("scenarios"),
             },

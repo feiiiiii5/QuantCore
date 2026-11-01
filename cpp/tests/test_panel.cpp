@@ -43,12 +43,15 @@ std::vector<qc::Security> make_securities() {
           {"S3", "300750", "宁德时代", 1, 20180611, 0}};
 }
 
-std::vector<qc::Date> make_dates() { return {20200102, 20200103, 20200106, 20200107}; }
+std::vector<qc::Date> make_dates() {
+  return {20200102, 20200103, 20200106, 20200107};
+}
 
 std::vector<double> make_st(size_t n_sec, size_t n_time) {
   std::vector<double> data(n_sec * n_time);
   for (size_t s = 0; s < n_sec; ++s) {
-    for (size_t t = 0; t < n_time; ++t) data[s * n_time + t] = static_cast<double>(s * 100 + t) + 0.5;
+    for (size_t t = 0; t < n_time; ++t)
+      data[s * n_time + t] = static_cast<double>(s * 100 + t) + 0.5;
   }
   return data;
 }
@@ -56,7 +59,8 @@ std::vector<double> make_st(size_t n_sec, size_t n_time) {
 std::vector<double> make_ts(size_t n_sec, size_t n_time) {
   std::vector<double> data(n_sec * n_time);
   for (size_t t = 0; t < n_time; ++t) {
-    for (size_t s = 0; s < n_sec; ++s) data[t * n_sec + s] = 1000.0 + static_cast<double>(s * 10 + t);
+    for (size_t s = 0; s < n_sec; ++s)
+      data[t * n_sec + s] = 1000.0 + static_cast<double>(s * 10 + t);
   }
   return data;
 }
@@ -157,10 +161,10 @@ TEST_CASE("panel header matches the documented v1 layout", "[panel][format]") {
   const auto bytes = read_all(file.path);
   REQUIRE(bytes.size() >= 256);
   CHECK(std::memcmp(bytes.data(), "QPANEL", 6) == 0);
-  CHECK(get_u32(bytes, 8) == 1);         // version
-  CHECK(get_u32(bytes, 12) == 256);      // header size
-  CHECK(get_u32(bytes, 16) == 0);        // flags
-  CHECK(get_u32(bytes, 20) == 2);        // field count
+  CHECK(get_u32(bytes, 8) == 1);     // version
+  CHECK(get_u32(bytes, 12) == 256);  // header size
+  CHECK(get_u32(bytes, 16) == 0);    // flags
+  CHECK(get_u32(bytes, 20) == 2);    // field count
   CHECK(get_u64(bytes, 24) == bytes.size());
   CHECK(get_u64(bytes, 32) == 3);  // n_sec
   CHECK(get_u64(bytes, 40) == 4);  // n_time
@@ -319,10 +323,10 @@ TEST_CASE("writer validates inputs", "[panel][validation]") {
                   std::invalid_argument);
   CHECK_THROWS_AS(writer.set_metadata(""), std::invalid_argument);
   writer.set_metadata("{}");
-  CHECK_THROWS_AS(writer.write((std::filesystem::temp_directory_path() / "qcore_no_such_dir" /
-                                "panel.qpanel")
-                                   .string()),
-                  std::runtime_error);
+  CHECK_THROWS_AS(
+      writer.write(
+          (std::filesystem::temp_directory_path() / "qcore_no_such_dir" / "panel.qpanel").string()),
+      std::runtime_error);
 }
 
 TEST_CASE("panel with no fields is valid but empty", "[panel]") {

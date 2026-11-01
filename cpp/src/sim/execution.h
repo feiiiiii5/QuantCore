@@ -15,7 +15,7 @@
 namespace qc {
 
 struct ExecRequest {
-  size_t date_index = 0;                        // panel row of the execution day
+  size_t date_index = 0;  // panel row of the execution day
   Date date = kInvalidDate;
   const std::vector<double>* weights = nullptr;  // target weights (signal date)
   Money signal_equity = 0;                       // equity at signal close
@@ -61,9 +61,9 @@ class Executor {
   Qty affordable(size_t sec, Qty want, Px fill_px) const;
   void reject(size_t sec, Side side, Date date, RejectReason reason, std::vector<Trade>& trades,
               std::map<RejectReason, uint64_t>& reasons, ExecOutcome& out) const;
-  void execute_one(const Intent& intent, Date date, size_t time,
-                   const std::vector<Px>& prev_close, std::vector<Trade>& trades,
-                   std::map<RejectReason, uint64_t>& reasons, ExecOutcome& out);
+  void execute_one(const Intent& intent, Date date, size_t time, const std::vector<Px>& prev_close,
+                   std::vector<Trade>& trades, std::map<RejectReason, uint64_t>& reasons,
+                   ExecOutcome& out);
 
   const PanelViews& views_;
   const BacktestConfig& cfg_;

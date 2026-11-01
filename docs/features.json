@@ -7,22 +7,22 @@
       "id": "M0-001",
       "milestone": "M0",
       "title": "repo bootstrap",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "make setup / make test; git repo initialized"
     },
     {
       "id": "M0-002",
       "milestone": "M0",
       "title": "toolchain mirrors",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Makefile + docs/DEV-SETUP.md mirror config; uv sync OK"
     },
     {
       "id": "M0-003",
       "milestone": "M0",
       "title": "Makefile targets",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "make setup/build/test/bench/lint/verify-cpp/ci-local/package"
     },
     {
       "id": "M0-004",
@@ -35,141 +35,141 @@
       "id": "M0-005",
       "milestone": "M0",
       "title": "pybind11 NumPy zero-copy smoke",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "_qcore Panel.field zero-copy ndarray (writeable=False, base=Panel) tested"
     },
     {
       "id": "M0-006",
       "milestone": "M0",
       "title": "wheel build",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "dist/quantcore-0.1.0-cp312-cp312-macosx_27_0_arm64.whl"
     },
     {
       "id": "M0-007",
       "milestone": "M0",
       "title": "AGENTS/PLAN/PROGRESS/DECISIONS",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "AGENTS.md + docs/PLAN/PROGRESS/DECISIONS"
     },
     {
       "id": "M0-008",
       "milestone": "M0",
       "title": "features.json",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "docs/features.json"
     },
     {
       "id": "M1-001",
       "milestone": "M1",
       "title": "fixed-point types",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ test_types fixed-point round; ctest 95/95"
     },
     {
       "id": "M1-002",
       "milestone": "M1",
       "title": "trading calendar",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ test_calendar; TradingCalendar weekdays/index/next/prev"
     },
     {
       "id": "M1-003",
       "milestone": "M1",
       "title": ".qpanel writer",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ test_panel roundtrip both layouts; Python snapshot writes .qpanel"
     },
     {
       "id": "M1-004",
       "milestone": "M1",
       "title": ".qpanel mmap reader",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Panel.open mmap; scripts/verify_cpp.py open 0.18ms"
     },
     {
       "id": "M1-005",
       "milestone": "M1",
       "title": "content hash+validation",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Panel.validate full hash; corruption test in cpp test_panel"
     },
     {
       "id": "M1-006",
       "milestone": "M1",
       "title": "thread pool",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ test_tpool (95/95)"
     },
     {
       "id": "M1-007",
       "milestone": "M1",
       "title": "rolling kernels (mean/std/sum/min/max/rank/corr)",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ test_kernels rolling mean/std/sum/min/max/rank/corr/cov/decay"
     },
     {
       "id": "M1-008",
       "milestone": "M1",
       "title": "cross-sectional kernels (rank/zscore/MAD/neutralize/quantile)",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ test_kernels cross rank/zscore/mad_winsor/quantile (no neutralize)"
     },
     {
       "id": "M1-009",
       "milestone": "M1",
       "title": "technical indicators (MA/EMA/MACD/RSI/KDJ/BOLL/ATR/OBV/CCI)",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ test_kernels MA/EMA/MACD/RSI/KDJ/BOLL/ATR/OBV/CCI"
     },
     {
       "id": "M1-010",
       "milestone": "M1",
       "title": "kernel tests vs numpy/pandas",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ kernel fixed references + cpp-panel pandas random differential (0 diff)"
     },
     {
       "id": "M1-011",
       "milestone": "M1",
       "title": "kernel benchmarks",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "build/cmake/qcore_bench 36 benchmarks, exit 0"
     },
     {
       "id": "M1-012",
       "milestone": "M1",
       "title": "determinism 1->N threads",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ test_tpool parallel_for deterministic across thread counts/grains"
     },
     {
       "id": "M2-001",
       "milestone": "M2",
       "title": "DataProvider interface",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "python/quantcore/providers/base.py; tests/test_providers.py"
     },
     {
       "id": "M2-002",
       "milestone": "M2",
       "title": "Synthetic provider",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "SyntheticConfig/generate_synthetic_panel; tests/test_synthetic_data.py 11"
     },
     {
       "id": "M2-003",
       "milestone": "M2",
       "title": "LocalFile provider",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "LocalFile provider + column mapping; test_providers"
     },
     {
       "id": "M2-004",
       "milestone": "M2",
       "title": "Tushare fixture provider",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Tushare fixture provider; test_providers; no live network"
     },
     {
       "id": "M2-005",
@@ -182,141 +182,141 @@
       "id": "M2-006",
       "milestone": "M2",
       "title": "AKShare/mootdx contract adapters",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "AKShare/mootdx lazy adapters (contract/smoke only, no live network)"
     },
     {
       "id": "M2-007",
       "milestone": "M2",
       "title": "ingest rate limit/retry/resume",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "ingest pipeline rate/retry/resume/watermark; test_data_store"
     },
     {
       "id": "M2-008",
       "milestone": "M2",
       "title": "schema validation/unit normalization",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "schema validation/unit normalization; test_data_store"
     },
     {
       "id": "M2-009",
       "milestone": "M2",
       "title": "bad-row quarantine",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "quarantine bad rows; test_data_store"
     },
     {
       "id": "M2-010",
       "milestone": "M2",
       "title": "quality report",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "quality report; CLI data update output; tests"
     },
     {
       "id": "M2-011",
       "milestone": "M2",
       "title": "immutable snapshot + manifest",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "content-addressed snapshot + manifest; tests/test_snapshot_qpanel.py"
     },
     {
       "id": "M2-012",
       "milestone": "M2",
       "title": "Parquet partitioned store",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "ParquetStore partition; test_data_store"
     },
     {
       "id": "M2-013",
       "milestone": "M2",
       "title": "DuckDB query layer",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "DuckDB query layer; test_data_store"
     },
     {
       "id": "M2-014",
       "milestone": "M2",
       "title": "SQLite state + migrations",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "SQLiteState WAL/migrations; test_data_store"
     },
     {
       "id": "M2-015",
       "milestone": "M2",
       "title": "PIT financial view",
       "passes": false,
-      "evidence": ""
+      "evidence": "partial/not implemented: see docs/acceptance-report.md"
     },
     {
       "id": "M2-016",
       "milestone": "M2",
       "title": "corporate actions",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "corporate actions in synthetic/snapshot/engine"
     },
     {
       "id": "M2-017",
       "milestone": "M2",
       "title": "incremental watermark/idempotent upsert",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "incremental watermark/idempotent upsert; test_data_store"
     },
     {
       "id": "M3-001",
       "milestone": "M3",
       "title": "engine semantics doc",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "docs/engine-semantics.md"
     },
     {
       "id": "M3-002",
       "milestone": "M3",
       "title": "RuleSet with effective dates",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "RuleSet/effective dates in engine; ctest rules"
     },
     {
       "id": "M3-003",
       "milestone": "M3",
       "title": "CostModel",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "CostModel; ctest fees recomputable"
     },
     {
       "id": "M3-004",
       "milestone": "M3",
       "title": "ExecutionModel next_open/close/vwap/fixed",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "4 ExecutionModels; ctest execution prices"
     },
     {
       "id": "M3-005",
       "milestone": "M3",
       "title": "T+1 ledger lots",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Ledger FIFO/T+1; ctest ledger 95/95"
     },
     {
       "id": "M3-006",
       "milestone": "M3",
       "title": "lot size constraints",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "lot constraints; ctest + differential"
     },
     {
       "id": "M3-007",
       "milestone": "M3",
       "title": "price limits/suspension/limit masks",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "limits/suspension/limit masks; ctest + synthetic scenarios"
     },
     {
       "id": "M3-008",
       "milestone": "M3",
       "title": "target->orders (sell first, cash check, min rebalance)",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "target->orders sell-first/cash/min-rebalance; ctest/differential"
     },
     {
       "id": "M3-009",
@@ -329,50 +329,50 @@
       "id": "M3-010",
       "milestone": "M3",
       "title": "trace reasons off/summary/full",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "trace off/summary/full + reasons; ctest"
     },
     {
       "id": "M3-011",
       "milestone": "M3",
       "title": "deterministic RNG",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "deterministic seed (no random in engine); tests"
     },
     {
       "id": "M3-012",
       "milestone": "M3",
       "title": "cooperative cancel/progress",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "CancelToken/progress; ctest + py smoke"
     },
     {
       "id": "M3-013",
       "milestone": "M3",
       "title": "metrics (return/annualized/sharpe/maxdd/winrate/turnover/fees)",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "metrics full; ctest + differential"
     },
     {
       "id": "M3-014",
       "milestone": "M3",
       "title": "benchmark comparison",
       "passes": false,
-      "evidence": ""
+      "evidence": "partial/not implemented: see docs/acceptance-report.md"
     },
     {
       "id": "M3-015",
       "milestone": "M3",
       "title": "reference engine differential",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "tests/test_cpp_differential.py 6 passed"
     },
     {
       "id": "M3-016",
       "milestone": "M3",
       "title": "golden cases",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "cpp/tests/test_engine/corporate/rules + Python golden refs"
     },
     {
       "id": "M3-017",
@@ -392,85 +392,85 @@
       "id": "M3-019",
       "milestone": "M3",
       "title": "determinism tests",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "C++ determinism tests + Python test_cpp_engine_deterministic"
     },
     {
       "id": "M3-020",
       "milestone": "M3",
       "title": "book invariants",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "ledger invariants each step; ctest"
     },
     {
       "id": "M4-001",
       "milestone": "M4",
       "title": "factor DSL parser/DAG/CSE",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Expression parser/DAG/CSE; ctest 17 cases/309 assertions"
     },
     {
       "id": "M4-002",
       "milestone": "M4",
       "title": "strategy interface A declarative",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "strategy/base declarative interface + templates"
     },
     {
       "id": "M4-003",
       "milestone": "M4",
       "title": "strategy interface B panel target weights",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "panel target weights (Strategy.generate_targets)"
     },
     {
       "id": "M4-004",
       "milestone": "M4",
       "title": "strategy interface C event on_bar",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "EventStrategy.on_bar implemented"
     },
     {
       "id": "M4-005",
       "milestone": "M4",
       "title": "strategy sandbox worker",
       "passes": false,
-      "evidence": ""
+      "evidence": "partial/not verified: see docs/PROGRESS.md known gaps"
     },
     {
       "id": "M4-006",
       "milestone": "M4",
       "title": "lookahead check",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "lookahead check module + CLI check lookahead"
     },
     {
       "id": "M4-007",
       "milestone": "M4",
       "title": ">=7 strategy templates",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "7 built-in templates; tests/test_strategy.py 16"
     },
     {
       "id": "M4-008",
       "milestone": "M4",
       "title": "experiment store",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "ExperimentStore: metadata/summary/result parquet/positions/equity/trades/report; tests/test_experiments_report.py"
     },
     {
       "id": "M4-009",
       "milestone": "M4",
       "title": "HTML/PDF report",
       "passes": false,
-      "evidence": ""
+      "evidence": "partial/not verified: see docs/PROGRESS.md known gaps"
     },
     {
       "id": "M4-010",
       "milestone": "M4",
       "title": "qc replay",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "qc replay snapshot experiment matched=true; tests/test_cli.py"
     },
     {
       "id": "M4-011",
@@ -483,50 +483,50 @@
       "id": "M5-001",
       "milestone": "M5",
       "title": "FastAPI API",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "FastAPI app/tests/test_api.py 8"
     },
     {
       "id": "M5-002",
       "milestone": "M5",
       "title": "WebSocket progress",
       "passes": false,
-      "evidence": ""
+      "evidence": "partial/not implemented: see docs/acceptance-report.md"
     },
     {
       "id": "M5-003",
       "milestone": "M5",
       "title": "SQLite job queue",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "SQLite job queue + single worker; tests/test_api.py"
     },
     {
       "id": "M5-004",
       "milestone": "M5",
       "title": "cancel/crash recovery",
       "passes": false,
-      "evidence": ""
+      "evidence": "partial/not implemented: see docs/acceptance-report.md"
     },
     {
       "id": "M5-005",
       "milestone": "M5",
       "title": "security (127.0.0.1, bearer, Host/Origin, CORS)",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "127.0.0.1/Bearer/Host-Origin/no CORS; tests/test_api.py + qc serve e2e"
     },
     {
       "id": "M5-006",
       "milestone": "M5",
       "title": "local notifications",
       "passes": false,
-      "evidence": ""
+      "evidence": "partial/not implemented: see docs/acceptance-report.md"
     },
     {
       "id": "M6-001",
       "milestone": "M6",
       "title": "UI shell/nav",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "ui/ React19+Vite six-page shell, theme/density, API client; pnpm build/test"
     },
     {
       "id": "M6-002",
@@ -822,5 +822,8 @@
       "passes": false,
       "evidence": ""
     }
-  ]
+  ],
+  "verified_at": "2026-11-01",
+  "verified_by": "make setup/test/lint/verify-cpp + npm/pnpm build; features only marked true when a command/test was actually run",
+  "note": "M0-M4 core, M5 partial API/jobs/security, M6 shell only; M7-M10 and remaining items are still false. Do not claim full completion."
 }

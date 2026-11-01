@@ -1,4 +1,5 @@
-// Google Benchmark: .qpanel write / fast mmap open / verified open (full content hash) / field scan.
+// Google Benchmark: .qpanel write / fast mmap open / verified open (full content hash) / field
+// scan.
 #include <benchmark/benchmark.h>
 
 #include <atomic>
@@ -85,7 +86,8 @@ struct Fixture {
 Fixture& fixture(std::size_t n_sec, std::size_t n_time, std::size_t n_fields) {
   static Fixture small(200, 250, 4);
   static Fixture medium(1000, 500, 4);
-  if (n_sec == 200) return small;
+  if (n_sec == 200)
+    return small;
   return medium;
 }
 
@@ -131,7 +133,8 @@ static void BM_PanelOpenFast(benchmark::State& state) {
     benchmark::DoNotOptimize(panel.field("f0").at(0, 0));
   }
   std::filesystem::remove(path, ec);
-  if (!ec) state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(bytes));
+  if (!ec)
+    state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(bytes));
 }
 BENCHMARK(BM_PanelOpenFast)->ArgsProduct({{200, 1000}, {250, 500}})->Unit(benchmark::kMillisecond);
 
@@ -154,9 +157,12 @@ static void BM_PanelOpenVerified(benchmark::State& state) {
     benchmark::DoNotOptimize(panel.content_hash());
   }
   std::filesystem::remove(path, ec);
-  if (!ec) state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(bytes));
+  if (!ec)
+    state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(bytes));
 }
-BENCHMARK(BM_PanelOpenVerified)->ArgsProduct({{200, 1000}, {250, 500}})->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_PanelOpenVerified)
+    ->ArgsProduct({{200, 1000}, {250, 500}})
+    ->Unit(benchmark::kMillisecond);
 
 static void BM_PanelFieldScan(benchmark::State& state) {
   Fixture& data = fixture(1000, 500, 4);
@@ -173,7 +179,8 @@ static void BM_PanelFieldScan(benchmark::State& state) {
   for (auto _ : state) {
     double sum = 0.0;
     for (std::size_t s = 0; s < panel.n_sec(); ++s) {
-      for (std::size_t t = 0; t < panel.n_time(); ++t) sum += field.at(s, t);
+      for (std::size_t t = 0; t < panel.n_time(); ++t)
+        sum += field.at(s, t);
     }
     benchmark::DoNotOptimize(sum);
     benchmark::ClobberMemory();

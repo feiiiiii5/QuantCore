@@ -32,8 +32,7 @@ TEST_CASE("ledger buy moves cash and includes fees in cost", "[ledger]") {
 
 TEST_CASE("ledger rejects buys beyond cash", "[ledger]") {
   Ledger ledger(to_money(1000.0));
-  CHECK_THROWS_AS(ledger.add_buy(0, kD2, 200, to_money(1000.0), to_money(5.0)),
-                  std::runtime_error);
+  CHECK_THROWS_AS(ledger.add_buy(0, kD2, 200, to_money(1000.0), to_money(5.0)), std::runtime_error);
   CHECK(ledger.cash() == to_money(1000.0));
   CHECK(ledger.position_qty(0) == 0);
 }
@@ -57,16 +56,16 @@ TEST_CASE("ledger FIFO consumes oldest lots with exact rounding", "[ledger]") {
   ledger.add_buy(0, kD1, 100, to_money(1000.0), to_money(1.0));  // cost 1001
   ledger.add_buy(0, kD2, 200, to_money(2400.0), to_money(1.0));  // cost 2401
   CHECK(ledger.position(0).sellable(kD3, true) == 300);
-  // 100 sh from lot 1 (cost 1001) + 50 sh from lot 2 (2401*50/200 = 600.25 -> 600).
+  // 100 sh from lot 1 (cost 1001) + 50 sh from lot 2 (2401*50/200 = 600.25).
   const Money pnl = ledger.add_sell(0, kD3, 150, to_money(1800.0), to_money(2.0));
-  CHECK(pnl == to_money(1.97));
+  CHECK(pnl == to_money(196.75));
   CHECK(ledger.position_qty(0) == 150);
-  CHECK(ledger.position(0).cost == to_money(1801.0));
-  CHECK(ledger.realized() == to_money(1.97));
+  CHECK(ledger.position(0).cost == to_money(1800.75));
+  CHECK(ledger.realized() == to_money(196.75));
   CHECK(ledger.fees() == to_money(4.0));
   ledger.mark(0, to_px(12.0));
   CHECK(ledger.market_value() == to_money(1800.0));
-  CHECK(ledger.unrealized() == to_money(-1.0));
+  CHECK(ledger.unrealized() == to_money(-0.75));
   ledger.assert_invariants(kD3);
 }
 

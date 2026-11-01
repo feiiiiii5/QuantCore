@@ -16,7 +16,8 @@ namespace qc {
 namespace {
 
 std::size_t resolve_threads(std::size_t threads) {
-  if (threads != 0) return threads;
+  if (threads != 0)
+    return threads;
   const unsigned hw = std::thread::hardware_concurrency();
   return hw == 0 ? std::size_t{1} : static_cast<std::size_t>(hw);
 }
@@ -37,7 +38,8 @@ ThreadPool::ThreadPool(size_t threads) {
     }
     cv_.notify_all();
     for (auto& t : workers_) {
-      if (t.joinable()) t.join();
+      if (t.joinable())
+        t.join();
     }
     throw;
   }
@@ -50,7 +52,8 @@ ThreadPool::~ThreadPool() {
   }
   cv_.notify_all();
   for (auto& t : workers_) {
-    if (t.joinable()) t.join();
+    if (t.joinable())
+      t.join();
   }
 }
 
@@ -61,7 +64,8 @@ void ThreadPool::worker_loop() {
       std::unique_lock<std::mutex> lk(mu_);
       cv_.wait(lk, [this]() { return stop_.load() || !tasks_.empty(); });
       if (tasks_.empty()) {
-        if (stop_.load()) return;
+        if (stop_.load())
+          return;
         continue;
       }
       task = std::move(tasks_.front());
@@ -83,10 +87,11 @@ void ThreadPool::worker_loop() {
   }
 }
 
-void ThreadPool::parallel_for(size_t n, const std::function<void(size_t)>& fn,
-                              size_t min_grain) {
-  if (n == 0) return;
-  if (!fn) throw std::invalid_argument("ThreadPool::parallel_for: empty function");
+void ThreadPool::parallel_for(size_t n, const std::function<void(size_t)>& fn, size_t min_grain) {
+  if (n == 0)
+    return;
+  if (!fn)
+    throw std::invalid_argument("ThreadPool::parallel_for: empty function");
   static constexpr std::size_t kChunksPerWorker = 4;
 
   struct ErrorSlot {
@@ -97,21 +102,24 @@ void ThreadPool::parallel_for(size_t n, const std::function<void(size_t)>& fn,
   const std::size_t workers = std::max<std::size_t>(workers_.size(), 1);
   const std::size_t grain = std::max<std::size_t>(min_grain, 1);
   std::size_t chunk = (n + workers * kChunksPerWorker - 1) / (workers * kChunksPerWorker);
-  if (chunk < grain) chunk = grain;
+  if (chunk < grain)
+    chunk = grain;
   const std::size_t chunks = (n + chunk - 1) / chunk;
 
   auto errors = std::make_shared<ErrorSlot>();
   errors->errors.assign(chunks, std::exception_ptr());
   {
     std::lock_guard<std::mutex> lk(mu_);
-    if (stop_.load()) throw std::runtime_error("ThreadPool stopped");
+    if (stop_.load())
+      throw std::runtime_error("ThreadPool stopped");
     for (std::size_t c = 0; c < chunks; ++c) {
       const std::size_t begin = c * chunk;
       const std::size_t end = std::min(n, begin + chunk);
       // fn is captured by reference: parallel_for blocks until every chunk has finished.
       tasks_.emplace([&fn, errors, c, begin, end]() {
         try {
-          for (std::size_t i = begin; i < end; ++i) fn(i);
+          for (std::size_t i = begin; i < end; ++i)
+            fn(i);
         } catch (...) {
           std::lock_guard<std::mutex> elk(errors->mu);
           errors->errors[c] = std::current_exception();
@@ -123,7 +131,8 @@ void ThreadPool::parallel_for(size_t n, const std::function<void(size_t)>& fn,
   wait_idle();
   // Deterministic error reporting: lowest failing chunk wins.
   for (const std::exception_ptr& e : errors->errors) {
-    if (e) std::rethrow_exception(e);
+    if (e)
+      std::rethrow_exception(e);
   }
 }
 

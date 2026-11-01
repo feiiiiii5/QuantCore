@@ -59,13 +59,13 @@ std::string write_bench_panel() {
     }
   }
   std::vector<double> open(kNsec * kNtime);
-  for (std::size_t i = 0; i < open.size(); ++i) open[i] = close[i] - 0.01;
+  for (std::size_t i = 0; i < open.size(); ++i)
+    open[i] = close[i] - 0.01;
 
-  const auto stamp = static_cast<unsigned long long>(
-      std::chrono::steady_clock::now().time_since_epoch().count());
-  const std::filesystem::path path =
-      std::filesystem::temp_directory_path() /
-      ("qcore_bench_expr_" + std::to_string(stamp) + ".qpanel");
+  const auto stamp =
+      static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count());
+  const std::filesystem::path path = std::filesystem::temp_directory_path() /
+                                     ("qcore_bench_expr_" + std::to_string(stamp) + ".qpanel");
   qc::PanelWriter writer(kNsec, kNtime, std::move(dates), std::move(securities));
   writer.add_field("close", qc::Layout::SecTime, close.data());
   writer.add_field("open", qc::Layout::SecTime, open.data());

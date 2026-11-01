@@ -68,8 +68,7 @@ void validate_securities(const std::vector<Security>& secs) {
                                   " has an empty sec_id");
     }
     if (sec.code.empty()) {
-      throw std::invalid_argument("PanelWriter: security '" + sec.sec_id +
-                                  "' has an empty code");
+      throw std::invalid_argument("PanelWriter: security '" + sec.sec_id + "' has an empty code");
     }
     if (sec.board < 0 || sec.board > 3) {
       throw std::invalid_argument("PanelWriter: security '" + sec.sec_id +
@@ -103,7 +102,8 @@ class HashSink {
 
   void write_bytes(const void* data, std::size_t n) {
     out_.write(static_cast<const char*>(data), static_cast<std::streamsize>(n));
-    if (!out_) throw std::runtime_error("PanelWriter::write: short write to temporary file");
+    if (!out_)
+      throw std::runtime_error("PanelWriter::write: short write to temporary file");
     // Hash starts from the qc::fnv1a64 default seed (obtained with a zero-length update).
     hash_ = fnv1a64(data, n, hash_);
     offset_ += n;
@@ -119,12 +119,17 @@ class HashSink {
   }
 
   void pad_to(uint64_t target) {
-    if (offset_ > target) throw std::runtime_error("PanelWriter: internal layout overflow");
+    if (offset_ > target)
+      throw std::runtime_error("PanelWriter: internal layout overflow");
     write_zeros(target - offset_);
   }
 
-  uint64_t hash() const { return hash_; }
-  uint64_t offset() const { return offset_; }
+  uint64_t hash() const {
+    return hash_;
+  }
+  uint64_t offset() const {
+    return offset_;
+  }
 
  private:
   std::ofstream& out_;
@@ -152,16 +157,16 @@ PanelWriter::PanelWriter(size_t n_sec, size_t n_time, std::vector<Date> dates,
                                 ") must equal n_time (" + std::to_string(n_time_) + ")");
   }
   if (secs_.size() != n_sec_) {
-    throw std::invalid_argument("PanelWriter: securities.size() (" +
-                                std::to_string(secs_.size()) + ") must equal n_sec (" +
-                                std::to_string(n_sec_) + ")");
+    throw std::invalid_argument("PanelWriter: securities.size() (" + std::to_string(secs_.size()) +
+                                ") must equal n_sec (" + std::to_string(n_sec_) + ")");
   }
   validate_dates(dates_);
   validate_securities(secs_);
 }
 
 void PanelWriter::add_field(const std::string& name, Layout layout, const double* data) {
-  if (name.empty()) throw std::invalid_argument("PanelWriter::add_field: empty field name");
+  if (name.empty())
+    throw std::invalid_argument("PanelWriter::add_field: empty field name");
   if (name.size() > kMaxFieldName) {
     throw std::invalid_argument("PanelWriter::add_field: field name '" + name +
                                 "' exceeds 31 bytes");
@@ -192,7 +197,8 @@ void PanelWriter::add_field(const std::string& name, Layout layout, const double
 }
 
 void PanelWriter::set_metadata(const std::string& json) {
-  if (json.empty()) throw std::invalid_argument("PanelWriter::set_metadata: empty metadata");
+  if (json.empty())
+    throw std::invalid_argument("PanelWriter::set_metadata: empty metadata");
   metadata_ = json;
 }
 
@@ -315,7 +321,8 @@ void PanelWriter::write(const std::string& path) {
     out.write(reinterpret_cast<const char*>(encoded_header.data()),
               static_cast<std::streamsize>(encoded_header.size()));
     out.flush();
-    if (!out) throw std::runtime_error("PanelWriter::write: failed to finalize '" + path + "'");
+    if (!out)
+      throw std::runtime_error("PanelWriter::write: failed to finalize '" + path + "'");
   } catch (...) {
     if (temp_valid) {
       std::error_code ignored;
@@ -332,7 +339,8 @@ void PanelWriter::write(const std::string& path) {
     std::filesystem::remove(temp, ignored);
     throw std::runtime_error(
         "PanelWriter::write: refusing to overwrite an existing .qpanel on Windows; "
-        "write a new snapshot path instead (" + path + ")");
+        "write a new snapshot path instead (" +
+        path + ")");
   }
   std::filesystem::rename(temp, target, ec);
 #else

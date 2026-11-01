@@ -119,13 +119,13 @@ class LocalFileProvider(DataProvider):
             raise ProviderUnavailableError(f"unsupported local file format: {path.suffix}")
         mapping = self.column_mapping.get(dataset, {})
         if mapping:
-            rename = {source: canonical for canonical, source in mapping.items()}
-            frame = frame.rename(columns=rename)
             missing_sources = [source for source in mapping.values() if source not in frame.columns]
             if missing_sources:
                 raise ProviderUnavailableError(
                     f"column_mapping[{dataset!r}] refers to missing source columns: {missing_sources}"
                 )
+            rename = {source: canonical for canonical, source in mapping.items()}
+            frame = frame.rename(columns=rename)
         self._cache[dataset] = frame
         return frame
 

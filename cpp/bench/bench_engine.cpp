@@ -34,7 +34,7 @@ struct BenchEnv {
     const std::string path = write_panel();
     panel.emplace(qc::Panel::open(path));
     std::error_code ec;
-    std::filesystem::remove(path, ec);  // unlink after mmap (POSIX)
+    std::filesystem::remove(path, ec);       // unlink after mmap (POSIX)
     cfg.initial_cash = qc::to_money(1.0e8);  // 100M CNY
     cfg.annual_days = 244;
     cfg.trace = qc::TraceLevel::Summary;
@@ -91,8 +91,8 @@ struct BenchEnv {
         const double open = to_yuan_tick(prev_close * (1.0 + drift));
         const double close = to_yuan_tick(prev_close * (1.0 + 0.02 * (next01() - 0.5)));
         const double high = to_yuan_tick(std::max(open, close) * (1.0 + 0.005 * next01()));
-        const double low = to_yuan_tick(std::max(0.01, std::min(open, close) *
-                                                           (1.0 - 0.005 * next01())));
+        const double low =
+            to_yuan_tick(std::max(0.01, std::min(open, close) * (1.0 - 0.005 * next01())));
         const double volume = 1000000.0 + 1000000.0 * next01();
         const size_t idx = sec * stride + t;
         fields[0][idx] = open;
@@ -107,8 +107,7 @@ struct BenchEnv {
   }
 
   void build_weights() {
-    std::vector<std::vector<double>> rows(kTime,
-                                          std::vector<double>(kSec, qc::kNaN));
+    std::vector<std::vector<double>> rows(kTime, std::vector<double>(kSec, qc::kNaN));
     size_t rebalances = 0;
     for (size_t t = 0; t + 1 < kTime; t += 21) {
       const size_t first = (rebalances * 37) % kSec;
@@ -126,8 +125,7 @@ struct BenchEnv {
         static_cast<long long>(std::chrono::steady_clock::now().time_since_epoch().count());
     const std::string path =
         (std::filesystem::temp_directory_path() /
-         ("qcore_bench_" + std::to_string(stamp) + "_" + std::to_string(counter++) +
-          ".qpanel"))
+         ("qcore_bench_" + std::to_string(stamp) + "_" + std::to_string(counter++) + ".qpanel"))
             .string();
     qc::PanelWriter writer(kSec, kTime, dates, securities);
     writer.add_field("open", qc::Layout::SecTime, fields[0].data());

@@ -12,7 +12,9 @@ namespace {
 constexpr Side kBuy = Side::Buy;
 constexpr Side kSell = Side::Sell;
 
-bool finite_positive(double v) { return std::isfinite(v) && v > 0.0; }
+bool finite_positive(double v) {
+  return std::isfinite(v) && v > 0.0;
+}
 
 }  // namespace
 
@@ -21,40 +23,53 @@ Px exec_reference_price(ExecType type, Px open, Px high, Px low, Px close, doubl
   (void)high;
   (void)low;
   switch (type) {
-    case ExecType::NextOpen: return open > 0 ? open : 0;
-    case ExecType::NextClose: return close > 0 ? close : 0;
+    case ExecType::NextOpen:
+      return open > 0 ? open : 0;
+    case ExecType::NextClose:
+      return close > 0 ? close : 0;
     case ExecType::NextVwap: {
-      if (!finite_positive(volume) || !finite_positive(amount_yuan)) return 0;
+      if (!finite_positive(volume) || !finite_positive(amount_yuan))
+        return 0;
       const double vwap_yuan = amount_yuan / volume;  // amount is CNY, volume is shares
-      if (!finite_positive(vwap_yuan)) return 0;
+      if (!finite_positive(vwap_yuan))
+        return 0;
       return to_px(vwap_yuan);
     }
-    case ExecType::AfterHoursFixed: return close > 0 ? close : 0;
+    case ExecType::AfterHoursFixed:
+      return close > 0 ? close : 0;
   }
   return 0;
 }
 
 bool after_hours_available(const RuleSet& rules, int board, Date date) {
-  if (!rules.after_hours) return false;
-  if (board == 2) return true;  // TODO(verify) STAR after-hours start date
+  if (!rules.after_hours)
+    return false;
+  if (board == 2)
+    return true;                                    // TODO(verify) STAR after-hours start date
   return date >= rules.after_hours_extension_date;  // TODO(verify) 2026-07-06 expansion
 }
 
 Px apply_slippage(Px ref, Side side, double slippage_bps, const RuleSet& rules) {
-  if (ref <= 0) return 0;
-  if (!(slippage_bps > 0.0)) return ref;
-  const double factor = side == kBuy ? 1.0 + slippage_bps / 10000.0
-                                     : 1.0 - slippage_bps / 10000.0;
+  if (ref <= 0)
+    return 0;
+  if (!(slippage_bps > 0.0))
+    return ref;
+  const double factor = side == kBuy ? 1.0 + slippage_bps / 10000.0 : 1.0 - slippage_bps / 10000.0;
   const double raw = static_cast<double>(ref) * factor;
-  if (!finite_positive(raw)) return 0;
+  if (!finite_positive(raw))
+    return 0;
   return round_to_tick(static_cast<Px>(std::llround(raw)), rules);
 }
 
 Px clamp_fill_price(Px fill, Px low, Px high, Px limit_up, Px limit_down) {
-  if (low > 0 && fill < low) fill = low;
-  if (high > 0 && fill > high) fill = high;
-  if (limit_up > 0 && fill > limit_up) fill = limit_up;
-  if (limit_down > 0 && fill < limit_down) fill = limit_down;
+  if (low > 0 && fill < low)
+    fill = low;
+  if (high > 0 && fill > high)
+    fill = high;
+  if (limit_up > 0 && fill > limit_up)
+    fill = limit_up;
+  if (limit_down > 0 && fill < limit_down)
+    fill = limit_down;
   return fill;
 }
 
@@ -90,7 +105,8 @@ RejectReason Executor::prepare(size_t sec, size_t time, Side side,
   const Security& security = panel.securities()[sec];
   const Date date = panel.dates()[time];
 
-  if (PanelViews::flag(views_.suspended, sec, time)) return RejectReason::Suspended;
+  if (PanelViews::flag(views_.suspended, sec, time))
+    return RejectReason::Suspended;
   // TODO(verify) delisting period / long suspension handling is conservative: a
   // security at/after its delist date is not tradable (engine force-liquidates).
   if (security.delist_date != kInvalidDate && date >= security.delist_date) {
@@ -100,39 +116,44 @@ RejectReason Executor::prepare(size_t sec, size_t time, Side side,
   const double volume = PanelViews::value(views_.volume, sec, time);
   const bool has_volume = PanelViews::has(views_.volume);
   if (has_volume) {
-    if (!std::isfinite(volume)) return RejectReason::NoQuote;
-    if (volume <= 0.0) return RejectReason::Suspended;  // TODO(verify) zero-volume day
+    if (!std::isfinite(volume))
+      return RejectReason::NoQuote;
+    if (volume <= 0.0)
+      return RejectReason::Suspended;  // TODO(verify) zero-volume day
   }
 
   const Px open = PanelViews::px(views_.open, sec, time);
   const Px high = PanelViews::px(views_.high, sec, time);
   const Px low = PanelViews::px(views_.low, sec, time);
   const Px close = PanelViews::px(views_.close, sec, time);
-  if (high <= 0 || low <= 0 || close <= 0 || high < low) return RejectReason::NoQuote;
+  if (high <= 0 || low <= 0 || close <= 0 || high < low)
+    return RejectReason::NoQuote;
   const double amount = PanelViews::value(views_.amount, sec, time);
-  const Px ref =
-      exec_reference_price(cfg_.exec.type, open, high, low, close, volume, amount);
-  if (ref <= 0) return RejectReason::NoQuote;
+  const Px ref = exec_reference_price(cfg_.exec.type, open, high, low, close, volume, amount);
+  if (ref <= 0)
+    return RejectReason::NoQuote;
 
   const bool is_st = PanelViews::flag(views_.st, sec, time);
   const int board = security.board;
-  Px limit_up = PanelViews::has(views_.limit_up)
-                    ? PanelViews::px(views_.limit_up, sec, time)
-                    : 0;
-  Px limit_down = PanelViews::has(views_.limit_down)
-                      ? PanelViews::px(views_.limit_down, sec, time)
-                      : 0;
+  Px limit_up = PanelViews::has(views_.limit_up) ? PanelViews::px(views_.limit_up, sec, time) : 0;
+  Px limit_down =
+      PanelViews::has(views_.limit_down) ? PanelViews::px(views_.limit_down, sec, time) : 0;
   const Px prev = sec < prev_close.size() ? prev_close[sec] : 0;
-  if (limit_up <= 0) limit_up = limit_up_px(cfg_.rules, prev, board, is_st, date);
-  if (limit_down <= 0) limit_down = limit_down_px(cfg_.rules, prev, board, is_st, date);
+  if (limit_up <= 0)
+    limit_up = limit_up_px(cfg_.rules, prev, board, is_st, date);
+  if (limit_down <= 0)
+    limit_down = limit_down_px(cfg_.rules, prev, board, is_st, date);
 
-  if (side == kBuy && limit_up > 0 && ref >= limit_up) return RejectReason::LimitUp;
-  if (side == kSell && limit_down > 0 && ref <= limit_down) return RejectReason::LimitDown;
+  if (side == kBuy && limit_up > 0 && ref >= limit_up)
+    return RejectReason::LimitUp;
+  if (side == kSell && limit_down > 0 && ref <= limit_down)
+    return RejectReason::LimitDown;
 
   // One-word board (high == low): no continuous trading. Conservative: reject both
   // sides; attribute to the touching limit when the price is at a limit.
   if (high == low) {
-    if (side == kBuy && limit_up > 0 && high >= limit_up) return RejectReason::LimitUp;
+    if (side == kBuy && limit_up > 0 && high >= limit_up)
+      return RejectReason::LimitUp;
     if (side == kSell && limit_down > 0 && low <= limit_down) {
       return RejectReason::LimitDown;
     }
@@ -147,9 +168,11 @@ RejectReason Executor::prepare(size_t sec, size_t time, Side side,
   fill_px = cfg_.exec.type == ExecType::AfterHoursFixed
                 ? close
                 : apply_slippage(ref, side, cfg_.exec.slippage_bps, cfg_.rules);
-  if (fill_px <= 0) return RejectReason::PriceOutOfRange;
+  if (fill_px <= 0)
+    return RejectReason::PriceOutOfRange;
   fill_px = clamp_fill_price(fill_px, low, high, limit_up, limit_down);
-  if (fill_px < low || fill_px > high) return RejectReason::PriceOutOfRange;
+  if (fill_px < low || fill_px > high)
+    return RejectReason::PriceOutOfRange;
   // 盘后固定价格成交价即收盘价，不受 [low, high] 之外的滑点影响。
   if (cfg_.exec.type != ExecType::AfterHoursFixed && (fill_px <= 0)) {
     return RejectReason::PriceOutOfRange;
@@ -158,14 +181,16 @@ RejectReason Executor::prepare(size_t sec, size_t time, Side side,
   volume_cap = -1;
   if (has_volume) {
     const double cap = std::floor(volume * cfg_.exec.max_participation);
-    if (!(cap >= 1.0)) return RejectReason::NoQuote;
+    if (!(cap >= 1.0))
+      return RejectReason::NoQuote;
     volume_cap = static_cast<Qty>(cap);
   }
   return RejectReason::None;
 }
 
 Qty Executor::affordable(size_t sec, Qty want, Px fill_px) const {
-  if (want <= 0 || fill_px <= 0) return 0;
+  if (want <= 0 || fill_px <= 0)
+    return 0;
   const Money cash = ledger_.cash();
   const SecurityCtx ctx = meta_[sec];
   auto cost_of = [&](Qty qty) -> Money {
@@ -176,8 +201,10 @@ Qty Executor::affordable(size_t sec, Qty want, Px fill_px) const {
   const int board = meta_[sec].board;
   if (board == 2 || board == 3) {
     const int64_t min_qty = board == 2 ? cfg_.rules.star_lot : cfg_.rules.bse_lot;
-    if (want < min_qty) return 0;
-    if (cost_of(min_qty) > cash) return 0;
+    if (want < min_qty)
+      return 0;
+    if (cost_of(min_qty) > cash)
+      return 0;
     Qty lo = min_qty;
     Qty hi = want;
     while (lo < hi) {
@@ -192,7 +219,8 @@ Qty Executor::affordable(size_t sec, Qty want, Px fill_px) const {
   }
   const int64_t lot = cfg_.rules.main_lot > 0 ? cfg_.rules.main_lot : 100;
   const Qty units = want / lot;
-  if (units <= 0) return 0;
+  if (units <= 0)
+    return 0;
   Qty lo = 0;
   Qty hi = units;
   while (lo < hi) {
@@ -228,21 +256,22 @@ void Executor::execute_one(const Intent& intent, Date date, size_t time,
   const size_t sec = static_cast<size_t>(intent.sec);
   Px fill_px = 0;
   Qty volume_cap = -1;
-  const RejectReason pre =
-      prepare(sec, time, intent.side, prev_close, fill_px, volume_cap);
+  const RejectReason pre = prepare(sec, time, intent.side, prev_close, fill_px, volume_cap);
   if (pre != RejectReason::None) {
     reject(sec, intent.side, date, pre, trades, reasons, out);
     return;
   }
   Qty qty = intent.qty;
-  if (volume_cap >= 0 && qty > volume_cap) qty = volume_cap;
+  if (volume_cap >= 0 && qty > volume_cap)
+    qty = volume_cap;
   if (intent.side == kSell) {
     const Qty available = ledger_.position(sec).sellable(date, cfg_.rules.t_plus_one);
     if (available <= 0) {
       reject(sec, kSell, date, RejectReason::TPlusOne, trades, reasons, out);
       return;
     }
-    if (qty > available) qty = available;
+    if (qty > available)
+      qty = available;
     if (qty <= 0) {
       reject(sec, kSell, date, RejectReason::NoQuote, trades, reasons, out);
       return;
@@ -301,14 +330,15 @@ ExecOutcome Executor::execute(const ExecRequest& req, std::vector<Trade>& trades
   intents.reserve(ns);
   for (size_t sec = 0; sec < ns; ++sec) {
     const double weight = sec < weights.size() ? weights[sec] : kNaN;
-    if (std::isnan(weight)) continue;  // NaN element: hold the existing position
+    if (std::isnan(weight))
+      continue;  // NaN element: hold the existing position
     const Qty held = ledger_.position_qty(static_cast<int32_t>(sec));
-    if (!std::isfinite(weight)) {
-      reject(sec, weight > 0.0 ? kBuy : kSell, date, RejectReason::MaxWeight, trades,
-             reasons, out);
+    if (!std::isfinite(weight) || weight > 1.0e6) {  // guard llround/overflow in target value
+      reject(sec, weight > 0.0 ? kBuy : kSell, date, RejectReason::MaxWeight, trades, reasons, out);
       continue;
     }
-    if (weight <= 0.0 && held == 0) continue;
+    if (weight <= 0.0 && held == 0)
+      continue;
     const Px ref = reference_px(sec, time);
     if (ref <= 0) {
       // Prefer the most specific rejection reason when the quote is unusable.
@@ -317,7 +347,8 @@ ExecOutcome Executor::execute(const ExecRequest& req, std::vector<Trade>& trades
         why = RejectReason::Suspended;
       } else if (PanelViews::has(views_.volume)) {
         const double vol = PanelViews::value(views_.volume, sec, time);
-        if (std::isfinite(vol) && vol <= 0.0) why = RejectReason::Suspended;
+        if (std::isfinite(vol) && vol <= 0.0)
+          why = RejectReason::Suspended;
       }
       reject(sec, weight > 0.0 ? kBuy : kSell, date, why, trades, reasons, out);
       continue;
@@ -325,12 +356,13 @@ ExecOutcome Executor::execute(const ExecRequest& req, std::vector<Trade>& trades
     Money target_value = 0;
     Qty desired = 0;
     if (weight > 0.0) {
-      target_value = static_cast<Money>(
-          std::llround(weight * static_cast<double>(req.signal_equity)));
+      target_value =
+          static_cast<Money>(std::llround(weight * static_cast<double>(req.signal_equity)));
       const Qty raw = target_value / ref;
       desired = canon_buy_qty(cfg_.rules, meta_[sec].board, raw);
     }
-    if (desired == held) continue;
+    if (desired == held)
+      continue;
     const Side side = desired > held ? kBuy : kSell;
     const Money current_value = notional(ref, held);
     const Money delta = target_value - current_value;

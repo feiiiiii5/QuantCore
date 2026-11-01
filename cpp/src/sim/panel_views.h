@@ -41,7 +41,9 @@ struct PanelViews {
     return v;
   }
 
-  static bool has(const FieldView& f) { return f.data != nullptr; }
+  static bool has(const FieldView& f) {
+    return f.data != nullptr;
+  }
 
   static double value(const FieldView& f, size_t sec, size_t time) {
     return f.data == nullptr ? kNaN : f.at(sec, time);
@@ -50,7 +52,8 @@ struct PanelViews {
   // Fixed-point price; returns 0 for NaN / non-positive / non-finite values.
   static Px px(const FieldView& f, size_t sec, size_t time) {
     const double v = value(f, sec, time);
-    if (!std::isfinite(v) || v <= 0.0) return 0;
+    if (!std::isfinite(v) || v <= 0.0)
+      return 0;
     return to_px(v);
   }
 
@@ -59,8 +62,12 @@ struct PanelViews {
     return std::isfinite(v) && v > 0.5;
   }
 
-  size_t n_sec() const { return panel->n_sec(); }
-  size_t n_time() const { return panel->n_time(); }
+  size_t n_sec() const {
+    return panel->n_sec();
+  }
+  size_t n_time() const {
+    return panel->n_time();
+  }
 };
 
 }  // namespace qc

@@ -10,8 +10,8 @@ namespace qc {
 
 // Exchange/board context needed to decide fee applicability.
 struct SecurityCtx {
-  int board = 0;         // matches Security::board: 0 MAIN, 1 GEM, 2 STAR, 3 BSE
-  bool is_st = false;    // ST/*ST flag on the trading date
+  int board = 0;             // matches Security::board: 0 MAIN, 1 GEM, 2 STAR, 3 BSE
+  bool is_st = false;        // ST/*ST flag on the trading date
   bool is_shanghai = false;  // SH-listed (code starts with '6'); transfer fee applicability
 };
 

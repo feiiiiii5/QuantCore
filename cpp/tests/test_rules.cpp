@@ -74,10 +74,10 @@ TEST_CASE("fees are recomputable per component", "[rules][costs]") {
   CostModel model;
   const Money amount = to_money(500000.0);
   const CostBreakdown buy = compute_costs(model, Side::Buy, amount, ctx(kMain, true));
-  CHECK(buy.commission == to_money(150.0));   // 500000 * 0.0003
+  CHECK(buy.commission == to_money(150.0));  // 500000 * 0.0003
   CHECK(buy.stamp_duty == 0);
-  CHECK(buy.transfer_fee == to_money(5.0));   // 500000 * 0.00001
-  CHECK(buy.other_fee == to_money(6.0));      // 5 + 1 (exchange + reg)
+  CHECK(buy.transfer_fee == to_money(5.0));  // 500000 * 0.00001
+  CHECK(buy.other_fee == to_money(6.0));     // 5 + 1 (exchange + reg)
   CHECK(buy.total == to_money(161.0));
 
   const CostBreakdown sell = compute_costs(model, Side::Sell, amount, ctx(kMain, true));
@@ -86,8 +86,7 @@ TEST_CASE("fees are recomputable per component", "[rules][costs]") {
 
   // 5 CNY minimum commission: 1000 * 0.0003 = 0.3 -> 5; transfer 0.01, exchange 0.01,
   // reg 0.002 (dedicated 1e-4 rounding per component).
-  const CostBreakdown small =
-      compute_costs(model, Side::Buy, to_money(1000.0), ctx(kMain, true));
+  const CostBreakdown small = compute_costs(model, Side::Buy, to_money(1000.0), ctx(kMain, true));
   CHECK(small.commission == to_money(5.0));
   CHECK(small.total == to_money(5.022));
 
@@ -102,18 +101,18 @@ TEST_CASE("fees are recomputable per component", "[rules][costs]") {
 }
 
 TEST_CASE("execution reference prices by model", "[rules][exec]") {
-  CHECK(exec_reference_price(ExecType::NextOpen, to_px(9.5), to_px(10.0), to_px(9.0),
-                             to_px(9.8), 1e6, 9.9e6) == to_px(9.5));
-  CHECK(exec_reference_price(ExecType::NextClose, to_px(9.5), to_px(10.0), to_px(9.0),
-                             to_px(9.8), 1e6, 9.9e6) == to_px(9.8));
+  CHECK(exec_reference_price(ExecType::NextOpen, to_px(9.5), to_px(10.0), to_px(9.0), to_px(9.8),
+                             1e6, 9.9e6) == to_px(9.5));
+  CHECK(exec_reference_price(ExecType::NextClose, to_px(9.5), to_px(10.0), to_px(9.0), to_px(9.8),
+                             1e6, 9.9e6) == to_px(9.8));
   CHECK(exec_reference_price(ExecType::AfterHoursFixed, to_px(9.5), to_px(10.0), to_px(9.0),
                              to_px(9.8), 1e6, 9.9e6) == to_px(9.8));
-  CHECK(exec_reference_price(ExecType::NextVwap, to_px(9.5), to_px(10.0), to_px(9.0),
-                             to_px(9.8), 1000000.0, 10400000.0) == to_px(10.4));
-  CHECK(exec_reference_price(ExecType::NextVwap, to_px(9.5), to_px(10.0), to_px(9.0),
-                             to_px(9.8), 0.0, 10400000.0) == 0);
-  CHECK(exec_reference_price(ExecType::NextOpen, 0, to_px(10.0), to_px(9.0), to_px(9.8),
-                             1e6, 9.9e6) == 0);
+  CHECK(exec_reference_price(ExecType::NextVwap, to_px(9.5), to_px(10.0), to_px(9.0), to_px(9.8),
+                             1000000.0, 10400000.0) == to_px(10.4));
+  CHECK(exec_reference_price(ExecType::NextVwap, to_px(9.5), to_px(10.0), to_px(9.0), to_px(9.8),
+                             0.0, 10400000.0) == 0);
+  CHECK(exec_reference_price(ExecType::NextOpen, 0, to_px(10.0), to_px(9.0), to_px(9.8), 1e6,
+                             9.9e6) == 0);
 }
 
 TEST_CASE("after-hours availability follows board and extension date", "[rules][exec]") {
@@ -133,8 +132,8 @@ TEST_CASE("slippage is adverse and tick rounded, fills clamp into the bar", "[ru
   CHECK(apply_slippage(to_px(10.0), Side::Buy, 0.0, rules) == to_px(10.0));
   CHECK(clamp_fill_price(to_px(10.5), to_px(9.8), to_px(10.2), 0, 0) == to_px(10.2));
   CHECK(clamp_fill_price(to_px(9.0), to_px(9.8), to_px(10.2), 0, 0) == to_px(9.8));
-  CHECK(clamp_fill_price(to_px(10.6), to_px(10.0), to_px(11.0), to_px(10.5),
-                         to_px(9.5)) == to_px(10.5));
-  CHECK(clamp_fill_price(to_px(9.0), to_px(9.5), to_px(11.0), to_px(10.5),
-                         to_px(9.5)) == to_px(9.5));
+  CHECK(clamp_fill_price(to_px(10.6), to_px(10.0), to_px(11.0), to_px(10.5), to_px(9.5)) ==
+        to_px(10.5));
+  CHECK(clamp_fill_price(to_px(9.0), to_px(9.5), to_px(11.0), to_px(10.5), to_px(9.5)) ==
+        to_px(9.5));
 }

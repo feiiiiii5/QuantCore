@@ -18,7 +18,9 @@ class ThreadPool {
   ~ThreadPool();
   ThreadPool(const ThreadPool&) = delete;
   ThreadPool& operator=(const ThreadPool&) = delete;
-  size_t size() const { return workers_.size(); }
+  size_t size() const {
+    return workers_.size();
+  }
   template <typename F>
   auto submit(F&& f) -> std::future<decltype(f())> {
     using R = decltype(f());
@@ -26,7 +28,8 @@ class ThreadPool {
     std::future<R> fut = task->get_future();
     {
       std::lock_guard<std::mutex> lk(mu_);
-      if (stop_) throw std::runtime_error("ThreadPool stopped");
+      if (stop_)
+        throw std::runtime_error("ThreadPool stopped");
       tasks_.emplace([task]() { (*task)(); });
     }
     cv_.notify_one();
@@ -35,6 +38,7 @@ class ThreadPool {
   // Deterministic parallel_for: results are written by index; caller owns out-of-order writes.
   void parallel_for(size_t n, const std::function<void(size_t)>& fn, size_t min_grain = 1);
   void wait_idle();
+
  private:
   void worker_loop();
   std::vector<std::thread> workers_;

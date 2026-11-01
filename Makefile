@@ -19,7 +19,7 @@ setup-ui:
 	pnpm -C ui install
 
 build:
-	$(UV) sync --reinstall-package quantcore --python $(PYTHON_VERSION)
+	$(UV) sync --reinstall-package quantcore --all-extras --python $(PYTHON_VERSION)
 	$(CMAKE) -S . -B $(BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=Release -DQC_BUILD_PYTHON=OFF -DQC_BUILD_TESTS=ON -DQC_BUILD_BENCH=ON
 	$(CMAKE) --build $(BUILD_DIR)
 

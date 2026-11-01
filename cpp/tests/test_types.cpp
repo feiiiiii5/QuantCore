@@ -21,8 +21,8 @@ void check_roundtrip(qc::Date date) {
 TEST_CASE("valid_date accepts real calendar dates", "[types][date]") {
   CHECK(qc::valid_date(20200102));
   CHECK(qc::valid_date(19991231));
-  CHECK(qc::valid_date(20240229));  // leap year
-  CHECK(qc::valid_date(20000229));  // divisible by 400
+  CHECK(qc::valid_date(20240229));   // leap year
+  CHECK(qc::valid_date(20000229));   // divisible by 400
   CHECK(!qc::valid_date(20190229));  // not a leap year
   CHECK(!qc::valid_date(19000229));  // divisible by 100, not 400
   CHECK(!qc::valid_date(20201301));  // month 13
@@ -47,9 +47,8 @@ TEST_CASE("string_to_date accepts YYYYMMDD and YYYY-MM-DD", "[types][date]") {
   CHECK(qc::string_to_date("2020-01-02") == 20200102);
   CHECK(qc::string_to_date("1999-12-31") == 19991231);
   CHECK(qc::string_to_date("2024-02-29") == 20240229);
-  const char* bad[] = {"",          "2020-1-2",    "2020010",  "202001021", "2020/01/02",
-                       "abcd0102",  "20201301",    "20200230", "00000101",  " 20200102",
-                       "2020-01-02x"};
+  const char* bad[] = {"",         "2020-1-2", "2020010",  "202001021", "2020/01/02", "abcd0102",
+                       "20201301", "20200230", "00000101", " 20200102", "2020-01-02x"};
   for (const char* text : bad) {
     CHECK_THROWS_AS(qc::string_to_date(text), std::invalid_argument);
   }
@@ -64,7 +63,8 @@ TEST_CASE("date components and roundtrip", "[types][date]") {
     for (int month = 1; month <= 12; ++month) {
       for (int day = 1; day <= 31; ++day) {
         const qc::Date date = qc::make_date(year, month, day);
-        if (qc::valid_date(date)) check_roundtrip(date);
+        if (qc::valid_date(date))
+          check_roundtrip(date);
       }
     }
   }

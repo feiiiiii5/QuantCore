@@ -7,7 +7,7 @@ quality report with every ingest run.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -72,7 +72,7 @@ class ProviderIngestor:
         self.quarantine = quarantine
         self.retry = retry or RetryPolicy(attempts=2, base_delay=0.0, max_delay=0.0)
 
-    def _call[T](self, fn: Any) -> T:
+    def _call(self, fn: Callable[[], Any]) -> Any:
         return retry_call(fn, self.retry, sleeper=lambda _: None)
 
     def _existing(self, name: str) -> pd.DataFrame | None:
@@ -208,14 +208,14 @@ class ProviderIngestor:
         report: QualityReport = run_quality_checks(panel)
         quarantined = 0
         if self.quarantine:
-            result = quarantine_bad_rows(panel)
-            if result.dropped:
-                bad = result.bad_rows.copy()
+            quarantined_result = quarantine_bad_rows(panel)
+            if quarantined_result.dropped:
+                bad = quarantined_result.bad_rows.copy()
                 bad["quarantined_at"] = pd.Timestamp.now(tz="UTC").isoformat()
                 self.store.write_dataset("quarantine", bad, partition_column="year")
-                panel = result.clean
-                report = result.report
-                quarantined = result.dropped
+                panel = quarantined_result.clean
+                report = quarantined_result.report
+                quarantined = quarantined_result.dropped
         if self.enforce_quality:
             report.raise_if_failed()
 

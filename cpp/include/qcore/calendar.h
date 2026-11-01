@@ -14,9 +14,15 @@ class TradingCalendar {
   // Weekdays in [start,end], minus synthetic holidays (used by synthetic data and tests).
   static TradingCalendar weekdays(Date start, Date end, const std::vector<Date>& holidays = {});
   static TradingCalendar from_file(const std::string& path);
-  bool empty() const { return dates_.empty(); }
-  size_t size() const { return dates_.size(); }
-  const std::vector<Date>& dates() const { return dates_; }
+  bool empty() const {
+    return dates_.empty();
+  }
+  size_t size() const {
+    return dates_.size();
+  }
+  const std::vector<Date>& dates() const {
+    return dates_;
+  }
   Date at(size_t i) const;
   int index_of(Date d) const;  // -1 if absent
   bool is_trading_day(Date d) const;
@@ -25,6 +31,7 @@ class TradingCalendar {
   Date next(Date d) const;
   Date prev(Date d) const;
   void save(const std::string& path) const;
+
  private:
   std::vector<Date> dates_;
   std::unordered_map<Date, int> index_;

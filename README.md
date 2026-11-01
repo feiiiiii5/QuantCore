@@ -21,11 +21,11 @@ Python 负责数据、策略与实验管理，React 负责交互。数据与策�
 make setup
 
 # 2) 生成合成数据并构建快照（SYNTHETIC，仅用于开发/演示）
-uv run qc data update --provider synthetic --securities 200 --years 5
-uv run qc snapshot build --dataset synthetic
+uv run qc data update --provider synthetic --n-sec 200 --start 2020-01-02 --end 2024-12-31
+uv run qc snapshot build
 
-# 3) 跑一次回测
-uv run qc backtest run --strategy ma_cross --start 2021-01-01 --end 2025-12-31
+# 3) 跑一次回测（template 见 qc backtest run --help）
+uv run qc backtest run --template dual_ma --start 2021-01-01 --end 2024-12-31
 ```
 
 > 真实数据：`qc data update --provider tushare` 需要 `TUSHARE_TOKEN`（或系统钥匙串）；无 Token 时全部功能用合成数据 + 录制 fixture 验证。见 `docs/DEV-SETUP.md` 与 `docs/DATA-LICENSES.md`。
@@ -46,6 +46,14 @@ make ci-local     # 本地完整门禁
 - [回测语义](docs/engine-semantics.md) · [规则来源](docs/rules-sources.md) · [数据字典](docs/data-dictionary.md)
 - [架构](docs/ARCHITECTURE.md) · [开发环境/镜像](docs/DEV-SETUP.md) · [策略手册](docs/strategy-guide.md)
 - [API](docs/API.md) · [快速上手（中文）](docs/QUICKSTART.md) · [贡献](CONTRIBUTING.md)
+
+## 当前状态（2026-11-01）
+
+- C++ core：panel/kernels/expression/engine，ctest **95/95**；`make verify-cpp` 差分/基准通过。
+- Python：pytest **93 passed / 2 skipped（共 95）**，ruff/mypy 全绿；合成数据→快照→.qpanel→C++ 回测→实验/HTML 报告 CLI 端到端可跑。
+- UI：React 19 + Vite 六页壳，`pnpm build/test` 通过；M6 尚未接真实后端数据。
+- 诚实状态：`docs/features.json` **63/117 passes**；M0–M3 完成，M4 大部分，M5/M6 部分，M7–M10 未实现。详见 [验收报告](docs/acceptance-report.md)。
+- 仅研究与模拟；合成数据标 `SYNTHETIC`；真实 Tushare 需 Token，未在本次验证。
 
 ## 许可证
 

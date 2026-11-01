@@ -23,36 +23,43 @@ namespace {
 }
 
 void validate_config(const BacktestConfig& cfg) {
-  if (cfg.initial_cash <= 0) invalid("initial_cash must be positive");
-  if (cfg.annual_days <= 0) invalid("annual_days must be positive");
+  if (cfg.initial_cash <= 0)
+    invalid("initial_cash must be positive");
+  if (cfg.annual_days <= 0)
+    invalid("annual_days must be positive");
   const RuleSet& rules = cfg.rules;
   if (rules.main_lot <= 0 || rules.star_lot <= 0 || rules.bse_lot <= 0) {
     invalid("lot sizes must be positive");
   }
-  if (!(rules.min_price_tick > 0.0)) invalid("min_price_tick must be positive");
+  if (!(rules.min_price_tick > 0.0))
+    invalid("min_price_tick must be positive");
   const double pcts[] = {rules.main_limit_pct, rules.gem_limit_pct, rules.star_limit_pct,
-                         rules.bse_limit_pct, rules.st_limit_pct, rules.st_limit_pct_after};
+                         rules.bse_limit_pct,  rules.st_limit_pct,  rules.st_limit_pct_after};
   for (double p : pcts) {
-    if (!(p >= 0.0) || p >= 1.0) invalid("price limit pct must be in [0, 1)");
+    if (!(p >= 0.0) || p >= 1.0)
+      invalid("price limit pct must be in [0, 1)");
   }
   const CostModel& costs = cfg.costs;
-  if (costs.commission_rate < 0.0 || costs.stamp_duty_rate < 0.0 ||
-      costs.transfer_fee_rate < 0.0 || costs.exchange_fee_rate < 0.0 ||
-      costs.reg_fee_rate < 0.0 || costs.min_commission < 0) {
+  if (costs.commission_rate < 0.0 || costs.stamp_duty_rate < 0.0 || costs.transfer_fee_rate < 0.0 ||
+      costs.exchange_fee_rate < 0.0 || costs.reg_fee_rate < 0.0 || costs.min_commission < 0) {
     invalid("cost model rates must be non-negative");
   }
-  if (!(cfg.exec.max_participation > 0.0)) invalid("max_participation must be positive");
+  if (!(cfg.exec.max_participation > 0.0))
+    invalid("max_participation must be positive");
   if (!std::isfinite(cfg.exec.slippage_bps) || cfg.exec.slippage_bps < -10000.0) {
     invalid("slippage_bps must be finite and >= -10000");
   }
-  if (cfg.exec.min_rebalance_value < 0) invalid("min_rebalance_value must be non-negative");
+  if (cfg.exec.min_rebalance_value < 0)
+    invalid("min_rebalance_value must be non-negative");
   const int exec_type = static_cast<int>(cfg.exec.type);
-  if (exec_type < 0 || exec_type > 3) invalid("unknown exec type");
+  if (exec_type < 0 || exec_type > 3)
+    invalid("unknown exec type");
 }
 
 bool any_finite(const std::vector<double>& row) {
   for (double v : row) {
-    if (!std::isnan(v)) return true;
+    if (!std::isnan(v))
+      return true;
   }
   return false;
 }
@@ -71,17 +78,18 @@ MatrixTargetSource::MatrixTargetSource(std::vector<std::vector<double>> rows, si
     : rows_(std::move(rows)) {
   // Rows shorter than the panel are padded with NaN ("hold"), never with 0 ("exit").
   for (auto& row : rows_) {
-    if (!row.empty() && row.size() < n_sec) row.resize(n_sec, kNaN);
+    if (!row.empty() && row.size() < n_sec)
+      row.resize(n_sec, kNaN);
   }
 }
 
 const std::vector<double>& MatrixTargetSource::weights(size_t date_index) {
-  if (date_index >= rows_.size()) return empty_;
+  if (date_index >= rows_.size())
+    return empty_;
   return rows_[date_index];
 }
 
-Engine::Engine(const Panel& panel, BacktestConfig config)
-    : panel_(panel), cfg_(std::move(config)) {
+Engine::Engine(const Panel& panel, BacktestConfig config) : panel_(panel), cfg_(std::move(config)) {
   validate_config(cfg_);
   for (const CorporateAction& ca : cfg_.corporate_actions) {
     if (ca.sec < 0 || static_cast<size_t>(ca.sec) >= panel_.n_sec() || ca.ex_date == kInvalidDate) {
@@ -105,10 +113,11 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
   std::map<RejectReason, uint64_t> reasons;
 
   auto finalize = [&]() {
-    result.metrics = compute_metrics(result.equity, cfg_.initial_cash, result.trades,
-                                     cfg_.annual_days, 0.0);
+    result.metrics =
+        compute_metrics(result.equity, cfg_.initial_cash, result.trades, cfg_.annual_days, 0.0);
     for (const auto& kv : reasons) {
-      if (kv.second > 0) result.reasons.push_back(ReasonCount{kv.first, kv.second});
+      if (kv.second > 0)
+        result.reasons.push_back(ReasonCount{kv.first, kv.second});
     }
     const std::vector<LedgerPosition>& positions = ledger.positions();
     for (size_t sec = 0; sec < positions.size(); ++sec) {
@@ -143,12 +152,12 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
   size_t end = nt;
   const std::vector<Date>& all_dates = panel.dates();
   if (cfg_.start != kInvalidDate) {
-    begin = static_cast<size_t>(
-        std::lower_bound(all_dates.begin(), all_dates.end(), cfg_.start) - all_dates.begin());
+    begin = static_cast<size_t>(std::lower_bound(all_dates.begin(), all_dates.end(), cfg_.start) -
+                                all_dates.begin());
   }
   if (cfg_.end != kInvalidDate) {
-    end = static_cast<size_t>(
-        std::upper_bound(all_dates.begin(), all_dates.end(), cfg_.end) - all_dates.begin());
+    end = static_cast<size_t>(std::upper_bound(all_dates.begin(), all_dates.end(), cfg_.end) -
+                              all_dates.begin());
   }
   if (begin >= end) {
     finalize();
@@ -190,12 +199,13 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
         if (qty_before > 0 && cash_per_share > 0) {
           ledger.add_dividend(ca.sec, date, notional(cash_per_share, qty_before));
         }
-        if (ca.split_ratio != 1.0) ledger.apply_split(ca.sec, ca.split_ratio);
+        if (ca.split_ratio != 1.0)
+          ledger.apply_split(ca.sec, ca.split_ratio);
         const Px base = prev_close[sec];
         if (base > 0 && (cash_per_share > 0 || ca.split_ratio != 1.0)) {
           // 除权除息参考价 = (前收盘 - 每股现金红利) / 送转比例 (TODO(verify) 配股等).
-          const double raw = (static_cast<double>(base) - static_cast<double>(cash_per_share)) /
-                             ca.split_ratio;
+          const double raw =
+              (static_cast<double>(base) - static_cast<double>(cash_per_share)) / ca.split_ratio;
           adjusted_prev[ca.sec] = raw > 0.0 ? static_cast<Px>(std::llround(raw)) : 0;
         }
       }
@@ -204,7 +214,8 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
     // 2) Execute the previous close's target weights at today's price.
     if (have_pending) {
       std::vector<Px> exec_prev_close = prev_close;
-      for (const auto& kv : adjusted_prev) exec_prev_close[static_cast<size_t>(kv.first)] = kv.second;
+      for (const auto& kv : adjusted_prev)
+        exec_prev_close[static_cast<size_t>(kv.first)] = kv.second;
       ExecRequest req;
       req.date_index = i;
       req.date = date;
@@ -220,11 +231,14 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
     // simply not tradable and keep their last mark.
     for (size_t sec = 0; sec < ns; ++sec) {
       const Security& security = panel.securities()[sec];
-      if (security.delist_date == kInvalidDate || date < security.delist_date) continue;
+      if (security.delist_date == kInvalidDate || date < security.delist_date)
+        continue;
       const Qty qty = ledger.position_qty(static_cast<int32_t>(sec));
-      if (qty <= 0) continue;
+      if (qty <= 0)
+        continue;
       const LedgerPosition& position = ledger.position(static_cast<int32_t>(sec));
-      if (qty > position.sellable(date, cfg_.rules.t_plus_one)) continue;  // bought today
+      if (qty > position.sellable(date, cfg_.rules.t_plus_one))
+        continue;  // bought today
       const Px px = position.last_px;
       const Money amount = notional(px, qty);
       CostBreakdown costs;

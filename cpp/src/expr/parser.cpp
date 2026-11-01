@@ -12,7 +12,9 @@
 
 namespace qc::expr {
 
-bool is_cross_sectional(Op op) { return op == Op::Rank || op == Op::ZScore; }
+bool is_cross_sectional(Op op) {
+  return op == Op::Rank || op == Op::ZScore;
+}
 
 bool is_rolling(Op op) {
   switch (op) {
@@ -30,37 +32,68 @@ bool is_rolling(Op op) {
 
 const char* op_name(Op op) {
   switch (op) {
-    case Op::Number: return "num";
-    case Op::Field: return "field";
-    case Op::Add: return "add";
-    case Op::Sub: return "sub";
-    case Op::Mul: return "mul";
-    case Op::Div: return "div";
-    case Op::Pow: return "pow";
-    case Op::Lt: return "lt";
-    case Op::Le: return "le";
-    case Op::Gt: return "gt";
-    case Op::Ge: return "ge";
-    case Op::Eq: return "eq";
-    case Op::Ne: return "ne";
-    case Op::And: return "and";
-    case Op::Or: return "or";
-    case Op::Not: return "not";
-    case Op::Neg: return "neg";
-    case Op::Abs: return "abs";
-    case Op::Log: return "log";
-    case Op::Sqrt: return "sqrt";
-    case Op::Min: return "min";
-    case Op::Max: return "max";
-    case Op::TsMean: return "ts_mean";
-    case Op::TsStd: return "ts_std";
-    case Op::TsSum: return "ts_sum";
-    case Op::TsMin: return "ts_min";
-    case Op::TsMax: return "ts_max";
-    case Op::TsRank: return "ts_rank";
-    case Op::Delay: return "delay";
-    case Op::Rank: return "rank";
-    case Op::ZScore: return "zscore";
+    case Op::Number:
+      return "num";
+    case Op::Field:
+      return "field";
+    case Op::Add:
+      return "add";
+    case Op::Sub:
+      return "sub";
+    case Op::Mul:
+      return "mul";
+    case Op::Div:
+      return "div";
+    case Op::Pow:
+      return "pow";
+    case Op::Lt:
+      return "lt";
+    case Op::Le:
+      return "le";
+    case Op::Gt:
+      return "gt";
+    case Op::Ge:
+      return "ge";
+    case Op::Eq:
+      return "eq";
+    case Op::Ne:
+      return "ne";
+    case Op::And:
+      return "and";
+    case Op::Or:
+      return "or";
+    case Op::Not:
+      return "not";
+    case Op::Neg:
+      return "neg";
+    case Op::Abs:
+      return "abs";
+    case Op::Log:
+      return "log";
+    case Op::Sqrt:
+      return "sqrt";
+    case Op::Min:
+      return "min";
+    case Op::Max:
+      return "max";
+    case Op::TsMean:
+      return "ts_mean";
+    case Op::TsStd:
+      return "ts_std";
+    case Op::TsSum:
+      return "ts_sum";
+    case Op::TsMin:
+      return "ts_min";
+    case Op::TsMax:
+      return "ts_max";
+    case Op::TsRank:
+      return "ts_rank";
+    case Op::Delay:
+      return "delay";
+    case Op::Rank:
+      return "rank";
+    case Op::ZScore:
+      return "zscore";
   }
   return "?";
 }
@@ -97,8 +130,8 @@ bool is_commutative(Op op) {
 }
 
 bool is_field_name(const std::string& name) {
-  return name == "open" || name == "high" || name == "low" || name == "close" ||
-         name == "volume" || name == "amount" || name == "returns";
+  return name == "open" || name == "high" || name == "low" || name == "close" || name == "volume" ||
+         name == "amount" || name == "returns";
 }
 
 struct FunctionInfo {
@@ -109,19 +142,20 @@ struct FunctionInfo {
 };
 
 constexpr FunctionInfo kFunctions[] = {
-    {"abs", Op::Abs, 1, false},      {"log", Op::Log, 1, false},
-    {"sqrt", Op::Sqrt, 1, false},    {"rank", Op::Rank, 1, false},
+    {"abs", Op::Abs, 1, false},       {"log", Op::Log, 1, false},
+    {"sqrt", Op::Sqrt, 1, false},     {"rank", Op::Rank, 1, false},
     {"zscore", Op::ZScore, 1, false}, {"pow", Op::Pow, 2, false},
-    {"min", Op::Min, 2, false},      {"max", Op::Max, 2, false},
+    {"min", Op::Min, 2, false},       {"max", Op::Max, 2, false},
     {"ts_mean", Op::TsMean, 2, true}, {"ts_std", Op::TsStd, 2, true},
-    {"ts_sum", Op::TsSum, 2, true},  {"ts_min", Op::TsMin, 2, true},
-    {"ts_max", Op::TsMax, 2, true},  {"ts_rank", Op::TsRank, 2, true},
+    {"ts_sum", Op::TsSum, 2, true},   {"ts_min", Op::TsMin, 2, true},
+    {"ts_max", Op::TsMax, 2, true},   {"ts_rank", Op::TsRank, 2, true},
     {"delay", Op::Delay, 2, true},
 };
 
 const FunctionInfo* lookup_function(const std::string& name) {
   for (const FunctionInfo& info : kFunctions) {
-    if (name == info.name) return &info;
+    if (name == info.name)
+      return &info;
   }
   return nullptr;
 }
@@ -144,23 +178,30 @@ class Parser {
 
   Program run() {
     program_.source = source_;
-    if (tokens_.size() <= 1) fail(0, "empty expression");
+    if (tokens_.size() <= 1)
+      fail(0, "empty expression");
     const int root = parse_or();
-    if (!at(TokenKind::End)) fail(peek().pos, "unexpected " + token_desc(peek()));
+    if (!at(TokenKind::End))
+      fail(peek().pos, "unexpected " + token_desc(peek()));
     program_.root = root;
     return std::move(program_);
   }
 
  private:
   [[noreturn]] void fail(size_t pos, const std::string& message) const {
-    throw std::invalid_argument("expression parse error at position " +
-                                std::to_string(pos + 1) + ": " + message);
+    throw std::invalid_argument("expression parse error at position " + std::to_string(pos + 1) +
+                                ": " + message);
   }
 
-  const Token& peek() const { return tokens_[pos_]; }
-  bool at(TokenKind kind) const { return tokens_[pos_].kind == kind; }
+  const Token& peek() const {
+    return tokens_[pos_];
+  }
+  bool at(TokenKind kind) const {
+    return tokens_[pos_].kind == kind;
+  }
   bool accept(TokenKind kind) {
-    if (!at(kind)) return false;
+    if (!at(kind))
+      return false;
     ++pos_;
     return true;
   }
@@ -170,7 +211,8 @@ class Parser {
     return pos;
   }
   void expect(TokenKind kind, const char* what) {
-    if (!at(kind)) fail(peek().pos, std::string("expected ") + what + ", got " + token_desc(peek()));
+    if (!at(kind))
+      fail(peek().pos, std::string("expected ") + what + ", got " + token_desc(peek()));
     ++pos_;
   }
   void enter(size_t pos) {
@@ -178,7 +220,9 @@ class Parser {
       fail(pos, "expression nesting too deep (limit " + std::to_string(kMaxDepth) + ")");
     }
   }
-  void leave() { --depth_; }
+  void leave() {
+    --depth_;
+  }
 
   int parse_or() {
     int lhs = parse_and();
@@ -213,13 +257,26 @@ class Parser {
     const int lhs = parse_additive();
     Op op;
     switch (peek().kind) {
-      case TokenKind::Lt: op = Op::Lt; break;
-      case TokenKind::Le: op = Op::Le; break;
-      case TokenKind::Gt: op = Op::Gt; break;
-      case TokenKind::Ge: op = Op::Ge; break;
-      case TokenKind::Eq: op = Op::Eq; break;
-      case TokenKind::Ne: op = Op::Ne; break;
-      default: return lhs;
+      case TokenKind::Lt:
+        op = Op::Lt;
+        break;
+      case TokenKind::Le:
+        op = Op::Le;
+        break;
+      case TokenKind::Gt:
+        op = Op::Gt;
+        break;
+      case TokenKind::Ge:
+        op = Op::Ge;
+        break;
+      case TokenKind::Eq:
+        op = Op::Eq;
+        break;
+      case TokenKind::Ne:
+        op = Op::Ne;
+        break;
+      default:
+        return lhs;
     }
     ++pos_;
     const int rhs = parse_additive();
@@ -308,7 +365,8 @@ class Parser {
     const size_t pos = advance();
     const FunctionInfo* function = lookup_function(name);
     if (at(TokenKind::LParen)) {
-      if (function == nullptr) fail(pos, "unknown function '" + name + "'");
+      if (function == nullptr)
+        fail(pos, "unknown function '" + name + "'");
       return parse_call(*function, pos);
     }
     if (function != nullptr) {
@@ -331,7 +389,8 @@ class Parser {
       for (;;) {
         arg_pos.push_back(peek().pos);
         args.push_back(parse_or());
-        if (!accept(TokenKind::Comma)) break;
+        if (!accept(TokenKind::Comma))
+          break;
       }
     }
     leave();
@@ -343,8 +402,10 @@ class Parser {
                          (function.arity == 1 ? " argument" : " arguments") + ", got " +
                          std::to_string(got));
     }
-    if (function.window) return make_window(function, args[0], args[1], arg_pos[1], name);
-    if (got == 1) return make_unary(function.op, args[0]);
+    if (function.window)
+      return make_window(function, args[0], args[1], arg_pos[1], name);
+    if (got == 1)
+      return make_unary(function.op, args[0]);
     return make_binary(function.op, args[0], args[1]);
   }
 
@@ -361,12 +422,14 @@ class Parser {
     const int lo = function.op == Op::Delay ? 0 : 1;
     if (raw < static_cast<double>(lo) || raw > static_cast<double>(kMaxWindow)) {
       fail(window_pos, name + " window must be in [" + std::to_string(lo) + ", " +
-                            std::to_string(kMaxWindow) + "]");
+                           std::to_string(kMaxWindow) + "]");
     }
     return intern(function.op, {value_id}, 0.0, static_cast<int>(raw));
   }
 
-  int make_number(double value) { return intern(Op::Number, {}, value, 0); }
+  int make_number(double value) {
+    return intern(Op::Number, {}, value, 0);
+  }
 
   int make_field(const std::string& name) {
     auto it = field_index_.find(name);
@@ -381,8 +444,12 @@ class Parser {
     return intern(Op::Field, {}, 0.0, index);
   }
 
-  int make_unary(Op op, int kid) { return intern(op, {kid}, 0.0, 0); }
-  int make_binary(Op op, int a, int b) { return intern(op, {a, b}, 0.0, 0); }
+  int make_unary(Op op, int kid) {
+    return intern(op, {kid}, 0.0, 0);
+  }
+  int make_binary(Op op, int a, int b) {
+    return intern(op, {a, b}, 0.0, 0);
+  }
 
   // Canonical intern: a node is shared whenever its normalised key was seen before.
   int intern(Op op, std::vector<int> kids, double number, int arg) {
@@ -407,7 +474,8 @@ class Parser {
         key = op_name(op);
         key += '(';
         for (size_t i = 0; i < ordered.size(); ++i) {
-          if (i != 0) key += ',';
+          if (i != 0)
+            key += ',';
           key += program_.nodes[static_cast<size_t>(ordered[i])].key;
         }
         if (is_rolling(op) || op == Op::Delay) {
@@ -419,7 +487,8 @@ class Parser {
       }
     }
     const auto existing = cse_.find(key);
-    if (existing != cse_.end()) return existing->second;
+    if (existing != cse_.end())
+      return existing->second;
     Node node;
     node.op = op;
     node.number = number;
@@ -429,7 +498,8 @@ class Parser {
     const int id = static_cast<int>(program_.nodes.size());
     program_.nodes.push_back(std::move(node));
     cse_.emplace(std::move(key), id);
-    if (is_cross_sectional(op)) program_.has_cross = true;
+    if (is_cross_sectional(op))
+      program_.has_cross = true;
     return id;
   }
 
@@ -446,13 +516,12 @@ class Parser {
 
 Program compile(const std::string& source) {
   if (source.size() > kMaxSourceLength) {
-    throw std::invalid_argument(
-        "expression parse error at position " + std::to_string(kMaxSourceLength + 1) +
-        ": source is longer than " + std::to_string(kMaxSourceLength) + " characters");
+    throw std::invalid_argument("expression parse error at position " +
+                                std::to_string(kMaxSourceLength + 1) + ": source is longer than " +
+                                std::to_string(kMaxSourceLength) + " characters");
   }
   Parser parser(source, tokenize(source));
   return parser.run();
 }
-
 
 }  // namespace qc::expr

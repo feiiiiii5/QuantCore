@@ -98,6 +98,8 @@ def normalize_tushare_daily(frame: pd.DataFrame) -> pd.DataFrame:
         out["amount"] = pd.to_numeric(out["amount"], errors="coerce").fillna(0) * 1000.0
     if "suspended" in out.columns:
         out["suspended"] = out["suspended"].fillna(0).astype(bool)
+    else:
+        out["suspended"] = False
     for column in ("adj_factor", "limit_up", "limit_down"):
         if column in out.columns:
             out[column] = pd.to_numeric(out[column], errors="coerce")
@@ -106,7 +108,12 @@ def normalize_tushare_daily(frame: pd.DataFrame) -> pd.DataFrame:
     if "pre_close" not in out.columns:
         out["pre_close"] = out.groupby("sec_id")["close"].shift(1)
     if "turnover" not in out.columns:
-        shares = pd.to_numeric(out.get("float_shares", 0), errors="coerce").fillna(0.0)
+        shares = pd.to_numeric(
+            out["float_shares"]
+            if "float_shares" in out.columns
+            else pd.Series(0.0, index=out.index),
+            errors="coerce",
+        ).fillna(0.0)
         out["turnover"] = np.where(shares > 0, out["volume"] / shares, 0.0)
     if "total_shares" not in out.columns:
         out["total_shares"] = 0
@@ -171,9 +178,11 @@ def normalize_tushare_financials(frame: pd.DataFrame) -> pd.DataFrame:
     for column in ("revenue", "net_profit", "total_assets", "total_equity", "roe", "eps", "bps"):
         if column not in out.columns:
             out[column] = np.nan
-    out["dividend_per_share"] = pd.to_numeric(
-        out.get("dividend_per_share", 0), errors="coerce"
-    ).fillna(0.0)
+    if "dividend_per_share" not in out.columns:
+        out["dividend_per_share"] = 0.0
+    out["dividend_per_share"] = pd.to_numeric(out["dividend_per_share"], errors="coerce").fillna(
+        0.0
+    )
     out["source"] = "TUSHARE_FIXTURE"
     return normalize_financials(out)
 
@@ -274,7 +283,7 @@ class TushareProvider(DataProvider):
         if not token:
             self.require_permission()
         try:
-            import tushare
+            import tushare  # type: ignore[import-not-found]
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise ProviderUnavailableError(
                 "tushare is not installed; install the optional 'tushare' package for live mode"

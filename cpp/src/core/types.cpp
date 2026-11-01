@@ -18,14 +18,17 @@ namespace {
   throw std::invalid_argument("string_to_date: invalid date '" + s + "' (" + why + ")");
 }
 
-bool is_digit(char c) { return c >= '0' && c <= '9'; }
+bool is_digit(char c) {
+  return c >= '0' && c <= '9';
+}
 
 // Reads `count` ASCII digits starting at pos; returns false on non-digit input.
 bool read_digits(const std::string& s, std::size_t pos, std::size_t count, int& out) {
   int v = 0;
   for (std::size_t i = 0; i < count; ++i) {
     const char c = s[pos + i];
-    if (!is_digit(c)) return false;
+    if (!is_digit(c))
+      return false;
     v = v * 10 + (c - '0');
   }
   out = v;
@@ -35,11 +38,13 @@ bool read_digits(const std::string& s, std::size_t pos, std::size_t count, int& 
 }  // namespace
 
 bool valid_date(Date d) {
-  if (d <= 0) return false;
+  if (d <= 0)
+    return false;
   const int y = date_year(d);
   const int m = date_month(d);
   const int dd = date_day(d);
-  if (y < 1 || y > 9999 || m < 1 || m > 12) return false;
+  if (y < 1 || y > 9999 || m < 1 || m > 12)
+    return false;
   return dd >= 1 && dd <= detail::days_in_month(y, m);
 }
 
@@ -49,8 +54,8 @@ std::string date_to_string(Date d) {
   }
   char buf[16];
   // Zero padded, 8 characters for years >= 1 (the internal representation is YYYYMMDD).
-  const int n = std::snprintf(buf, sizeof(buf), "%04d%02d%02d", date_year(d), date_month(d),
-                              date_day(d));
+  const int n =
+      std::snprintf(buf, sizeof(buf), "%04d%02d%02d", date_year(d), date_month(d), date_day(d));
   if (n != 8) {
     throw std::invalid_argument("date_to_string: date out of representable range " +
                                 std::to_string(d));
@@ -67,16 +72,20 @@ Date string_to_date(const std::string& s) {
       throw_parse_error(s, "expected YYYYMMDD");
     }
   } else if (s.size() == 10) {
-    if (s[4] != '-' || s[7] != '-') throw_parse_error(s, "expected YYYY-MM-DD");
+    if (s[4] != '-' || s[7] != '-')
+      throw_parse_error(s, "expected YYYY-MM-DD");
     if (!read_digits(s, 0, 4, y) || !read_digits(s, 5, 2, m) || !read_digits(s, 8, 2, d)) {
       throw_parse_error(s, "expected YYYY-MM-DD");
     }
   } else {
     throw_parse_error(s, "expected 8 or 10 characters");
   }
-  if (y < 1 || y > 9999) throw_parse_error(s, "year out of range");
-  if (m < 1 || m > 12) throw_parse_error(s, "month out of range");
-  if (d < 1 || d > detail::days_in_month(y, m)) throw_parse_error(s, "day out of range");
+  if (y < 1 || y > 9999)
+    throw_parse_error(s, "year out of range");
+  if (m < 1 || m > 12)
+    throw_parse_error(s, "month out of range");
+  if (d < 1 || d > detail::days_in_month(y, m))
+    throw_parse_error(s, "day out of range");
   return make_date(y, m, d);
 }
 

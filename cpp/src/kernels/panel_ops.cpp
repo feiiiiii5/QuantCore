@@ -28,19 +28,20 @@ struct RollingEntry {
 };
 
 constexpr RollingEntry kRollingOps[] = {
-    {"sum", &rolling_sum},       {"mean", &rolling_mean},
-    {"std", &rolling_std},       {"min", &rolling_min},
-    {"max", &rolling_max},       {"argmax", &rolling_argmax},
-    {"rank", &rolling_rank},     {"decay_linear", &rolling_decay_linear},
+    {"sum", &rolling_sum},   {"mean", &rolling_mean},
+    {"std", &rolling_std},   {"min", &rolling_min},
+    {"max", &rolling_max},   {"argmax", &rolling_argmax},
+    {"rank", &rolling_rank}, {"decay_linear", &rolling_decay_linear},
 };
 
 RollingFn find_rolling_op(const std::string& op) {
   for (const RollingEntry& entry : kRollingOps) {
-    if (op == entry.name) return entry.fn;
+    if (op == entry.name)
+      return entry.fn;
   }
   if (op == "corr" || op == "cov") {
-    throw std::invalid_argument("rolling_panel: op '" + op +
-                                "' needs two fields; call rolling_" + op + " directly");
+    throw std::invalid_argument("rolling_panel: op '" + op + "' needs two fields; call rolling_" +
+                                op + " directly");
   }
   throw std::invalid_argument("rolling_panel: unknown op '" + op + "'");
 }
@@ -70,7 +71,8 @@ void rolling_panel(const Panel& panel, const std::string& field, size_t window,
   std::vector<double> series(n_time, kNaNValue);
   std::vector<double> result(n_time, kNaNValue);
   for (std::size_t sec = 0; sec < n_sec; ++sec) {
-    for (std::size_t t = 0; t < n_time; ++t) series[t] = view.at(sec, t);
+    for (std::size_t t = 0; t < n_time; ++t)
+      series[t] = view.at(sec, t);
     fn(series.data(), n_time, window, result.data());
     for (std::size_t t = 0; t < n_time; ++t) {
       out[out_index(out_layout, sec, t, n_sec, n_time)] = result[t];
@@ -88,7 +90,8 @@ void cross_panel(const Panel& panel, const std::string& field, const std::string
   std::vector<double> section(n_sec, kNaNValue);
   std::vector<double> result(n_sec, kNaNValue);
   for (std::size_t t = 0; t < n_time; ++t) {
-    for (std::size_t sec = 0; sec < n_sec; ++sec) section[sec] = view.at(sec, t);
+    for (std::size_t sec = 0; sec < n_sec; ++sec)
+      section[sec] = view.at(sec, t);
     if (op == "rank") {
       cross_rank(section.data(), n_sec, result.data());
     } else if (op == "zscore") {

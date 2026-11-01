@@ -33,13 +33,25 @@ class Ledger {
  public:
   explicit Ledger(Money initial_cash, bool t_plus_one = true, size_t n_sec = 0);
 
-  Money initial_cash() const { return initial_cash_; }
-  Money cash() const { return cash_; }
-  Money realized() const { return realized_; }
-  Money dividends() const { return dividends_; }
-  Money fees() const { return fees_; }
+  Money initial_cash() const {
+    return initial_cash_;
+  }
+  Money cash() const {
+    return cash_;
+  }
+  Money realized() const {
+    return realized_;
+  }
+  Money dividends() const {
+    return dividends_;
+  }
+  Money fees() const {
+    return fees_;
+  }
   Money market_value() const;
-  Money equity() const { return cash_ + market_value(); }
+  Money equity() const {
+    return cash_ + market_value();
+  }
   Money unrealized() const;
 
   // Applies a buy fill; `amount + fees` leaves cash. Lot cost includes fees.
@@ -56,8 +68,12 @@ class Ledger {
 
   Qty position_qty(int32_t sec) const;
   const LedgerPosition& position(int32_t sec) const;
-  const std::vector<LedgerPosition>& positions() const { return positions_; }
-  size_t position_count() const { return positions_.size(); }
+  const std::vector<LedgerPosition>& positions() const {
+    return positions_;
+  }
+  size_t position_count() const {
+    return positions_.size();
+  }
 
   // Throws std::runtime_error listing the failed invariant:
   //  - cash >= 0, qty/cost/lots consistency, mark prices non-negative

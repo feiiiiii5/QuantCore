@@ -21,7 +21,9 @@
 
 namespace qc::kernels::detail {
 
-inline bool valid(double v) { return !std::isnan(v); }
+inline bool valid(double v) {
+  return !std::isnan(v);
+}
 
 inline void require_series(const double* x, size_t n, const char* name) {
   if (n != 0 && x == nullptr) {
@@ -50,7 +52,8 @@ inline void require_positive(int value, const char* name, const char* param) {
 // True when [begin, end) is fully populated with finite-or-infinite (i.e. non-NaN) values.
 inline bool window_valid(const double* x, size_t begin, size_t end) {
   for (size_t j = begin; j < end; ++j) {
-    if (!valid(x[j])) return false;
+    if (!valid(x[j]))
+      return false;
   }
   return true;
 }
