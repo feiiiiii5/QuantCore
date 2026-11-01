@@ -98,7 +98,7 @@ std::vector<qc::Date> parse_dates(const py::object& dates) {
   }
   const py::sequence sequence = py::cast<py::sequence>(dates);
   out.reserve(static_cast<std::size_t>(py::len(sequence)));
-  for (const py::handle item : sequence)
+  for (const py::handle& item : sequence)
     out.push_back(python_date(item, "dates entry"));
   return out;
 }
@@ -132,7 +132,7 @@ std::vector<qc::Security> parse_securities(const py::object& securities) {
   std::vector<qc::Security> out;
   const py::sequence sequence = py::cast<py::sequence>(securities);
   out.reserve(static_cast<std::size_t>(py::len(sequence)));
-  for (const py::handle item : sequence) {
+  for (const py::handle& item : sequence) {
     if (py::isinstance<qc::Security>(item)) {
       out.push_back(py::cast<qc::Security>(item));
     } else if (py::isinstance<py::dict>(item)) {

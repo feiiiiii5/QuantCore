@@ -37,22 +37,5 @@ jobs:
       - name: Verify C++ backend
         run: uv run python scripts/verify_cpp.py
 
-  windows:
-    # Experimental until the Windows port (mmap layer + portable 128-bit arithmetic) is verified;
-    # macOS/Linux are the primary CI targets for now.  See docs/PROGRESS.md known gaps.
-    continue-on-error: true
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - uses: astral-sh/setup-uv@v4
-      - name: Build + test
-        shell: pwsh
-        run: |
-          uv sync --all-extras --python 3.12
-          cmake -S . -B build/cmake -G "Visual Studio 17 2022" -A x64 -DQC_BUILD_PYTHON=OFF -DQC_BUILD_TESTS=ON
-          cmake --build build/cmake --config Release
-          ctest --test-dir build/cmake -C Release --output-on-failure
-          uv run pytest -q
+# Windows is a target platform but not yet CI-verified (mmap layer + MSVC wide-integer
+# portability); see docs/PROGRESS.md known gaps.  Do not advertise Windows as tested.

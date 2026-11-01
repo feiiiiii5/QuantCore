@@ -82,7 +82,7 @@ std::vector<qc::CorporateAction> actions_from_object(py::handle value) {
     out.push_back(action_from_object(value));
     return out;
   }
-  for (const py::handle item : py::cast<py::sequence>(value)) {
+  for (const py::handle& item : py::cast<py::sequence>(value)) {
     out.push_back(action_from_object(item));
   }
   return out;
