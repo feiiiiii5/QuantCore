@@ -322,8 +322,8 @@
       "id": "M3-009",
       "milestone": "M3",
       "title": "engine risk limits",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "RiskLimitsConfig(long_only/max_positions/max_weight) applied to target weights before C++ execution; tests/test_risk_limits.py; UI advanced risk fields"
     },
     {
       "id": "M3-010",

@@ -97,3 +97,7 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 ## Benchmark comparison (M3)
 - `POST /api/config` / backtest `config.benchmark_code` (optional security code) → buy-and-hold benchmark over the same result dates.
 - Result payloads include `benchmark:{code,sec_id,name,dates,equity,total_return,metrics}` and metrics `benchmark_return/excess_return/tracking_error/information_ratio`; persisted as `result/benchmark.json` and included in job/experiment result payloads.
+
+## Risk limits (M3)
+- Backtest `config.risk` accepts `{max_positions?: int, max_weight?: float (0,1], long_only?: bool=true}`.
+- Target weights are clamped/limited before the C++ engine runs; long-only by default, negative targets set to 0. Output/metrics remain engine-native.

@@ -21,7 +21,7 @@ import { notify } from "../lib/notify";
 const DEFAULTS: BacktestDraft = {
   template: "momentum", paramsText: '{"top_n": 10, "lookback": 60}', start: "2022-01-04", end: "2024-12-31", cash: "1000000",
   exec: "next_open", commissionRate: "0.03", minCommission: "5", stampDutyRate: "0.05", slippageBps: "0", maxParticipation: "1",
-  minRebalanceValue: "0", trace: "summary", seed: "42", benchmarkCode: "",
+  minRebalanceValue: "0", trace: "summary", seed: "42", benchmarkCode: "", maxPositions: "", maxWeight: "",
 };
 
 function monthlyReturns(result: BacktestResultPayload): Array<{ month: string; value: number }> {
@@ -97,6 +97,10 @@ export default function BacktestPage() {
           stamp_duty_rate: Number(draft.stampDutyRate) / 100, transfer_fee_rate: 0.00001, exchange_fee_rate: 0.00001, reg_fee_rate: 0.000002,
         },
         exec: { type: draft.exec, slippage_bps: Number(draft.slippageBps) || 0, max_participation: Number(draft.maxParticipation) || 1, min_rebalance_value: Number(draft.minRebalanceValue) || 0 },
+        risk: {
+          max_positions: draft.maxPositions ? Number(draft.maxPositions) : undefined,
+          max_weight: draft.maxWeight ? Number(draft.maxWeight) : undefined,
+        },
       };
       submit.mutate({ template: draft.template, params, config }, {
         onSuccess: (response) => { setJobId(response.job_id); },
@@ -205,8 +209,10 @@ export default function BacktestPage() {
               <label>最小调仓额（元）<input value={draft.minRebalanceValue} onChange={(event) => update("minRebalanceValue", event.target.value)} inputMode="decimal" /></label>
               <label>trace<select value={draft.trace} onChange={(event) => update("trace", event.target.value)}><option value="off">off</option><option value="summary">summary</option><option value="full">full</option></select></label>
               <label>seed<input value={draft.seed} onChange={(event) => update("seed", event.target.value)} inputMode="numeric" /></label>
+              <label>最大持仓数<input value={draft.maxPositions} onChange={(event) => update("maxPositions", event.target.value)} inputMode="numeric" placeholder="不限" /></label>
+              <label>单票最大权重<input value={draft.maxWeight} onChange={(event) => update("maxWeight", event.target.value)} inputMode="decimal" placeholder="0-1，如 0.1" /></label>
             </div>
-            <p className="muted small">费用按「百分比」输入并换算为小数传给后端；调仓频率当前由模板参数控制。基准字段后端未实现，已禁用而非伪造。</p>
+            <p className="muted small">费用按「百分比」输入并换算为小数传给后端；调仓频率由模板参数控制。风险限制在目标权重生成后应用（long-only、最大持仓、单票最大权重），基准为可选的本地证券买入持有。</p>
           </details>
           {progress.job ? <div className="progress" role="status"><div className="progress-bar" style={{ width: `${Math.round(progress.job.progress * 100)}%` }} /><span>{progress.job.status} · {Math.round(progress.job.progress * 100)}% · {progress.transport ?? "等待"}</span></div> : null}
           {error ? <p className="error" role="alert">{error}</p> : null}

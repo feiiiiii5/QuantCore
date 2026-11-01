@@ -17,6 +17,8 @@ export interface BacktestDraft {
   trace: string;
   seed: string;
   benchmarkCode: string;
+  maxPositions: string;
+  maxWeight: string;
 }
 
 interface WorkspaceState {

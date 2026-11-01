@@ -146,6 +146,7 @@ def run_backtest(
         raise BacktestError(
             f"weights shape {matrix.shape} does not match the panel {(n_time, n_sec)}"
         )
+    matrix = _apply_risk_limits(matrix, cfg)
     with _PanelHandle(panel) as panel_object:
         cpp_config = _cpp_config(module, cfg, calendar)
         engine = module.Engine(panel_object, cpp_config)
@@ -165,6 +166,34 @@ def run_backtest(
     if result.engine_backend != "cpp":  # pragma: no cover - defensive
         raise BacktestError(f"engine_backend must be 'cpp', got {result.engine_backend!r}")
     return result
+
+
+def _apply_risk_limits(matrix: np.ndarray, config: BacktestConfig) -> np.ndarray:
+    """Apply long-only, max-weight and max-position limits to each rebalance row."""
+    risk = config.risk
+    output = matrix.copy()
+    for row in range(output.shape[0]):
+        values = output[row]
+        finite = np.isfinite(values)
+        if not finite.any():
+            continue
+        if risk.long_only:
+            values[finite & (values < 0.0)] = 0.0
+        if risk.max_weight is not None:
+            values[finite] = np.minimum(values[finite], float(risk.max_weight))
+        if risk.max_positions is not None and int(risk.max_positions) > 0:
+            candidates = np.flatnonzero(np.isfinite(values) & (values > 0.0))
+            keep = {
+                int(index)
+                for index in candidates[
+                    np.argsort(-values[candidates], kind="stable")[: int(risk.max_positions)]
+                ]
+            }
+            for index in candidates:
+                if int(index) not in keep:
+                    values[index] = 0.0
+        output[row] = values
+    return output
 
 
 def _attach_benchmark(
@@ -210,11 +239,16 @@ def _attach_benchmark(
     valid = [(idx, value) for idx, value in enumerate(equity) if value is not None]
     if len(valid) < 2:
         raise BacktestError(f"benchmark series is too short: {code}")
-    first = float(valid[0][1])
-    last = float(valid[-1][1])
+    benchmark_values = [float(value) for _, value in valid]
+    first = benchmark_values[0]
+    last = benchmark_values[-1]
     benchmark_return = last / first - 1.0 if first else 0.0
     benchmark_returns = np.asarray(
-        [float(equity[i]) / float(equity[i - 1]) - 1.0 for i, _ in valid[1:]], dtype=np.float64
+        [
+            benchmark_values[index] / benchmark_values[index - 1] - 1.0
+            for index in range(1, len(benchmark_values))
+        ],
+        dtype=np.float64,
     )
     strategy_returns = np.asarray(
         [float(result.returns[i]) for i, _ in valid[1:]], dtype=np.float64

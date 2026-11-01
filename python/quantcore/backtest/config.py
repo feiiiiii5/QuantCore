@@ -80,6 +80,15 @@ class ExecModelConfig(BaseModel):
     min_rebalance_value: float = Field(default=0.0, ge=0, description="skip tiny rebalances, CNY")
 
 
+class RiskLimitsConfig(BaseModel):
+    """Optional portfolio risk limits applied to target weights before execution."""
+
+    model_config = ConfigDict(extra="forbid")
+    max_positions: int | None = Field(default=None, ge=1, le=5000)
+    max_weight: float | None = Field(default=None, gt=0, le=1.0)
+    long_only: bool = True
+
+
 class BacktestConfig(BaseModel):
     """Complete backtest configuration (dates optional; default to the panel range)."""
 
@@ -90,6 +99,7 @@ class BacktestConfig(BaseModel):
     rules: RuleSetConfig = Field(default_factory=RuleSetConfig)
     costs: CostModelConfig = Field(default_factory=CostModelConfig)
     exec: ExecModelConfig = Field(default_factory=ExecModelConfig)
+    risk: RiskLimitsConfig = Field(default_factory=RiskLimitsConfig)
     trace: TraceLevel = TraceLevel.summary
     seed: int = 42
     annual_days: int = Field(default=244, ge=1)
