@@ -36,6 +36,9 @@ export default function PaperPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [alerts, setAlerts] = useState<Array<{ id: string; type: "equity_above" | "equity_below"; value: number }>>([]);
+  const [alertType, setAlertType] = useState<"equity_above" | "equity_below">("equity_below");
+  const [alertValue, setAlertValue] = useState("");
   const playTimer = useRef<number | null>(null);
 
   const stopPlay = useCallback(() => {
@@ -91,11 +94,32 @@ export default function PaperPage() {
     } catch (e) { setError(`${e}`); } finally { setBusy(false); }
   };
 
+  const storageKey = selected ? `qc_paper_alerts_${selected}` : "";
+  useEffect(() => {
+    if (!storageKey) { setAlerts([]); return; }
+    try {
+      const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]") as Array<{ id: string; type: "equity_above" | "equity_below"; value: number }>;
+      setAlerts(Array.isArray(parsed) ? parsed : []);
+    } catch { setAlerts([]); }
+  }, [storageKey]);
+  const saveAlerts = (next: Array<{ id: string; type: "equity_above" | "equity_below"; value: number }>) => {
+    setAlerts(next);
+    if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
+  };
+  const checkAlerts = (next: PaperSessionDetail) => {
+    const equity = next.account.equity;
+    for (const alert of alerts) {
+      const hit = alert.type === "equity_below" ? equity <= alert.value : equity >= alert.value;
+      if (hit) notify({ title: "模拟账户提醒", body: `权益 ${money(equity)} ${alert.type === "equity_below" ? "低于" : "高于"} ${money(alert.value)}`, kind: "info" });
+    }
+  };
+
   const step = async () => {
     if (!selected) return;
     try {
       const next = await api.stepPaper(selected, 1);
       setDetail(next);
+      checkAlerts(next);
       const fills = next.fills?.length ?? 0;
       if (fills > 0) notify({ title: "模拟成交", body: `${fills} 笔委托在 ${dateText(next.session.current_date)} 成交（仅本地模拟）`, kind: "success" });
       await loadSessions();
@@ -223,6 +247,13 @@ export default function PaperPage() {
                 <div><h3>盈亏</h3><div className={`kpi ${(account?.pnl || 0) >= 0 ? "up" : "down"}`}>{money(account?.pnl || 0)}（{pct(account?.pnl_pct || 0)}）</div></div>
               </div>
               <div className="chart-block" style={{ marginTop: 10 }}>{equityOption ? <Chart option={equityOption} height={230} /> : null}</div>
+              <div className="card-head" style={{ marginTop: 10 }}><h3>本地提醒</h3><span className="muted small">仅本机 localStorage；每日推进后检查</span></div>
+              <div className="button-row">
+                <select value={alertType} onChange={(e) => setAlertType(e.target.value as "equity_above" | "equity_below")} style={{ maxWidth: 140 }}><option value="equity_below">权益低于</option><option value="equity_above">权益高于</option></select>
+                <input placeholder="金额" value={alertValue} onChange={(e) => setAlertValue(e.target.value)} inputMode="decimal" style={{ maxWidth: 140 }} />
+                <button className="btn" onClick={() => { const value = Number(alertValue); if (!Number.isFinite(value) || value <= 0) return; saveAlerts([...alerts, { id: `alert_${Date.now()}`, type: alertType, value }]); setAlertValue(""); }}>添加提醒</button>
+              </div>
+              {alerts.length ? <div className="alert-list">{alerts.map((alert) => <span className="badge" key={alert.id}>{alert.type === "equity_below" ? "≤" : "≥"} {money(alert.value)} <button className="link-btn" onClick={() => saveAlerts(alerts.filter((item) => item.id !== alert.id))}>×</button></span>)}</div> : <p className="muted small">暂无提醒；例如“权益低于 900,000”会在下次推进后 toast/桌面通知。</p>}
               <div className="grid two-col" style={{ marginTop: 10 }}>
                 <div>
                   <div className="card-head"><h3>提交模拟委托</h3></div>

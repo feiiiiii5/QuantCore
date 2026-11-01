@@ -728,8 +728,8 @@
       "id": "M9-003",
       "milestone": "M9",
       "title": "alerts",
-      "passes": false,
-      "evidence": "not implemented: continuous live feed/alerts/multi-strategy/plugin are M9 next scope"
+      "passes": true,
+      "evidence": "Local paper equity-threshold alerts persisted in localStorage; evaluated after each step; toast + optional browser Notification; UI /paper 本地提醒"
     },
     {
       "id": "M9-004",

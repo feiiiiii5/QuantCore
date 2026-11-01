@@ -305,3 +305,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .toast strong { display: block; font-size: 12.5px; }
 .toast small { display: block; color: var(--muted); margin-top: 2px; }
 .toast .icon-btn { margin-left: auto; flex: none; }
+
+/* paper alerts */
+.alert-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.link-btn { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 2px; font-size: 12px; }
