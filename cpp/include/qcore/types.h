@@ -6,6 +6,15 @@
 #include <string>
 
 namespace qc {
+// 128-bit accumulator for notional/market-value overflow checks.  GCC/Clang expose
+// __int128 as an extension; __extension__ keeps -Wpedantic clean.  MSVC falls back to
+// 64-bit (documented limitation; Windows CI is experimental until a portable wide type lands).
+#if defined(__SIZEOF_INT128__)
+__extension__ typedef __int128 int128;
+#else
+typedef long long int128;
+#endif
+
 using Px = int64_t;     // 1e-4 CNY
 using Money = int64_t;  // 1e-4 CNY
 using Qty = int64_t;    // shares

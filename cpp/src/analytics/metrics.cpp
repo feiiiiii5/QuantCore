@@ -123,23 +123,23 @@ Metrics compute_metrics(const std::vector<Money>& equity, Money initial_cash,
 
   // Fees, turnover, FIFO round-trip statistics from the fill list.
   Money total_fees = 0;
-  __int128 traded_notional = 0;
+  int128 traded_notional = 0;
   int64_t fills = 0;
-  __int128 equity_sum = static_cast<__int128>(initial_cash);
+  int128 equity_sum = static_cast<int128>(initial_cash);
   for (Money e : equity)
-    equity_sum += static_cast<__int128>(e);
+    equity_sum += static_cast<int128>(e);
   std::vector<std::vector<FifoLot>> lots;
   int64_t sells = 0;
   int64_t wins = 0;
-  __int128 gross_profit = 0;
-  __int128 gross_loss = 0;
+  int128 gross_profit = 0;
+  int128 gross_loss = 0;
   size_t max_sec = 0;
   for (const Trade& t : trades) {
     if (t.reason != RejectReason::None || t.qty <= 0)
       continue;
     ++fills;
     total_fees += t.fee_total;
-    traded_notional += static_cast<__int128>(t.amount < 0 ? -t.amount : t.amount);
+    traded_notional += static_cast<int128>(t.amount < 0 ? -t.amount : t.amount);
     if (t.sec < 0)
       continue;
     max_sec = std::max(max_sec, static_cast<size_t>(t.sec));
@@ -160,9 +160,9 @@ Metrics compute_metrics(const std::vector<Money>& equity, Money initial_cash,
       ++sells;
       if (pnl > 0) {
         ++wins;
-        gross_profit += static_cast<__int128>(pnl);
+        gross_profit += static_cast<int128>(pnl);
       } else if (pnl < 0) {
-        gross_loss += static_cast<__int128>(-pnl);
+        gross_loss += static_cast<int128>(-pnl);
       }
     }
   }

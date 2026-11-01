@@ -15,9 +15,9 @@ namespace {
 }  // namespace
 
 Money notional(Px px, Qty qty) {
-  const __int128 v = static_cast<__int128>(px) * static_cast<__int128>(qty);
-  if (v > static_cast<__int128>(std::numeric_limits<Money>::max()) ||
-      v < static_cast<__int128>(std::numeric_limits<Money>::min())) {
+  const int128 v = static_cast<int128>(px) * static_cast<int128>(qty);
+  if (v > static_cast<int128>(std::numeric_limits<Money>::max()) ||
+      v < static_cast<int128>(std::numeric_limits<Money>::min())) {
     fail("notional overflow: px=" + std::to_string(px) + " qty=" + std::to_string(qty));
   }
   return static_cast<Money>(v);
@@ -172,26 +172,26 @@ void Ledger::mark(int32_t sec, Px px) {
 }
 
 Money Ledger::market_value() const {
-  __int128 sum = 0;
+  int128 sum = 0;
   for (const auto& pos : positions_) {
     if (pos.qty == 0)
       continue;
-    sum += static_cast<__int128>(pos.qty) * static_cast<__int128>(pos.last_px);
+    sum += static_cast<int128>(pos.qty) * static_cast<int128>(pos.last_px);
   }
-  if (sum > static_cast<__int128>(std::numeric_limits<Money>::max())) {
+  if (sum > static_cast<int128>(std::numeric_limits<Money>::max())) {
     fail("market value overflow");
   }
   return static_cast<Money>(sum);
 }
 
 Money Ledger::unrealized() const {
-  __int128 sum = 0;
+  int128 sum = 0;
   for (const auto& pos : positions_) {
-    sum += static_cast<__int128>(pos.qty) * static_cast<__int128>(pos.last_px);
-    sum -= static_cast<__int128>(pos.cost);
+    sum += static_cast<int128>(pos.qty) * static_cast<int128>(pos.last_px);
+    sum -= static_cast<int128>(pos.cost);
   }
-  if (sum > static_cast<__int128>(std::numeric_limits<Money>::max()) ||
-      sum < static_cast<__int128>(std::numeric_limits<Money>::min())) {
+  if (sum > static_cast<int128>(std::numeric_limits<Money>::max()) ||
+      sum < static_cast<int128>(std::numeric_limits<Money>::min())) {
     fail("unrealized overflow");
   }
   return static_cast<Money>(sum);
@@ -204,8 +204,8 @@ void Ledger::assert_invariants(Date date) const {
     fail("realized overflow");
   for (size_t i = 0; i < positions_.size(); ++i) {
     const LedgerPosition& pos = positions_[i];
-    __int128 sum_qty = 0;
-    __int128 sum_cost = 0;
+    int128 sum_qty = 0;
+    int128 sum_cost = 0;
     for (const auto& lot : pos.lots) {
       if (lot.qty < 0)
         fail("negative lot qty at sec " + std::to_string(i));
@@ -217,10 +217,10 @@ void Ledger::assert_invariants(Date date) const {
       sum_qty += lot.qty;
       sum_cost += lot.cost;
     }
-    if (sum_qty != static_cast<__int128>(pos.qty)) {
+    if (sum_qty != static_cast<int128>(pos.qty)) {
       fail("position qty != sum(lots) at sec " + std::to_string(i));
     }
-    if (sum_cost != static_cast<__int128>(pos.cost)) {
+    if (sum_cost != static_cast<int128>(pos.cost)) {
       fail("position cost != sum(lots) at sec " + std::to_string(i));
     }
     if (pos.last_px < 0)
@@ -229,9 +229,9 @@ void Ledger::assert_invariants(Date date) const {
       fail("sellable > position at sec " + std::to_string(i));
     }
   }
-  const __int128 lhs = static_cast<__int128>(cash_) + static_cast<__int128>(market_value());
-  const __int128 rhs = static_cast<__int128>(initial_cash_) + static_cast<__int128>(realized_) +
-                       static_cast<__int128>(unrealized()) + static_cast<__int128>(dividends_);
+  const int128 lhs = static_cast<int128>(cash_) + static_cast<int128>(market_value());
+  const int128 rhs = static_cast<int128>(initial_cash_) + static_cast<int128>(realized_) +
+                       static_cast<int128>(unrealized()) + static_cast<int128>(dividends_);
   if (lhs != rhs) {
     fail("net value conservation failed on " + std::to_string(date) + ": cash+mv=" +
          std::to_string(cash_ + market_value()) + " initial+realized+unrealized+div=" +
