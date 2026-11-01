@@ -1,81 +1,94 @@
 import { useEffect, useMemo, useState } from "react";
 import Editor from "@monaco-editor/react";
-import "../monaco";
 import { Play, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api/client";
+import { useTemplates, useValidateStrategy } from "../api/queries";
 import type { Template } from "../api/types";
+import ParamForm, { defaultsFromSchema } from "../components/ParamForm";
 import StatePanel from "../components/StatePanel";
 import { zhCN as t } from "../i18n/zh-CN";
-
-function defaults(template: Template | undefined): Record<string, unknown> {
-  const output: Record<string, unknown> = {};
-  for (const [key, spec] of Object.entries(template?.params_schema.properties || {})) {
-    if (spec.default !== undefined) output[key] = spec.default;
-  }
-  return output;
-}
+import "../monaco";
 
 export default function StrategyPage() {
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [selected, setSelected] = useState("");
-  const [paramsText, setParamsText] = useState("{}");
-  const [validation, setValidation] = useState("");
-  const [valid, setValid] = useState<boolean | null>(null);
-  const [error, setError] = useState("");
+  const templates = useTemplates();
+  const validate = useValidateStrategy();
   const navigate = useNavigate();
-  const template = useMemo(() => templates.find((item) => item.id === selected), [templates, selected]);
+  const [selected, setSelected] = useState("");
+  const [params, setParams] = useState<Record<string, unknown>>({});
+  const [jsonText, setJsonText] = useState("{}");
+  const [jsonError, setJsonError] = useState("");
+  const [mode, setMode] = useState<"form" | "json">("form");
+  const template = useMemo(() => templates.data?.find((item) => item.id === selected), [templates.data, selected]);
 
   useEffect(() => {
-    api.templates().then((items) => {
-      setTemplates(items);
-      if (items[0]) { setSelected(items[0].id); setParamsText(JSON.stringify(defaults(items[0]), null, 2)); }
-    }).catch((e) => setError(`${e}`));
-  }, []);
+    const first = templates.data?.[0];
+    if (!selected && first) setSelected(first.id);
+  }, [selected, templates.data]);
   useEffect(() => {
-    if (template) { setParamsText(JSON.stringify(defaults(template), null, 2)); setValid(null); setValidation(""); }
+    if (!template) return;
+    const defaults = defaultsFromSchema(template.params_schema);
+    setParams(defaults);
+    setJsonText(JSON.stringify(defaults, null, 2));
+    setJsonError("");
+    validate.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template]);
 
-  const parseParams = () => {
-    try { return JSON.parse(paramsText) as Record<string, unknown>; } catch (e) { throw new Error(`参数 JSON 无效：${e}`); }
-  };
-  const validate = async () => {
-    setError(""); setValidation("");
+  const updateParams = (next: Record<string, unknown>) => { setParams(next); setJsonText(JSON.stringify(next, null, 2)); setJsonError(""); };
+  const updateJson = (text: string) => {
+    setJsonText(text);
     try {
-      const result = await api.validateStrategy(selected, parseParams());
-      setValid(result.valid);
-      setValidation(result.valid ? "参数通过校验" : JSON.stringify(result.errors, null, 2));
-    } catch (e) { setError(`${e}`); }
+      const parsed: unknown = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("参数必须是 JSON 对象");
+      setParams(parsed as Record<string, unknown>);
+      setJsonError("");
+    } catch (error) { setJsonError(error instanceof Error ? error.message : "JSON 无效"); }
+  };
+  const onValidate = () => {
+    if (!selected) return;
+    validate.mutate({ template: selected, params });
   };
   const run = () => {
     try {
-      const params = parseParams();
-      navigate(`/backtest?template=${encodeURIComponent(selected)}&params=${encodeURIComponent(JSON.stringify(params))}`);
-    } catch (e) { setError(`${e}`); }
+      const parsed: unknown = JSON.parse(jsonText);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("参数必须是 JSON 对象");
+      navigate(`/backtest?template=${encodeURIComponent(selected)}&params=${encodeURIComponent(JSON.stringify(parsed))}`);
+    } catch (error) { setJsonError(error instanceof Error ? error.message : "JSON 无效"); }
   };
 
   return (
     <>
-      <div className="page-head"><div><h1>策略</h1><p>模板 · JSON Schema 参数 · 校验 · 版本与运行</p></div>
-        <div className="button-row"><button className="btn" onClick={() => void validate()}><ShieldCheck size={15} /> 校验参数</button><button className="btn primary" onClick={run}><Play size={15} /> 运行回测</button></div>
+      <div className="page-head">
+        <div><h1>策略</h1><p>模板 · JSON Schema 自动表单 · Monaco · 参数校验 · 版本与运行</p></div>
+        <div className="button-row"><button className="btn" onClick={onValidate} disabled={!selected || validate.isPending}><ShieldCheck size={15} /> {validate.isPending ? "校验中…" : "校验参数"}</button><button className="btn primary" onClick={run} disabled={!selected}><Play size={15} /> 运行回测</button></div>
       </div>
-      <div className="grid strategy-layout">
-        <div className="card template-list">
-          <h3>内置模板</h3>
-          {templates.map((item) => <button key={item.id} className={`template-item ${selected === item.id ? "active" : ""}`} onClick={() => setSelected(item.id)}><strong>{item.id}</strong><span>{item.description}</span></button>)}
-          {!templates.length ? <StatePanel loading /> : null}
-        </div>
-        <div className="card">
-          <div className="card-head"><h3>{selected || "策略"}</h3>{valid === true ? <span className="badge success">参数有效</span> : valid === false ? <span className="badge danger">参数无效</span> : null}</div>
-          <p className="muted small">{template?.description}</p>
-          <label className="field-label">参数 JSON（保存到实验元数据）</label>
-          <div className="editor-frame">
-            <Editor height="280px" defaultLanguage="json" value={paramsText} onChange={(value) => setParamsText(value || "{}")} options={{ minimap: { enabled: false }, fontSize: 13, automaticLayout: true, scrollBeyondLastLine: false }} />
+      {templates.isLoading ? <StatePanel loading /> : templates.error ? <StatePanel error={templates.error.message} onRetry={() => void templates.refetch()} /> : (
+        <div className="grid strategy-layout">
+          <div className="card template-list">
+            <h3>内置模板 <span className="muted small">{templates.data?.length ?? 0}</span></h3>
+            {(templates.data ?? []).map((item: Template) => (
+              <button key={item.id} className={`template-item ${selected === item.id ? "active" : ""}`} onClick={() => setSelected(item.id)}>
+                <strong>{item.name || item.id}</strong><span>{item.description}</span>
+              </button>
+            ))}
           </div>
-          {validation ? <pre className={`validation ${valid ? "success" : "error"}`}>{validation}</pre> : null}
-          {error ? <p className="error">{error}</p> : null}
+          <div className="card">
+            <div className="card-head"><h3>{template?.name || template?.id || "策略"}</h3>{validate.data?.valid === true ? <span className="badge success">参数有效</span> : validate.data && !validate.data.valid ? <span className="badge danger">参数无效</span> : null}</div>
+            <p className="muted small">{template?.description}</p>
+            <div className="tabs compact-tabs" role="tablist">
+              <button role="tab" aria-selected={mode === "form"} className={mode === "form" ? "active" : ""} onClick={() => setMode("form")}>表单</button>
+              <button role="tab" aria-selected={mode === "json"} className={mode === "json" ? "active" : ""} onClick={() => setMode("json")}>JSON</button>
+            </div>
+            {mode === "form" ? <ParamForm schema={template?.params_schema} value={params} onChange={updateParams} /> : (
+              <div className="editor-frame"><Editor height="280px" defaultLanguage="json" value={jsonText} onChange={(value) => updateJson(value ?? "{}")} options={{ minimap: { enabled: false }, fontSize: 13, automaticLayout: true, scrollBeyondLastLine: false }} /></div>
+            )}
+            {jsonError ? <p className="error">JSON：{jsonError}</p> : null}
+            {validate.error ? <p className="error">{validate.error.message}</p> : null}
+            {validate.data && !validate.data.valid ? <pre className="validation error">{JSON.stringify(validate.data.errors, null, 2)}</pre> : null}
+            {validate.data?.valid ? <p className="success-text">参数通过 pydantic schema 校验；默认值可继续调整。</p> : null}
+          </div>
         </div>
-      </div>
+      )}
       <p className="muted small">{t.disclaimer}</p>
     </>
   );

@@ -12,7 +12,7 @@
 | M3 回测引擎 | ✅ | ctest 95/95；C++/参考差分 6/6；规则/费用/T+1/手数/涨跌停/停牌/trace/指标 |
 | M4 SDK/CLI/策略 | 🟡 大部分 | DSL 17 用例/309 assertions；7 模板；lookahead/实验/HTML 报告/CLI/replay；C++ 并行 sweep/PDF 未做 |
 | M5 服务层 | ✅ | FastAPI 契约、Bearer/Host/Origin/no-CORS、SQLite 任务队列、WebSocket、取消/崩溃恢复、GZip |
-| M6 UI V1 | ✅ | 七页工作台接通真实 API；Playwright **12** 条；浅/深色、移动端、无横向溢出、性能预算 |
+| M6 UI V1 | ✅ | 七页工作台接通真实 API；Playwright **14** 条；浅/深色、移动端、无横向溢出、性能预算 |
 | M7 研究工具 | 🟡 基础 | IC/RankIC/ICIR、分层、衰减、参数扫描+热力图、滚动验证、行业归因；Deflated Sharpe/PBO/成本敏感性/容量未做 |
 | M8 V2 数据 | ❌ | 未实现 |
 | M9 V3 模拟交易 | ❌ | 未实现；`BrokerGateway` 仍为禁用语义 |
@@ -27,14 +27,14 @@ uv run pytest -q -p no:warnings
 # 123 collected；121 passed / 2 skipped
 
 pnpm -C ui test
-# 1 passed (App shell smoke)
+# 7 passed (4 files)
 
 pnpm -C ui build
 # 通过；初始 index/charts/react 约 1.4 MB raw（charts 1.0 MB），编辑器按需加载
 
 make e2e   # 需要本机 Chrome；会构建 UI、启动隔离 qc serve
 # pytest e2e marker + vitest + Playwright
-# 12 passed: 行情/选股/回测/实验/数据/策略/设置/研究/onboarding/暗色/移动端/性能
+# 14 passed: 行情/选股/回测/实验/笔记/数据/策略/设置/研究/onboarding/暗色/性能/全局搜索/移动端
 
 make verify-cpp
 # C++ backend、差分 6/6、open/20 factors/engine/ratio 门禁通过

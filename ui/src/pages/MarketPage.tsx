@@ -1,145 +1,139 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
-import { api } from "../api/client";
-import type { Bars, MarketOverview, SecurityRow } from "../api/types";
-import Chart from "../components/Chart";
+import { RefreshCw, SlidersHorizontal } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { useBars, useOverview, useSecurities } from "../api/queries";
+import type { SecurityRow } from "../api/types";
+import KLineChart from "../components/KLineChart";
 import Sparkline from "../components/Sparkline";
 import StatePanel from "../components/StatePanel";
-import { zhCN as t } from "../i18n/zh-CN";
+import VirtualTable from "../components/VirtualTable";
+import { compact, num, signedPct } from "../lib/format";
 import { useChartPalette } from "../theme";
-
-const percent = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+import { useWorkspace } from "../store/workspace";
+import { zhCN as t } from "../i18n/zh-CN";
 
 export default function MarketPage() {
   const palette = useChartPalette();
-  const [searchParams] = useSearchParams();
-  const [overview, setOverview] = useState<MarketOverview | null>(null);
-  const [securities, setSecurities] = useState<SecurityRow[]>([]);
-  const [selected, setSelected] = useState<SecurityRow | null>(null);
-  const [bars, setBars] = useState<Bars | null>(null);
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [barLoading, setBarLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const overview = useOverview();
+  const securitiesQuery = useSecurities("", 1000);
+  const rows = securitiesQuery.data ?? [];
+  const [picked, setPicked] = useState(() => useWorkspace.getState().marketCode);
+  const [query, setQuery] = useState(() => useWorkspace.getState().marketQuery);
+  const [showMA5, setShowMA5] = useState(true);
+  const [showMA20, setShowMA20] = useState(true);
+  const [showVolume, setShowVolume] = useState(true);
+  const setMarketCode = useWorkspace((state) => state.setMarketCode);
+  const setMarketQuery = useWorkspace((state) => state.setMarketQuery);
+  const code = searchParams.get("code") || picked || rows[0]?.code || "";
+  const bars = useBars(code || null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const [ov, rows] = await Promise.all([api.overview(), api.securities("", 300)]);
-      setOverview(ov); setSecurities(rows);
-      const code = searchParams.get("code");
-      const hit = code ? rows.find((row) => row.code === code || row.sec_id === code) : undefined;
-      const first = hit || rows.find((row) => !row.suspended) || rows[0] || null;
-      setSelected(first);
-      if (first) setBars(await api.bars(first.code));
-    } catch (e) { setError(`${e}`); } finally { setLoading(false); }
-  }, [searchParams]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!code && rows[0]) { setPicked(rows[0].code); setMarketCode(rows[0].code); }
+  }, [code, rows, setMarketCode]);
+  useEffect(() => { setMarketQuery(query); }, [query, setMarketQuery]);
 
-  const pick = async (row: SecurityRow) => {
-    setSelected(row); setBarLoading(true); setError("");
-    try { setBars(await api.bars(row.code)); } catch (e) { setError(`${e}`); } finally { setBarLoading(false); }
-  };
-  const filtered = securities.filter((row) => !query || `${row.code}${row.name}${row.industry}`.toLowerCase().includes(query.toLowerCase()));
+  const select = useCallback((row: SecurityRow) => {
+    setPicked(row.code);
+    setMarketCode(row.code);
+    setSearchParams({ code: row.code }, { replace: true });
+  }, [setMarketCode, setSearchParams]);
 
-  const candleOption = bars && {
-    animation: false,
-    tooltip: { trigger: "axis" as const, axisPointer: { type: "cross" as const } },
-    legend: { data: ["K线", "MA5", "MA20"], top: 0, textStyle: { fontSize: 11 } },
-    grid: [{ left: 50, right: 16, top: 32, height: "58%" }, { left: 50, right: 16, top: "76%", height: "16%" }],
-    xAxis: [
-      { type: "category" as const, data: bars.dates, axisLine: { lineStyle: { color: "#9aa3af" } }, axisLabel: { fontSize: 10 } },
-      { type: "category" as const, data: bars.dates, gridIndex: 1, axisLabel: { show: false }, axisTick: { show: false } },
-    ],
-    yAxis: [
-      { type: "value" as const, scale: true, splitLine: { lineStyle: { color: "rgba(148,163,184,.18)" } } },
-      { type: "value" as const, gridIndex: 1, splitNumber: 2, axisLabel: { fontSize: 10 } },
-    ],
-    dataZoom: [{ type: "inside" as const, xAxisIndex: [0, 1], start: 55, end: 100 }],
-    series: [
-      {
-        name: "K线", type: "candlestick" as const,
-        data: bars.dates.map((_, i) => [bars.open[i], bars.close[i], bars.low[i], bars.high[i]]),
-        itemStyle: { color: palette.up, color0: palette.down, borderColor: palette.up, borderColor0: palette.down },
-      },
-      { name: "MA5", type: "line" as const, data: bars.ma5, showSymbol: false, lineStyle: { width: 1, color: "#eab308" } },
-      { name: "MA20", type: "line" as const, data: bars.ma20, showSymbol: false, lineStyle: { width: 1, color: "#3b82f6" } },
-      { name: "成交量", type: "bar" as const, xAxisIndex: 1, yAxisIndex: 1, data: bars.volume, itemStyle: { color: "rgba(99,102,241,.45)" } },
-    ],
-  };
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return rows;
+    return rows.filter((row) => `${row.code}${row.name}${row.industry}${row.board}`.toLowerCase().includes(needle));
+  }, [query, rows]);
+  const selected = rows.find((row) => row.code === code) ?? null;
+  const refresh = () => { void overview.refetch(); void securitiesQuery.refetch(); void bars.refetch(); };
 
+  const columns = useMemo<ColumnDef<SecurityRow, unknown>[]>(() => [
+    { accessorKey: "code", header: "代码", size: 96, cell: ({ row }) => <span className="mono">{row.original.code}</span> },
+    { accessorKey: "name", header: "名称", size: 150, cell: ({ row }) => <span className="truncate" title={row.original.name}>{row.original.name}</span> },
+    { accessorKey: "industry", header: "行业", size: 100, cell: ({ row }) => <span className="truncate" title={row.original.industry}>{row.original.industry}</span> },
+    { accessorKey: "last", header: "最新", size: 92, cell: ({ row }) => <span className="num">{num(row.original.last)}</span> },
+    { accessorKey: "change_pct", header: "涨跌", size: 88, cell: ({ row }) => <span className={`num ${row.original.change_pct >= 0 ? "up" : "down"}`}>{signedPct(row.original.change_pct / 100)}</span> },
+    { accessorKey: "turnover", header: "换手", size: 84, cell: ({ row }) => <span className="num">{num(row.original.turnover)}%</span> },
+    { accessorKey: "mktcap", header: "市值", size: 100, cell: ({ row }) => <span className="num" title={`${row.original.mktcap}`}>{compact(row.original.mktcap)}</span> },
+  ], []);
+
+  const loading = overview.isLoading || securitiesQuery.isLoading;
+  const fatalError = overview.error || securitiesQuery.error;
   return (
     <>
       <div className="page-head">
-        <div><h1>行情</h1><p>指数、涨跌分布、行业板块、自选与 K 线（本地快照，SYNTHETIC 标注）</p></div>
-        <button className="btn" onClick={() => void load()}><RefreshCw size={15} /> 刷新</button>
+        <div><h1>行情</h1><p>指数、涨跌分布、行业板块、证券搜索与 K 线（本地快照，SYNTHETIC 标注）</p></div>
+        <button className="btn" onClick={refresh} disabled={loading}><RefreshCw size={15} /> 刷新</button>
       </div>
-      {loading ? <StatePanel loading /> : error && !overview ? <StatePanel error={error} onRetry={() => void load()} /> : null}
-      {overview ? (
+      {fatalError && !overview.data && !rows.length ? <StatePanel error={`本地服务未连接或尚无快照：${fatalError.message}`} onRetry={refresh} /> : null}
+      {loading && !fatalError ? <StatePanel loading /> : null}
+      {overview.data ? (
         <>
           <div className="grid kpis">
-            {overview.indices.map((index) => (
+            {overview.data.indices.map((index) => (
               <div className="card index-card" key={index.name}>
-                <div className="index-top"><h3>{index.name}</h3><span className={index.change_pct >= 0 ? "up" : "down"}>{percent(index.change_pct)}</span></div>
-                <div className="kpi">{index.close.toFixed(2)}</div>
+                <div className="index-top"><h3>{index.name}</h3><span className={index.change_pct >= 0 ? "up" : "down"}>{signedPct(index.change_pct / 100)}</span></div>
+                <div className="kpi">{num(index.close)}</div>
                 <Sparkline values={index.spark} positive={index.change_pct >= 0} />
               </div>
             ))}
           </div>
           <div className="grid two-col" style={{ marginTop: 14 }}>
             <div className="card">
-              <h3>涨跌分布 <span className="muted small">截至 {overview.as_of || "—"}</span></h3>
+              <h3>涨跌分布 <span className="muted small">截至 {overview.data.as_of || "—"}</span></h3>
               <div className="breadth">
-                <span className="up">上涨 {overview.breadth.up}</span>
-                <span className="down">下跌 {overview.breadth.down}</span>
-                <span>平盘 {overview.breadth.flat}</span>
-                <span>涨停 {overview.breadth.limit_up}</span>
-                <span>跌停 {overview.breadth.limit_down}</span>
-                <span>停牌 {overview.breadth.suspended}</span>
+                <span className="up">上涨 {overview.data.breadth.up}</span>
+                <span className="down">下跌 {overview.data.breadth.down}</span>
+                <span>平盘 {overview.data.breadth.flat}</span>
+                <span>涨停 {overview.data.breadth.limit_up}</span>
+                <span>跌停 {overview.data.breadth.limit_down}</span>
+                <span>停牌 {overview.data.breadth.suspended}</span>
+              </div>
+              <div className="breadth-bar" aria-hidden="true">
+                <i className="up-bg" style={{ flex: Math.max(overview.data.breadth.up, 0.01) }} />
+                <i className="flat-bg" style={{ flex: Math.max(overview.data.breadth.flat, 0.01) }} />
+                <i className="down-bg" style={{ flex: Math.max(overview.data.breadth.down, 0.01) }} />
               </div>
             </div>
             <div className="card">
               <h3>行业板块</h3>
-              <div className="sector-list">
-                {overview.sectors.slice(0, 8).map((sector) => (
-                  <div className="sector-row" key={sector.name}>
-                    <span>{sector.name}</span>
-                    <span className={sector.avg_change >= 0 ? "up" : "down"}>{percent(sector.avg_change)}</span>
-                    <small>{sector.up}↑ / {sector.down}↓</small>
-                  </div>
-                ))}
-              </div>
+              {overview.data.sectors.length ? <div className="sector-list">{overview.data.sectors.slice(0, 10).map((sector) => (
+                <div className="sector-row" key={sector.name}>
+                  <span className="truncate" title={sector.name}>{sector.name}</span>
+                  <span className={sector.avg_change >= 0 ? "up" : "down"}>{signedPct(sector.avg_change / 100)}</span>
+                  <small>{sector.up}↑ / {sector.down}↓</small>
+                </div>
+              ))}</div> : <StatePanel empty emptyHint="当前快照没有行业数据。" />}
             </div>
           </div>
           <div className="grid market-layout" style={{ marginTop: 14 }}>
             <div className="card market-table-card">
-              <div className="card-head"><h3>证券列表</h3><input className="input compact" placeholder="代码/名称/行业" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
-              <div className="table-wrap tall">
-                <table>
-                  <thead><tr><th>代码</th><th>名称</th><th>行业</th><th className="num">最新</th><th className="num">涨跌</th><th className="num">换手</th></tr></thead>
-                  <tbody>
-                    {filtered.slice(0, 120).map((row) => (
-                      <tr key={row.sec_id} className={selected?.sec_id === row.sec_id ? "selected" : ""} onClick={() => void pick(row)}>
-                        <td>{row.code}</td><td>{row.name}</td><td>{row.industry}</td>
-                        <td className="num">{row.last.toFixed(2)}</td>
-                        <td className={`num ${row.change_pct >= 0 ? "up" : "down"}`}>{percent(row.change_pct)}</td>
-                        <td className="num">{row.turnover.toFixed(2)}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <div className="card-head"><h3>证券列表 <span className="muted small">{filtered.length} / {rows.length}</span></h3><input className="input compact" placeholder="代码/名称/行业" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="筛选证券" /></div>
+              {securitiesQuery.isError ? <StatePanel error={securitiesQuery.error.message} onRetry={() => void securitiesQuery.refetch()} /> : (
+                <VirtualTable data={filtered} columns={columns} rowKey={(row) => row.sec_id} height={450} onRowClick={select} ariaLabel="证券列表" empty={<span className="muted">没有匹配证券</span>} />
+              )}
             </div>
             <div className="card chart-card">
-              <div className="card-head"><h3>{selected ? `${selected.code} ${selected.name}` : "K 线"}</h3><span className="muted small">{selected ? `${selected.board} · ${selected.industry}` : ""}</span></div>
-              {barLoading ? <StatePanel loading /> : candleOption ? <Chart option={candleOption} height={430} /> : <StatePanel empty emptyHint="选择证券查看 K 线" />}
+              <div className="card-head">
+                <h3>{selected ? `${selected.code} ${selected.name}` : "K 线"}</h3>
+                <div className="chart-tools" aria-label="K线指标">
+                  <span className="muted small">{selected ? `${selected.board} · ${selected.industry}` : ""}</span>
+                  <button className={`chip ${showMA5 ? "active" : ""}`} onClick={() => setShowMA5((value) => !value)} aria-pressed={showMA5}>MA5</button>
+                  <button className={`chip ${showMA20 ? "active" : ""}`} onClick={() => setShowMA20((value) => !value)} aria-pressed={showMA20}>MA20</button>
+                  <button className={`chip ${showVolume ? "active" : ""}`} onClick={() => setShowVolume((value) => !value)} aria-pressed={showVolume}>量</button>
+                  <SlidersHorizontal size={14} className="muted" aria-hidden="true" />
+                </div>
+              </div>
+              {bars.isLoading ? <StatePanel loading /> : bars.error ? <StatePanel error={bars.error.message} onRetry={() => void bars.refetch()} /> : bars.data ? (
+                <KLineChart bars={bars.data} palette={palette} height={430} showMA5={showMA5} showMA20={showMA20} showVolume={showVolume} />
+              ) : <StatePanel empty emptyHint="选择左侧证券查看 K 线、成交量与均线" />}
             </div>
           </div>
-          {overview.snapshot.synthetic ? <p className="notice">当前为 SYNTHETIC 合成行情，仅用于功能演示，不代表真实市场。</p> : null}
-          <p className="muted small">{t.disclaimer}</p>
+          {overview.data.snapshot.synthetic ? <p className="notice">当前为 SYNTHETIC 合成行情，仅用于功能演示，不代表真实市场。</p> : null}
         </>
       ) : null}
+      <p className="muted small">{t.disclaimer}</p>
     </>
   );
 }

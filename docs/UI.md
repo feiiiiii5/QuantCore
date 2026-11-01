@@ -55,7 +55,7 @@
 ## 预算与验证
 - 初始 JS 约 1.4MB raw（ECharts 1.0MB + app 0.31MB + React 0.05MB）；Monaco 3.3MB 仅 `/strategy` 按需加载。
 - Playwright 预算测试：首屏 <5s、初始 JS <2MB raw、无 console/page error；移动端 390px 无横向溢出。
-- `make e2e`：构建 UI + 隔离 `qc serve` + 12 条 Playwright，覆盖行情/选股/回测/实验/数据/策略/设置/研究/onboarding/暗色/性能/移动端。
+- `make e2e`：构建 UI + 隔离 `qc serve` + 14 条 Playwright，覆盖行情/选股/回测/实验/数据/策略/设置/研究/onboarding/暗色/性能/移动端。
 
 ## 兼容性
 - 桌面优先（macOS/Windows），移动端为响应式兜底：≤900px 侧栏折叠为图标，表格横向滚动。

@@ -20,7 +20,7 @@ test("market page renders indices, breadth and K-line", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "行情" })).toBeVisible();
   await expect(page.locator(".index-card")).toHaveCount(4);
-  await expect(page.locator("canvas")).toHaveCount(1);
+  await expect(page.locator(".kline-canvas canvas").first()).toBeVisible();
   await expect(page.locator(".breadth")).toContainText("上涨");
   await page.screenshot({ path: "/tmp/qc-market.png", fullPage: true });
   expect(errors).toEqual([]);
@@ -31,7 +31,7 @@ test("screener runs and shows matched rows", async ({ page }) => {
   await page.goto("/screener");
   await expect(page.getByRole("heading", { name: "选股" })).toBeVisible();
   await page.getByRole("button", { name: /运行选股/ }).click();
-  await expect(page.locator("tbody tr").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".vtable-row").first()).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".card-head").last()).toContainText("只");
   await page.screenshot({ path: "/tmp/qc-screener.png", fullPage: true });
   expect(errors).toEqual([]);
@@ -44,8 +44,8 @@ test("backtest submits a job and renders equity/trades", async ({ page }) => {
   await page.getByRole("button", { name: /运行回测/ }).click();
   await expect(page.getByText("总收益")).toBeVisible({ timeout: 90_000 });
   await expect(page.locator(".chart-block canvas")).toBeVisible();
-  await expect(page.locator(".table-wrap.trades tbody tr").first()).toBeVisible();
-  await page.locator(".table-wrap.trades tbody tr").first().click();
+  await expect(page.locator(".vtable-row").first()).toBeVisible();
+  await page.locator(".vtable-row").first().click();
   await expect(page.getByRole("heading", { name: "交易解释" })).toBeVisible();
   await page.screenshot({ path: "/tmp/qc-backtest.png", fullPage: true });
   expect(errors).toEqual([]);
@@ -60,7 +60,29 @@ test("experiments and data pages connect to the local service", async ({ page })
   await page.goto("/data");
   await expect(page.getByRole("heading", { name: "数据", exact: true })).toBeVisible();
   await expect(page.getByText("数据仓库")).toBeVisible();
+  await expect(page.locator(".provider-row").first()).toBeVisible();
+  const snapshotRow = page.locator(".card table tbody tr").first();
+  if (await snapshotRow.count()) {
+    await snapshotRow.click();
+    await expect(page.getByRole("heading", { name: /质量报告/ })).toBeVisible({ timeout: 15000 });
+  }
   await page.screenshot({ path: "/tmp/qc-data.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("experiment tags and notes persist locally", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/experiments");
+  await expect(page.locator(".experiment-item").first()).toBeVisible({ timeout: 30000 });
+  await page.locator(".experiment-item").first().click();
+  const tags = page.getByLabel(/标签（逗号分隔，本地）/);
+  const notes = page.getByLabel(/笔记（本地）/);
+  await tags.fill("e2e, 动量");
+  await notes.fill("本地笔记 e2e");
+  await page.reload();
+  await expect(page.locator(".experiment-item").first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByLabel(/标签（逗号分隔，本地）/)).toHaveValue("e2e, 动量");
+  await expect(page.getByLabel(/笔记（本地）/)).toHaveValue("本地笔记 e2e");
   expect(errors).toEqual([]);
 });
 
@@ -129,8 +151,11 @@ test("onboarding creates a demo snapshot and experiment", async ({ page }) => {
   await page.getByRole("button", { name: /一键示例/ }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("heading", { name: "三步开始" })).toBeVisible();
-  await page.getByRole("button", { name: /生成示例数据并回测/ }).click();
-  await expect(page).toHaveURL(/\/experiments/, { timeout: 90_000 });
+  await page.getByRole("button", { name: /生成示例数据与快照/ }).click();
+  await expect(page.getByRole("button", { name: /下一步/ })).toBeVisible({ timeout: 90_000 });
+  await page.getByRole("button", { name: /下一步/ }).click();
+  await page.getByRole("button", { name: /运行示例回测/ }).click();
+  await expect(page).toHaveURL(/\/experiments/, { timeout: 120_000 });
   await expect(page.getByRole("heading", { name: "实验", exact: true })).toBeVisible();
   await page.screenshot({ path: "/tmp/qc-onboarding.png", fullPage: true });
   expect(errors).toEqual([]);
@@ -158,6 +183,21 @@ test("initial UI load meets the local performance budget", async ({ page }) => {
     .reduce((sum, entry) => sum + ((entry as PerformanceResourceTiming).encodedBodySize || 0), 0));
   expect(elapsed).toBeLessThan(5000);
   expect(encoded).toBeLessThan(2_000_000);
+  expect(errors).toEqual([]);
+});
+
+test("global search focuses with Ctrl+K and filters securities locally", async ({ page }) => {
+  const errors = await prepare(page);
+  await page.goto("/");
+  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30000 });
+  await page.keyboard.press("Control+k");
+  const search = page.getByRole("combobox", { name: "全局搜索" });
+  await expect(search).toBeFocused();
+  await search.fill("000001");
+  await expect(page.locator(".search-hit").first()).toBeVisible({ timeout: 10000 });
+  await page.locator(".search-hit").first().click();
+  await expect(page).toHaveURL(/code=000001/);
+  await expect(page.locator(".kline-legend")).toContainText("000001");
   expect(errors).toEqual([]);
 });
 

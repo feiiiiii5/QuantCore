@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Grid3X3, Layers, PieChart, Play, Sigma } from "lucide-react";
 import type { EChartsOption } from "echarts";
-import { api } from "../api/client";
-import type { AttributionResult, Experiment, FactorResult, SweepResult, WalkForwardResult } from "../api/types";
+import { isApiError } from "../api/client";
+import { useAttribution, useExperiments, useFactor, useSweep, useWalkForward } from "../api/queries";
 import Chart from "../components/Chart";
 import StatePanel from "../components/StatePanel";
 import { zhCN as t } from "../i18n/zh-CN";
@@ -22,51 +22,58 @@ const pct = (value: number) => `${(value * 100).toFixed(2)}%`;
 
 export default function ResearchPage() {
   const [tab, setTab] = useState<Tab>("factor");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const [expression, setExpression] = useState("rank(ret(close,20))");
   const [forwardDays, setForwardDays] = useState("5");
   const [quantiles, setQuantiles] = useState("5");
-  const [factor, setFactor] = useState<FactorResult | null>(null);
+  const factorMutation = useFactor();
+  const factor = factorMutation.data ?? null;
 
   const [sweepTemplate, setSweepTemplate] = useState("momentum");
   const [gridText, setGridText] = useState('{"top_n": [5, 10, 20], "lookback": [20, 60, 120]}');
-  const [sweep, setSweep] = useState<SweepResult | null>(null);
+  const sweepMutation = useSweep();
+  const sweep = sweepMutation.data ?? null;
 
   const [walkTemplate, setWalkTemplate] = useState("momentum");
   const [walkParams, setWalkParams] = useState('{"top_n": 10, "lookback": 60}');
   const [folds, setFolds] = useState("4");
-  const [walk, setWalk] = useState<WalkForwardResult | null>(null);
+  const walkMutation = useWalkForward();
+  const walk = walkMutation.data ?? null;
 
-  const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const experimentsQuery = useExperiments();
+  const experiments = experimentsQuery.data ?? [];
   const [runId, setRunId] = useState("");
-  const [attribution, setAttribution] = useState<AttributionResult | null>(null);
+  const attributionMutation = useAttribution();
+  const attribution = attributionMutation.data ?? null;
+  const busy = factorMutation.isPending || sweepMutation.isPending || walkMutation.isPending || attributionMutation.isPending;
+  const activeError = tab === "factor" ? factorMutation.error : tab === "sweep" ? sweepMutation.error : tab === "walk" ? walkMutation.error : attributionMutation.error;
+  const unimplemented = isApiError(activeError) && activeError.status === 404;
+  const errorText = formError || (activeError && !unimplemented ? activeError.message : "");
 
   useEffect(() => {
-    if (tab !== "attribution" || experiments.length) return;
-    api.experiments().then((items) => { setExperiments(items); if (items[0]) setRunId(items[0].run_id); }).catch((e) => setError(`${e}`));
-  }, [tab, experiments.length]);
+    if (tab !== "attribution" || runId || !experiments.length) return;
+    setRunId(experiments[0].run_id);
+  }, [tab, runId, experiments]);
 
-  const runFactor = async () => {
-    setBusy(true); setError("");
-    try { setFactor(await api.factor({ expression, forward_days: Number(forwardDays), quantiles: Number(quantiles) })); }
-    catch (e) { setError(`${e}`); } finally { setBusy(false); }
+  const runFactor = () => {
+    setFormError("");
+    factorMutation.mutate({ expression, forward_days: Number(forwardDays), quantiles: Number(quantiles) });
   };
-  const runSweep = async () => {
-    setBusy(true); setError("");
-    try { setSweep(await api.sweep({ template: sweepTemplate, param_grid: JSON.parse(gridText) })); }
-    catch (e) { setError(`${e}`); } finally { setBusy(false); }
+  const runSweep = () => {
+    setFormError("");
+    try { sweepMutation.mutate({ template: sweepTemplate, param_grid: JSON.parse(gridText) as Record<string, unknown> }); }
+    catch (reason) { setFormError(reason instanceof Error ? reason.message : "参数网格 JSON 无效"); }
   };
-  const runWalk = async () => {
-    setBusy(true); setError("");
-    try { setWalk(await api.walkForward({ template: walkTemplate, params: JSON.parse(walkParams), folds: Number(folds) })); }
-    catch (e) { setError(`${e}`); } finally { setBusy(false); }
+  const runWalk = () => {
+    setFormError("");
+    try { walkMutation.mutate({ template: walkTemplate, params: JSON.parse(walkParams) as Record<string, unknown>, folds: Number(folds) }); }
+    catch (reason) { setFormError(reason instanceof Error ? reason.message : "参数 JSON 无效"); }
   };
-  const runAttribution = async () => {
-    setBusy(true); setError("");
-    try { setAttribution(await api.attribution(runId)); }
-    catch (e) { setError(`${e}`); } finally { setBusy(false); }
+  const runAttribution = () => {
+    setFormError("");
+    if (!runId) { setFormError("请选择实验"); return; }
+    attributionMutation.mutate(runId);
   };
 
   const icOption = useMemo<EChartsOption | null>(() => {
@@ -151,9 +158,10 @@ export default function ResearchPage() {
     <>
       <div className="page-head"><div><h1>研究</h1><p>因子 IC/分层/衰减 · 参数扫描与热力图 · 滚动验证 · 行业归因</p></div></div>
       <div className="tabs" role="tablist">
-        {TABS.map(({ id, label, icon: Icon }) => <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? "active" : ""} onClick={() => { setTab(id); setError(""); }}><Icon size={15} /> {label}</button>)}
+        {TABS.map(({ id, label, icon: Icon }) => <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? "active" : ""} onClick={() => { setTab(id); setFormError(""); }}><Icon size={15} /> {label}</button>)}
       </div>
-      {error ? <p className="error">{error}</p> : null}
+      {errorText ? <p className="error" role="alert">{errorText}</p> : null}
+      {unimplemented ? <StatePanel empty emptyHint="该研究接口在当前后端版本未实现（404）；页面不会崩溃。请升级后端或使用已有能力。" /> : null}
       {tab === "factor" ? (
         <div className="grid two-col">
           <div className="card">
@@ -163,7 +171,7 @@ export default function ResearchPage() {
               <label>预测期（交易日）<input value={forwardDays} onChange={(e) => setForwardDays(e.target.value)} inputMode="numeric" /></label>
               <label>分层数<input value={quantiles} onChange={(e) => setQuantiles(e.target.value)} inputMode="numeric" /></label>
             </div>
-            <button className="btn primary" disabled={busy} onClick={() => void runFactor()}><Play size={15} /> {busy ? "计算中…" : "运行诊断"}</button>
+            <button className="btn primary" disabled={busy} onClick={runFactor}><Play size={15} /> {busy ? "计算中…" : "运行诊断"}</button>
             <p className="muted small">IC 使用未来收益做评价，不参与建仓，避免前视偏差。</p>
           </div>
           <div className="card">
@@ -193,7 +201,7 @@ export default function ResearchPage() {
             <select value={sweepTemplate} onChange={(e) => setSweepTemplate(e.target.value)}><option value="momentum">动量</option><option value="dual_ma">双均线</option><option value="low_vol">低波动</option><option value="multi_factor">多因子</option></select>
             <label className="field-label">参数网格 JSON</label>
             <textarea className="code-input" rows={5} value={gridText} onChange={(e) => setGridText(e.target.value)} spellCheck={false} />
-            <button className="btn primary" disabled={busy} onClick={() => void runSweep()}><Play size={15} /> {busy ? "扫描中…" : "运行扫描"}</button>
+            <button className="btn primary" disabled={busy} onClick={runSweep}><Play size={15} /> {busy ? "扫描中…" : "运行扫描"}</button>
             <p className="muted small">服务端限制最多 200 个组合；结果用于研究，不代表未来收益。</p>
           </div>
           <div className="card">
@@ -215,7 +223,7 @@ export default function ResearchPage() {
             <label className="field-label">参数 JSON</label>
             <textarea className="code-input" rows={3} value={walkParams} onChange={(e) => setWalkParams(e.target.value)} spellCheck={false} />
             <label className="field-label">折数<input value={folds} onChange={(e) => setFolds(e.target.value)} inputMode="numeric" /></label>
-            <button className="btn primary" disabled={busy} onClick={() => void runWalk()}><Play size={15} /> {busy ? "验证中…" : "运行滚动验证"}</button>
+            <button className="btn primary" disabled={busy} onClick={runWalk}><Play size={15} /> {busy ? "验证中…" : "运行滚动验证"}</button>
           </div>
           <div className="card">
             {!walk ? <StatePanel empty emptyHint="运行滚动验证查看各折表现" /> : (
@@ -233,7 +241,7 @@ export default function ResearchPage() {
           <div className="card">
             <label className="field-label">实验</label>
             <select value={runId} onChange={(e) => setRunId(e.target.value)}>{experiments.map((item) => <option key={item.run_id} value={item.run_id}>{item.strategy_name || item.template} · {item.run_id.slice(-8)}</option>)}</select>
-            <button className="btn primary" style={{ marginTop: 12 }} disabled={busy || !runId} onClick={() => void runAttribution()}><Play size={15} /> {busy ? "归因中…" : "运行行业归因"}</button>
+            <button className="btn primary" style={{ marginTop: 12 }} disabled={busy || !runId || experimentsQuery.isLoading} onClick={runAttribution}><Play size={15} /> {busy ? "归因中…" : "运行行业归因"}</button>
             <p className="muted small">按 FIFO 已实现 + 未实现盈亏归因，含费用，近似研究口径。</p>
           </div>
           <div className="card">

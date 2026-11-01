@@ -1,3 +1,22 @@
+/** UI-API v2 response types. Keep this file the single source of payload shapes. */
+
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+export interface JsonSchema {
+  title?: string;
+  description?: string;
+  type?: string;
+  default?: unknown;
+  enum?: unknown[];
+  minimum?: number;
+  maximum?: number;
+  anyOf?: JsonSchema[];
+  oneOf?: JsonSchema[];
+  properties?: Record<string, JsonSchema>;
+  required?: string[];
+  additionalProperties?: boolean | JsonSchema;
+}
+
 export interface Health {
   status: string;
   version: string;
@@ -39,11 +58,28 @@ export interface IndexQuote {
   spark: number[];
 }
 
+export interface MarketBreadth {
+  up: number;
+  down: number;
+  flat: number;
+  limit_up: number;
+  limit_down: number;
+  suspended: number;
+}
+
+export interface SectorRow {
+  name: string;
+  count: number;
+  avg_change: number;
+  up: number;
+  down: number;
+}
+
 export interface MarketOverview {
   snapshot: SnapshotInfo;
   indices: IndexQuote[];
-  breadth: { up: number; down: number; flat: number; limit_up: number; limit_down: number; suspended: number };
-  sectors: Array<{ name: string; count: number; avg_change: number; up: number; down: number }>;
+  breadth: MarketBreadth;
+  sectors: SectorRow[];
   as_of: string | null;
   updated_at: string;
 }
@@ -104,19 +140,30 @@ export interface ScreenerRow {
 
 export interface ScreenerResult {
   as_of: number;
-  snapshot: string;
+  snapshot: string | null;
   universe_count: number;
   matched_count: number;
   rows: ScreenerRow[];
 }
 
+export interface ScreenerSaved {
+  id: string;
+  name: string;
+  expression: string;
+  created_at: string;
+}
+
 export interface Template {
   id: string;
+  name?: string;
   description: string;
-  params_schema: {
-    properties?: Record<string, { title?: string; type?: string; default?: unknown; minimum?: number; maximum?: number; enum?: unknown[]; anyOf?: unknown[] }>;
-    required?: string[];
-  };
+  params_schema: JsonSchema;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: unknown[];
+  defaults: Record<string, unknown>;
 }
 
 export interface Metrics {
@@ -132,6 +179,7 @@ export interface Metrics {
   total_fees: number;
   trade_count: number;
   trading_days?: number;
+  calmar?: number;
 }
 
 export interface Trade {
@@ -167,6 +215,20 @@ export interface BacktestResultPayload {
   seed: number;
 }
 
+export interface JobResult {
+  run_id?: string;
+  engine_backend?: string;
+  engine_version?: string;
+  metrics?: Metrics;
+  trade_count?: number;
+  final_equity?: number;
+  snapshot?: Record<string, unknown>;
+  synthetic?: boolean;
+  report?: string;
+  experiments_root?: string;
+  [key: string]: unknown;
+}
+
 export interface Job {
   id: string;
   kind: string;
@@ -176,7 +238,7 @@ export interface Job {
   started_at: string | null;
   finished_at: string | null;
   error: string | null;
-  result: Record<string, unknown> | null;
+  result: JobResult | null;
 }
 
 export interface Experiment {
@@ -194,16 +256,67 @@ export interface Experiment {
   synthetic: boolean;
 }
 
+export interface ExperimentDetail {
+  run_id: string;
+  metadata: Record<string, unknown>;
+  summary: Record<string, unknown>;
+  metrics: Metrics;
+  result?: BacktestResultPayload | null;
+}
+
+export interface CompareResult {
+  ids: string[];
+  metrics: Record<string, Metrics>;
+  equity: Array<{ run_id: string; dates: number[]; equity: number[] }>;
+}
+
+export interface ReplayResult {
+  run_id?: string;
+  matched?: boolean;
+  equity_matched?: boolean;
+  trades_matched?: boolean;
+  metrics_matched?: boolean;
+  differences?: unknown;
+  diffs?: unknown;
+  [key: string]: unknown;
+}
+
+export interface ProviderInfo {
+  id: string;
+  name: string;
+  requires_token: boolean;
+  requires_network: boolean;
+  available: boolean;
+  capabilities: Record<string, boolean>;
+}
+
+export interface SnapshotStatus {
+  id: string;
+  content_hash: string;
+  created_at: string;
+  synthetic: boolean;
+  source: string;
+  n_sec: number;
+  n_time: number;
+  start: number;
+  end: number;
+  panel_available: boolean;
+  quality: Record<string, unknown>;
+  fields: string[];
+}
+
 export interface DataStatus {
   data_root: string;
   warehouse: { exists: boolean; datasets: Record<string, number>; rows: number; bytes: number; manifest_hash: string };
-  snapshots: Array<{
-    id: string; content_hash: string; created_at: string; synthetic: boolean; source: string;
-    n_sec: number; n_time: number; start: number; end: number; panel_available: boolean;
-    quality: Record<string, unknown>; fields: string[];
-  }>;
+  snapshots: SnapshotStatus[];
   storage: { warehouse_bytes: number; snapshot_bytes: number; experiments_bytes: number; free_bytes: number };
-  providers: Array<Record<string, unknown>>;
+  providers: ProviderInfo[];
+}
+
+export interface QualityReport {
+  snapshot_id: string;
+  quality: Record<string, unknown>;
+  report?: Record<string, unknown>;
 }
 
 export interface FactorResult {
@@ -218,15 +331,21 @@ export interface FactorResult {
   rank_icir: number | null;
   ic_series: Array<{ date: number; ic: number | null; rank_ic: number | null }>;
   quantile_returns: Array<{ bucket: number; mean_return: number | null; observations: number }>;
-  decay: Array<{ days: number; rank_ic: number | null }>;
+  decay: Array<{ days: number; ic?: number | null; rank_ic: number | null }>;
   coverage: number;
   observations: number;
 }
 
+export interface SweepPoint {
+  params: Record<string, unknown>;
+  metrics: Metrics;
+  error: string | null;
+}
+
 export interface SweepResult {
   template?: string;
-  points: Array<{ params: Record<string, unknown>; metrics: Record<string, number>; error: string | null }>;
-  best: { params: Record<string, unknown>; metrics: Record<string, number> } | null;
+  points: SweepPoint[];
+  best: { params: Record<string, unknown>; metrics: Metrics } | null;
   engine_backend: string;
   bounded_points?: number;
   synthetic?: boolean;
@@ -254,5 +373,13 @@ export interface AttributionResult {
   run_id: string;
   strategy_name?: string | null;
   synthetic?: boolean;
-  industries: Array<{ industry: string; pnl: number; realized: number; unrealized?: number; market_value?: number; weight?: number; securities?: number }>;
+  industries: Array<{
+    industry: string;
+    pnl: number;
+    realized: number;
+    unrealized?: number;
+    market_value?: number;
+    weight?: number;
+    securities?: number;
+  }>;
 }

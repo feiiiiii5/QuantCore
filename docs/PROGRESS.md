@@ -10,7 +10,7 @@
 - M3：event-driven 引擎，规则/费用/T+1/手数/涨跌停/停牌/除权除息/trace/指标；差分 6/6；引擎 300×965 月度调仓约 2.6ms。
 - M4：DSL（tokenizer/parser/CSE/eval）、7 模板、lookahead/sandbox 接口、实验存储/HTML 报告、CLI backtest/replay；C++ 并行 sweep、PDF 未做。
 - M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI。
-- M6：React 19 + Vite 七页（行情/选股/策略/回测/实验/研究/数据 + 设置）；ECharts 图表、Monaco 本地打包、交易解释、onboarding、浅/深色、密度、移动端；Playwright **12** 条通过。
+- M6：React 19 + Vite 七页（行情/选股/策略/回测/实验/研究/数据 + 设置）；ECharts 图表、Monaco 本地打包、交易解释、onboarding、浅/深色、密度、移动端；Playwright **14** 条通过。
 - M7：因子 IC/RankIC/ICIR、分层、衰减；参数扫描 + Sharpe 热力图；滚动验证；行业 FIFO 归因。Deflated Sharpe/PBO、成本敏感性、bootstrap/容量未做。
 - M8/M9：未实现。`BrokerGateway` 保持禁用语义，无真实下单。
 - M10：wheel + UI 构建 + 中文文档 + 许可；Electron/安装包/SBOM/Windows 未做。
@@ -26,13 +26,13 @@ uv run pytest -q -p no:warnings
 # 123 collected；121 passed / 2 skipped
 
 pnpm -C ui test
-# 1 passed
+# 7 passed (4 files)
 
 pnpm -C ui build
 # 通过；初始 JS 约 1.4 MB raw，Monaco 3.3 MB 按路由懒加载
 
 make e2e
-# 构建 UI + 隔离 qc serve + Playwright 12 passed：
+# 构建 UI + 隔离 qc serve + Playwright 14 passed：
 # 行情/选股/回测/实验/数据/策略/设置/研究/onboarding/暗色/移动端/性能
 
 uv run python scripts/verify_cpp.py
