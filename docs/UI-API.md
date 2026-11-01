@@ -118,3 +118,6 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 ## Paper auto-run (M9, simulated clock)
 - `POST /api/paper/sessions/{sid}/auto` `{interval_ms?:50..60000, days_per_tick?:1..30}` starts a server-side simulated clock that steps the existing historical session (no live market feed); `POST .../auto/stop`; `GET .../auto` status.
 - Runs are daemon threads, persist each step, stop at session end/delete; UI button and 1s polling while active.
+
+## V2 datasets (M8-005)
+- `GET /api/data/catalog` returns the v2 catalog: daily_bars, minute_bars (SYNTHETIC view), securities, financials, corporate_actions and snapshots, with grain/storage/fields and caveats.

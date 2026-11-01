@@ -150,6 +150,22 @@ export interface Bars {
   suspended: number[];
 }
 
+export interface DatasetInfo {
+  name: string;
+  version: string;
+  grain: string;
+  storage: string;
+  synthetic: boolean | null;
+  fields: string[];
+  description: string;
+}
+
+export interface DatasetCatalog {
+  version: string;
+  datasets: DatasetInfo[];
+  notes: string[];
+}
+
 export interface MinuteBar {
   datetime: number;
   date: number;

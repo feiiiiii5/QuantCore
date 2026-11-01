@@ -1,5 +1,5 @@
 import type {
-  MinuteBars,
+  DatasetCatalog, MinuteBars,
   AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, Experiment, ExperimentDetail,
   FactorCorrelationResult, FactorResult, FinancialsResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
   CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperAutoStatus, PaperOrder, PaperPortfolioResult,
@@ -138,6 +138,7 @@ export const api = {
   replayExperiment: (id: string) => request<ReplayResult>(`/api/experiments/${encodeURIComponent(id)}/replay`, { method: "POST" }),
   deleteExperiment: (id: string) => request<{ run_id: string; deleted: boolean }>(`/api/experiments/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
+  dataCatalog: () => request<DatasetCatalog>("/api/data/catalog"),
   dataStatus: () => request<DataStatus>("/api/data/status"),
   providers: () => request<ProviderInfo[]>("/api/data/providers"),
   snapshots: () => request<SnapshotStatus[]>("/api/data/snapshots"),

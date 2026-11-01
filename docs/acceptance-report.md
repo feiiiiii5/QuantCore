@@ -1,7 +1,7 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02。M0–M7 基本完成，M9 大部分完成；M8 完成证券资料/PIT/ETF+可转债数据与 paper 手数，M10 完成发布工具/审计/性能门禁/桌面壳/unsigned 打包。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **115/117**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **116/117**）。
 
 ## 里程碑
 | 阶段 | 状态 | 证据 |
@@ -14,7 +14,7 @@
 | M5 服务层 | ✅ | FastAPI 契约、Bearer/Host/Origin/no-CORS、SQLite 任务队列、WebSocket、取消/崩溃恢复、GZip、本地通知 |
 | M6 UI V1 | ✅ | 八页工作台接通真实 API；Playwright **18** 条；浅/深色、移动端、无横向溢出、性能预算、全局搜索、插件/模拟/组合视图 |
 | M7 研究工具 | ✅ | IC/RankIC/ICIR、分层、衰减、因子相关、grid/random 扫描、滚动、归因、DSR/PBO、成本敏感性、Monte Carlo、容量 |
-| M8 V2 数据 | 🟡 大部分 | 证券资料/PIT 财务/ETF+可转债 canonical 数据与 paper 手数、合成分钟线 API/UI 已做；V2 datasets 未做；C++ 回测仍按 board 手数 |
+| M8 V2 数据 | ✅ 大部分 | 证券资料/PIT/ETF+可转债/合成分钟线/V2 数据集目录已做；C++ 回测仍按 board 手数，分钟线为 SYNTHETIC |
 | M9 V3 模拟交易 | 🟡 大部分 | 虚拟账户/逐日回放/委托撤单/成交/信号 CSV/提醒/本地插件/只读多策略组合/服务端模拟时钟自动推进；真实实时行情 feed 未接 |
 | M10 发布 | 🟡 大部分 | wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS zip + Windows zip（windows-latest CI 构建）；无签名/公证、未做安装运行验证 |
 
@@ -24,7 +24,7 @@ make lint
 # ruff check/format 通过；mypy 69 files 无问题
 
 uv run pytest -q -p no:warnings
-# 194 collected；192 passed / 2 skipped
+# 196 collected；194 passed / 2 skipped
 
 pnpm -C ui test
 # 7 passed (4 files)
@@ -47,7 +47,7 @@ make verify-cpp
 - [x] 仅研究与模拟：无真实下单；`BrokerGateway` 未实现；界面与报告有“不构成投资建议”。
 - [x] 认证：Bearer token、Host/Origin 校验、无 CORS、loopback only；token 从 `qc serve --open` URL 持久化后立即从地址栏移除。
 - [x] 合成数据标 `SYNTHETIC`；Tushare 真实网络需 Token，未验证。
-- [ ] features.json 全 true：**115/117**（未达完成定义）。
+- [ ] features.json 全 true：**116/117**（未达完成定义）。
 - [ ] M8 分钟线/V2 datasets、M9 实时行情：未完成（见下）。
 - [ ] 真实 Tushare 数据跑通：无 Token，未验证。
 - [ ] 5500×20y / 10000 组 sweep / 峰值 RSS：未测（verify-cpp 为小集）。
@@ -64,6 +64,6 @@ make verify-cpp
 ## 下一步
 1. 补 M8 V2 数据与 M10 Electron/安装包；真实 Tushare 小样本验证。
 2. 保持无真实下单与本地优先；每轮 make ci-local/e2e/verify-cpp 后再 push。
-3. 剩余 2 项 features.json 清零后再宣称完整交付。
+3. 剩余 1 项 features.json（M9-002 实时 feed）清零后再宣称完整交付。
 4. 全市场 5500×20y 基准、10k sweep、峰值 RSS 仍未测。
 5. Windows CI/打包仍未验证。

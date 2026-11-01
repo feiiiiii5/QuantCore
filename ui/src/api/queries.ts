@@ -17,6 +17,7 @@ export const qk = {
   experiment: (id: string) => ["experiments", "detail", id] as const,
   experimentResult: (id: string) => ["experiments", "result", id] as const,
   data: ["data", "status"] as const,
+  dataCatalog: ["data", "catalog"] as const,
   providers: ["data", "providers"] as const,
   quality: (snapshot: string) => ["data", "quality", snapshot] as const,
   jobs: (status?: string) => ["jobs", status ?? "all"] as const,
@@ -73,6 +74,9 @@ export function useExperimentDetail(id: string | null) {
 }
 export function useExperimentResult(id: string | null) {
   return useQuery({ queryKey: qk.experimentResult(id ?? ""), queryFn: () => api.experimentResult(id ?? ""), enabled: Boolean(id) });
+}
+export function useDataCatalog() {
+  return useQuery({ queryKey: qk.dataCatalog, queryFn: api.dataCatalog, staleTime: 60_000 });
 }
 export function useDataStatus() {
   return useQuery({ queryKey: qk.data, queryFn: api.dataStatus });

@@ -66,8 +66,10 @@ test("experiments and data pages connect to the local service", async ({ page })
   await page.goto("/data");
   await expect(page.getByRole("heading", { name: "数据", exact: true })).toBeVisible();
   await expect(page.getByText("数据仓库")).toBeVisible();
+  await expect(page.getByText("V2 数据集")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "minute_bars" })).toBeVisible();
   await expect(page.locator(".provider-row").first()).toBeVisible();
-  const snapshotRow = page.locator(".card table tbody tr").first();
+  const snapshotRow = page.getByTestId("snapshot-table").locator("tbody tr").first();
   if (await snapshotRow.count()) {
     await snapshotRow.click();
     await expect(page.getByRole("heading", { name: /质量报告/ })).toBeVisible({ timeout: 15000 });

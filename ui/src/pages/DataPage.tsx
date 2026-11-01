@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy, Database, HardDrive, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useBuildSnapshot, useDataStatus, useQuality, useUpdateData } from "../api/queries";
+import { useBuildSnapshot, useDataCatalog, useDataStatus, useQuality, useUpdateData } from "../api/queries";
 import type { SnapshotStatus } from "../api/types";
 import StatePanel from "../components/StatePanel";
 import Onboarding from "../components/Onboarding";
@@ -13,6 +13,7 @@ interface DataJob { id: string; kind: "data_update" | "snapshot_build" }
 
 export default function DataPage() {
   const status = useDataStatus();
+  const catalog = useDataCatalog();
   const update = useUpdateData();
   const snapshot = useBuildSnapshot();
   const navigate = useNavigate();
@@ -110,11 +111,15 @@ export default function DataPage() {
           <div className="grid two-col" style={{ marginTop: 14 }}>
             <div className="card">
               <div className="card-head"><h3>快照</h3><span className="muted small">点击行查看质量</span></div>
-              {data.snapshots.length ? <div className="table-wrap"><table><thead><tr><th>ID</th><th>证券</th><th>交易日</th><th>区间</th><th>质量</th><th>类型</th></tr></thead><tbody>{data.snapshots.map((snap: SnapshotStatus) => <tr key={snap.id} className={qualitySnapshot === snap.id ? "selected" : ""} onClick={() => setQualitySnapshot(snap.id)}><td className="mono truncate" title={snap.id}>{snap.id}</td><td>{snap.n_sec}</td><td>{snap.n_time}</td><td>{dateInt(snap.start)} – {dateInt(snap.end)}</td><td>{String((snap.quality as { passed?: boolean }).passed ?? "—")}</td><td>{snap.synthetic ? "SYNTHETIC" : snap.source}</td></tr>)}</tbody></table></div> : <StatePanel empty emptyHint="还没有快照。使用“首次向导”或“更新 + 构建快照”。" />}
+              {data.snapshots.length ? <div className="table-wrap" data-testid="snapshot-table"><table><thead><tr><th>ID</th><th>证券</th><th>交易日</th><th>区间</th><th>质量</th><th>类型</th></tr></thead><tbody>{data.snapshots.map((snap: SnapshotStatus) => <tr key={snap.id} className={qualitySnapshot === snap.id ? "selected" : ""} onClick={() => setQualitySnapshot(snap.id)}><td className="mono truncate" title={snap.id}>{snap.id}</td><td>{snap.n_sec}</td><td>{snap.n_time}</td><td>{dateInt(snap.start)} – {dateInt(snap.end)}</td><td>{String((snap.quality as { passed?: boolean }).passed ?? "—")}</td><td>{snap.synthetic ? "SYNTHETIC" : snap.source}</td></tr>)}</tbody></table></div> : <StatePanel empty emptyHint="还没有快照。使用“首次向导”或“更新 + 构建快照”。" />}
               <div className="inline-actions"><button className="btn" onClick={() => void copy(data.data_root, "数据目录")}><Copy size={14} /> 复制数据路径</button><button className="btn" onClick={() => void copy(`${data.data_root}/snapshots`, "快照目录")}><Copy size={14} /> 复制快照路径</button><button className="btn" onClick={() => setNotice("导入：将 Parquet/LocalFile 放入数据目录后运行数据更新；导出：快照目录可直接复制备份。")}>导入/导出提示</button></div>
               {qualitySnapshot ? <div className="quality-panel"><div className="card-head"><h3>质量报告 <span className="mono small">{qualitySnapshot}</span></h3><button className="btn ghost" onClick={() => setQualitySnapshot(null)}>关闭</button></div>{qualityQuery.isLoading ? <StatePanel loading /> : qualityQuery.error ? <p className="error">{qualityQuery.error.message}</p> : <pre className="validation">{JSON.stringify(quality?.report ?? quality?.quality ?? {}, null, 2)}</pre>}</div> : null}
             </div>
             <div className="card"><h3>数据源</h3><div className="provider-list">{data.providers.map((provider) => <div key={provider.id} className="provider-row"><div><strong>{provider.name}</strong><small className="muted">{provider.requires_token ? "需要 Token" : provider.requires_network ? "需要网络" : "本地/公开"}</small></div><span className={provider.available ? "badge success" : "badge"}>{provider.available ? "可用" : "不可用"}</span></div>)}</div><p className="muted small">凭据只从本地环境/系统钥匙串读取；UI 不发起真实网络请求，也不记录 Token。</p></div>
+          </div>
+          <div className="card" style={{ marginTop: 14 }}><h3>V2 数据集 <span className="muted small">{catalog.data?.version ?? "v2"} · 离线 schema</span></h3>
+            {catalog.data ? <div className="table-wrap"><table><thead><tr><th>名称</th><th>粒度</th><th>存储</th><th>类型</th><th>字段</th></tr></thead><tbody>{catalog.data.datasets.map((dataset) => <tr key={dataset.name}><td className="mono">{dataset.name}</td><td>{dataset.grain}</td><td>{dataset.storage}</td><td>{dataset.synthetic === true ? <span className="badge">SYNTHETIC</span> : dataset.synthetic === false ? "本地" : "—"}</td><td className="muted small">{dataset.fields.length}</td></tr>)}</tbody></table></div> : catalog.error ? <p className="error">{catalog.error.message}</p> : <StatePanel loading />}
+            <p className="muted small">{catalog.data?.notes?.[0] ?? "分钟线为合成视图；日线/快照为本地数据。"}</p>
           </div>
           <div className="card" style={{ marginTop: 14 }}><h3><ShieldCheck size={14} /> 质量与存储</h3><div className="metric-inline"><span>行数 <strong>{num(data.warehouse.rows, 0)}</strong></span><span>数据集 <strong>{Object.keys(data.warehouse.datasets).length}</strong></span><span>manifest <strong className="mono">{data.warehouse.manifest_hash.slice(0, 16)}…</strong></span><span>快照字节 <strong>{bytes(data.storage.snapshot_bytes)}</strong></span></div><p className="muted small">合成数据标 SYNTHETIC；规则/费率 TODO(verify)。质量报告按快照选择查看。</p></div>
         </>

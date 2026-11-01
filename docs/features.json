@@ -707,8 +707,8 @@
       "id": "M8-005",
       "milestone": "M8",
       "title": "V2 datasets",
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "V2 dataset catalog (daily_bars/minute_bars/securities/financials/corporate_actions/snapshots) with versions/grains/storage/fields; GET /api/data/catalog + Data UI card; minute_bars explicitly synthetic"
     },
     {
       "id": "M9-001",

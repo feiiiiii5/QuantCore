@@ -10,6 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
+from ..data.catalog import catalog_payload
 from ..data.store import ParquetStore
 from ..data.synthetic import SyntheticConfig, generate_synthetic_panel
 from ..errors import QuantCoreError
@@ -134,6 +135,10 @@ def _approved_roots(
 
 
 def register_data_routes(app: FastAPI, ctx: Workspace) -> None:
+    @app.get("/api/data/catalog")
+    def data_catalog() -> Any:
+        return catalog_payload()
+
     @app.get("/api/data/status")
     def status() -> Any:
         return _data_status(ctx)
