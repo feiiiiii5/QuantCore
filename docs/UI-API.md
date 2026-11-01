@@ -87,3 +87,9 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 ## M7 factor correlation / random sweep
 - `POST /api/research/factor_correlation` `{expressions:[2..10], snapshot?, start?, end?, method?:"pearson"|"spearman"}` → `{expressions,labels,matrix, average_abs_correlation, observations, periods, dates, method, note}`; daily cross-sectional mean correlation over common tradable support.
 - `POST /api/research/sweep` now accepts `{mode?:"grid"|"random", sample_size?:0..200, seed?:42}`; random mode samples without replacement and returns `sampling:{mode,requested,returned,seed}`; grid mode semantics unchanged (max 200).
+
+## Local strategy plugins (M9)
+- `GET /api/strategies/plugins` → list `data_root/strategies/*.py` with `valid/issues/interface/description/version`; static AST audit, no import during listing.
+- `POST /api/strategies/plugins/{name}/validate` → `{valid,issues,interface,policy}`; path traversal/non-.py → 404.
+- `POST /api/strategies/plugins/{name}/backtest` `{params?,snapshot?,start?,end?,initial_cash?}` → **202** `{job_id,status,plugin}`; job runs through the normal backtest queue and persists experiment metadata `plugin`.
+- Policy: local trusted plugins only, static audit is not a hard security boundary; no network, no real orders. `params` are recorded in the experiment spec but the current loader does not pass them into the plugin body.

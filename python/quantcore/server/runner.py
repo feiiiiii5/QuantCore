@@ -99,6 +99,7 @@ def _persist_backtest_experiment(
     snapshot: Snapshot | None,
     panel: PanelData | None,
     config: BacktestConfig,
+    plugin_name: str | None = None,
 ) -> Any:
     """Persist a backtest result in the experiment store (UI + replay compatible)."""
     reference = _snapshot_reference(snapshot, panel)
@@ -118,6 +119,8 @@ def _persist_backtest_experiment(
         "synthetic": synthetic,
         "status": "completed",
     }
+    if plugin_name:
+        metadata["plugin"] = str(plugin_name)
     run_id = store.create("backtest", metadata, content_hash=spec.content_hash())
     store.save_text(run_id, "strategy.yaml", spec.to_yaml())
     if snapshot is None and panel is not None:
@@ -160,6 +163,7 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
     snapshots_root = Path(
         payload.get("snapshots_root") or payload.get("default_snapshots_root") or "data/snapshots"
     )
+    plugin_name = payload.get("plugin")
     snapshot: Snapshot | None = None
     panel: PanelData | None = None
     if snapshot_ref:
@@ -186,7 +190,13 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
     _progress(0.8, ctx)
     _check(ctx)
     record = _persist_backtest_experiment(
-        store, spec, result, snapshot=snapshot, panel=panel, config=config
+        store,
+        spec,
+        result,
+        snapshot=snapshot,
+        panel=panel,
+        config=config,
+        plugin_name=str(plugin_name) if plugin_name else None,
     )
     _progress(0.95, ctx)
     summary_path = record.directory / "summary.json"
@@ -212,6 +222,7 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
         "report": str(record.directory / "report.html"),
         "experiment_dir": str(record.directory),
         "experiments_root": str(experiments_root),
+        "plugin": plugin_name,
     }
 
 

@@ -572,3 +572,32 @@ export interface CapacityResult {
   limiting_sec: string;
   notes: string;
 }
+
+export interface PluginIssue {
+  severity: string;
+  message: string;
+  line: number;
+}
+
+export interface PluginInfo {
+  name: string;
+  path: string;
+  bytes: number;
+  updated_at: string;
+  valid: boolean;
+  issues: PluginIssue[];
+  interface: string;
+  description: string | null;
+  version: string | null;
+}
+
+export interface PluginValidation extends Omit<PluginInfo, "path" | "bytes" | "updated_at"> {
+  path: string;
+  policy: Record<string, unknown>;
+}
+
+export interface PluginBacktestAccepted {
+  job_id: string;
+  status: string;
+  plugin: string;
+}

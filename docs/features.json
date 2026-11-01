@@ -742,8 +742,8 @@
       "id": "M9-005",
       "milestone": "M9",
       "title": "plugin API",
-      "passes": false,
-      "evidence": "not implemented: continuous live feed/alerts/multi-strategy/plugin are M9 next scope"
+      "passes": true,
+      "evidence": "Local plugin API: GET /api/strategies/plugins, POST validate/backtest (202 job queue); static AST audit policy; UI plugin panel; tests/test_plugins.py + plugin Playwright"
     },
     {
       "id": "M9-006",

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { Play, ShieldCheck } from "lucide-react";
+import { Play, RefreshCw, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useTemplates, useValidateStrategy } from "../api/queries";
-import type { Template } from "../api/types";
+import { usePlugins, useRunPlugin, useTemplates, useValidatePlugin, useValidateStrategy } from "../api/queries";
+import type { PluginInfo, Template } from "../api/types";
 import ParamForm, { defaultsFromSchema } from "../components/ParamForm";
+import { useJobProgress } from "../hooks/useJobProgress";
+import { notify } from "../lib/notify";
 import StatePanel from "../components/StatePanel";
 import { zhCN as t } from "../i18n/zh-CN";
 import "../monaco";
@@ -18,6 +20,13 @@ export default function StrategyPage() {
   const [jsonText, setJsonText] = useState("{}");
   const [jsonError, setJsonError] = useState("");
   const [mode, setMode] = useState<"form" | "json">("form");
+  const plugins = usePlugins();
+  const validatePlugin = useValidatePlugin();
+  const runPlugin = useRunPlugin();
+  const [pluginName, setPluginName] = useState("");
+  const [pluginParams, setPluginParams] = useState("{}");
+  const [pluginJobId, setPluginJobId] = useState<string | null>(null);
+  const pluginJob = useJobProgress(pluginJobId);
   const template = useMemo(() => templates.data?.find((item) => item.id === selected), [templates.data, selected]);
 
   useEffect(() => {
@@ -33,6 +42,27 @@ export default function StrategyPage() {
     validate.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template]);
+
+  useEffect(() => {
+    if (!pluginName && plugins.data?.length) setPluginName(plugins.data[0].name);
+  }, [pluginName, plugins.data]);
+  useEffect(() => {
+    if (pluginJob.job?.status === "done") {
+      const runId = typeof pluginJob.job.result?.run_id === "string" ? pluginJob.job.result.run_id : "";
+      notify({ title: "插件回测完成", body: runId ? `实验 ${runId.slice(-8)}` : "结果已写入实验", kind: "success" });
+      if (runId) navigate(`/experiments?run=${encodeURIComponent(runId)}`);
+    }
+  }, [pluginJob.job, navigate]);
+  const selectedPlugin = plugins.data?.find((item) => item.name === pluginName) ?? null;
+  const runLocalPlugin = () => {
+    if (!selectedPlugin) return;
+    setJsonError("");
+    try {
+      const parsed: unknown = JSON.parse(pluginParams);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("插件参数必须是 JSON 对象");
+      runPlugin.mutate({ name: selectedPlugin.name, payload: { params: parsed } }, { onSuccess: (accepted) => setPluginJobId(accepted.job_id) });
+    } catch (error) { setJsonError(error instanceof Error ? error.message : "插件参数 JSON 无效"); }
+  };
 
   const updateParams = (next: Record<string, unknown>) => { setParams(next); setJsonText(JSON.stringify(next, null, 2)); setJsonError(""); };
   const updateJson = (text: string) => {
@@ -89,6 +119,40 @@ export default function StrategyPage() {
           </div>
         </div>
       )}
+      <div className="card" style={{ marginTop: 14 }}>
+        <div className="card-head"><h3>本地策略插件 <span className="muted small">{plugins.data?.length ?? 0} 个 · data/strategies/*.py</span></h3><button className="btn ghost" onClick={() => void plugins.refetch()}><RefreshCw size={14} /> 刷新</button></div>
+        <p className="muted small">放在本机 data/strategies/*.py 的策略模块；静态 AST 审计通过后可提交到后台任务运行。插件仅本机执行，不是安全沙箱，不要放不可信代码；不联网、不产生真实委托。</p>
+        {plugins.error ? <p className="error">{plugins.error.message}</p> : null}
+        <div className="grid two-col" style={{ marginTop: 8 }}>
+          <div className="template-list">
+            {(plugins.data ?? []).map((item: PluginInfo) => (
+              <button key={item.name} className={`template-item ${pluginName === item.name ? "active" : ""}`} onClick={() => { setPluginName(item.name); validatePlugin.reset(); }}>
+                <strong>{item.name} <span className={item.valid ? "badge success" : "badge danger"}>{item.valid ? "通过审计" : "审计失败"}</span></strong>
+                <span>{item.description || item.interface}</span>
+                <small className="muted">{item.version ? `v${item.version} · ` : ""}{item.bytes} bytes</small>
+              </button>
+            ))}
+            {!plugins.isLoading && !(plugins.data ?? []).length ? <p className="muted small">暂无插件。把合法策略 .py 放到 data/strategies/ 后刷新（例如实现 Strategy 子类或 create_strategy()）。</p> : null}
+          </div>
+          <div>
+            {selectedPlugin ? (
+              <>
+                <div className="card-head"><h3>{selectedPlugin.name}</h3><span className="muted small">{selectedPlugin.interface}</span></div>
+                {selectedPlugin.issues.length ? <pre className="validation error">{selectedPlugin.issues.map((issue) => `L${issue.line}: ${issue.message}`).join("\n")}</pre> : null}
+                <label className="field-label">插件参数 JSON（当前记录到实验 metadata；插件自身参数请用默认值/PLUGIN_INFO）</label>
+                <textarea className="code-input" rows={3} value={pluginParams} onChange={(event) => setPluginParams(event.target.value)} spellCheck={false} />
+                <div className="button-row" style={{ marginTop: 8 }}>
+                  <button className="btn" disabled={validatePlugin.isPending} onClick={() => validatePlugin.mutate(selectedPlugin.name)}><ShieldCheck size={15} /> {validatePlugin.isPending ? "审计中…" : "审计"}</button>
+                  <button className="btn primary" disabled={!selectedPlugin.valid || runPlugin.isPending} onClick={runLocalPlugin}><Play size={15} /> {runPlugin.isPending ? "提交中…" : "运行插件回测"}</button>
+                </div>
+                {validatePlugin.data ? <p className={validatePlugin.data.valid ? "success-text" : "error"}>{validatePlugin.data.valid ? "静态审计通过，可提交回测。" : `审计失败：${validatePlugin.data.issues.length} 个问题`}</p> : null}
+                {runPlugin.error ? <p className="error">{runPlugin.error.message}</p> : null}
+                {pluginJobId ? <div className="progress"><div className="progress-bar" style={{ width: `${Math.round((pluginJob.job?.progress || 0) * 100)}%` }} /><span>{pluginJob.job?.status ?? "pending"} · {Math.round((pluginJob.job?.progress || 0) * 100)}%</span></div> : null}
+              </>
+            ) : <StatePanel empty emptyHint="从左侧选择插件；或添加本地 .py 策略模块。" />}
+          </div>
+        </div>
+      </div>
       <p className="muted small">{t.disclaimer}</p>
     </>
   );

@@ -265,3 +265,38 @@ test("research robustness computes deflated Sharpe without overflow", async ({ p
   expect(errors).toEqual([]);
   await page.screenshot({ path: "/tmp/qc-robustness.png", fullPage: true });
 });
+
+test("local strategy plugin lists, audits and runs through the job queue", async ({ page, request }) => {
+  const errors = await prepare(page);
+  const auth = { Authorization: `Bearer ${token}` };
+  const bootstrap = await request.post("/api/onboarding/bootstrap", {
+    headers: auth,
+    data: { n_sec: 24, start: "2023-01-03", end: "2024-12-31", seed: 61 },
+  });
+  expect(bootstrap.ok()).toBeTruthy();
+  const source = [
+    'PLUGIN_INFO = {"description": "demo equal weight", "version": "1"}',
+    "import numpy as np",
+    "from quantcore.strategy.base import Strategy",
+    "",
+    "class DemoPlugin(Strategy):",
+    '    name = "demo_plugin"',
+    "    def generate_weights(self, panel):",
+    "        weights = np.full((panel.n_time, panel.n_sec), np.nan)",
+    "        for index in range(0, panel.n_time, 20):",
+    "            weights[index] = 1.0 / panel.n_sec",
+    "        return weights",
+  ].join("\n");
+  const put = await request.put("/api/strategies/files/demo_plugin.py", { headers: auth, data: { content: source } });
+  expect(put.ok()).toBeTruthy();
+  await page.goto("/strategy");
+  await expect(page.getByRole("heading", { name: "策略", level: 1 })).toBeVisible();
+  await expect(page.getByText("demo_plugin", { exact: false }).first()).toBeVisible({ timeout: 20_000 });
+  await page.getByText("demo_plugin", { exact: false }).first().click();
+  await page.getByRole("button", { name: "审计", exact: true }).click();
+  await expect(page.getByText(/静态审计通过|审计失败/)).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: /运行插件回测/ }).click();
+  await page.waitForURL(/\/experiments/, { timeout: 60_000 });
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: "/tmp/qc-plugin.png", fullPage: true });
+});

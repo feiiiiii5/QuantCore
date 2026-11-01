@@ -20,6 +20,7 @@
 - DSL 表达式（`rank/ret/ma/std/ts_mean/...`），运行后在表格展示匹配数/行业/市值/分数；支持浏览器本地保存与 CSV 导出。
 
 ### 策略 `/strategy`
+- 本地插件：data/strategies/*.py 的发现/静态审计/运行回测（后台任务）；页面明确静态审计不是安全沙箱。
 - 七个模板与 JSON Schema 默认参数；Monaco 本地编辑器编辑参数 JSON；调用 `/api/strategies/validate` 显示校验结果。
 - “运行回测”把模板/参数带到回测页；编辑器按路由懒加载，首屏不下载 3.3MB Monaco chunk。
 
@@ -59,7 +60,7 @@
 ## 预算与验证
 - 初始 JS 约 1.4MB raw（ECharts 1.0MB + app 0.31MB + React 0.05MB）；Monaco 3.3MB 仅 `/strategy` 按需加载。
 - Playwright 预算测试：首屏 <5s、初始 JS <2MB raw、无 console/page error；移动端 390px 无横向溢出。
-- `make e2e`：构建 UI + 隔离 `qc serve` + 16 条 Playwright，覆盖行情/选股/回测/实验/数据/策略/设置/研究/稳健性/模拟/onboarding/暗色/性能/移动端。
+- `make e2e`：构建 UI + 隔离 `qc serve` + 17 条 Playwright，覆盖行情/选股/回测/实验/数据/策略/设置/研究/稳健性/模拟/onboarding/暗色/性能/移动端。
 
 ## 兼容性
 - 桌面优先（macOS/Windows），移动端为响应式兜底：≤900px 侧栏折叠为图标，表格横向滚动。

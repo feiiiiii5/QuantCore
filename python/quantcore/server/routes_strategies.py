@@ -9,7 +9,8 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
 
-from ..errors import StrategyValidationError
+from ..errors import QuantCoreError, StrategyValidationError
+from ..strategy.plugins import build_plugin_spec, list_plugins, validate_plugin
 from ..strategy.sandbox import audit_source
 from ..strategy.spec import StrategySpec
 from ..templates.registry import (
@@ -17,7 +18,7 @@ from ..templates.registry import (
     list_templates,
     template_param_model,
 )
-from .schemas import StrategyFileRequest, TemplateValidateRequest
+from .schemas import PluginBacktestRequest, StrategyFileRequest, TemplateValidateRequest
 from .workspace import Workspace, json_safe
 
 TEMPLATE_NAMES: dict[str, str] = {
@@ -149,3 +150,58 @@ def register_strategy_routes(app: FastAPI, ctx: Workspace) -> None:
             "kind": ALLOWED_SUFFIXES[path.suffix.lower()],
             "bytes": path.stat().st_size,
         }
+
+    # -- local strategy plugins (M9): discover / audit / run via job queue ------------
+    @app.get("/api/strategies/plugins")
+    def plugins() -> Any:
+        return json_safe([info.to_dict() for info in list_plugins(_files_root(ctx))])
+
+    @app.post("/api/strategies/plugins/{name}/validate")
+    def validate_plugin_file(name: str) -> Any:
+        try:
+            return json_safe(validate_plugin(_files_root(ctx), name))
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/api/strategies/plugins/{name}/backtest", status_code=202)
+    def plugin_backtest(name: str, payload: PluginBacktestRequest) -> Any:
+        root = _files_root(ctx)
+        try:
+            plugin_spec = build_plugin_spec(root, name, payload.params)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (ValueError, StrategyValidationError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            snapshot = ctx.snapshot(payload.snapshot)
+        except (FileNotFoundError, QuantCoreError) as exc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"snapshot unavailable: {exc}; build a snapshot or pass snapshot=",
+            ) from exc
+        config: dict[str, Any] = {"initial_cash": float(payload.initial_cash)}
+        if payload.start is not None:
+            config["start"] = payload.start
+        if payload.end is not None:
+            config["end"] = payload.end
+        job_payload: dict[str, Any] = {
+            "kind": "backtest",
+            "strategy": plugin_spec.to_dict(),
+            "snapshot": snapshot.snapshot_id,
+            "snapshots_root": str(ctx.settings.snapshots_root),
+            "experiments_root": str(ctx.settings.experiments_root),
+            "config": config,
+            "plugin": plugin_spec.name,
+        }
+        job_id = ctx.queue.submit("backtest", job_payload)
+        return {"job_id": job_id, "status": "pending", "plugin": plugin_spec.name}
+
+    # Catch encoded/traversal paths under /api/strategies/plugins and answer 404 (rather
+    # than letting the UI catch-all produce a 405). Specific routes above win first.
+    @app.api_route(
+        "/api/strategies/plugins/{rest:path}",
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        include_in_schema=False,
+    )
+    def plugin_path_guard(rest: str) -> Any:
+        raise HTTPException(status_code=404, detail=f"plugin not found: {rest!r}")

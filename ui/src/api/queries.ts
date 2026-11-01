@@ -9,6 +9,7 @@ export const qk = {
   securityProfile: (code: string) => ["market", "profile", code] as const,
   bars: (code: string | null, snapshot?: string) => ["market", "bars", code ?? "", snapshot ?? "latest"] as const,
   templates: ["strategies", "templates"] as const,
+  plugins: ["strategies", "plugins"] as const,
   screenerPresets: ["screener", "presets"] as const,
   experiments: (limit: number) => ["experiments", limit] as const,
   experiment: (id: string) => ["experiments", "detail", id] as const,
@@ -42,6 +43,19 @@ export function useScreenerPresets() {
 }
 export function useTemplates() {
   return useQuery({ queryKey: qk.templates, queryFn: api.templates, staleTime: 60_000 });
+}
+export function usePlugins() {
+  return useQuery({ queryKey: qk.plugins, queryFn: api.plugins, staleTime: 15_000 });
+}
+export function useValidatePlugin() {
+  return useMutation({ mutationFn: api.validatePlugin });
+}
+export function useRunPlugin() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, payload }: { name: string; payload: Record<string, unknown> }) => api.runPlugin(name, payload),
+    onSuccess: () => { void client.invalidateQueries({ queryKey: ["jobs"] }); },
+  });
 }
 export function useExperiments(limit = 100) {
   return useQuery({ queryKey: qk.experiments(limit), queryFn: () => api.experiments(limit) });

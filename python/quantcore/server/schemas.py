@@ -240,3 +240,15 @@ class CapacityRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     run_id: str = Field(min_length=1, max_length=160)
     adv_participation: float = Field(default=0.1, gt=0, le=1)
+
+
+# ---------------------------------------------------------------- local strategy plugins (M9)
+class PluginBacktestRequest(BaseModel):
+    """Run a local plugin strategy through the async backtest job queue."""
+
+    model_config = ConfigDict(extra="forbid")
+    params: dict[str, Any] = Field(default_factory=dict)
+    snapshot: str | None = None
+    start: int | str | None = None
+    end: int | str | None = None
+    initial_cash: float = Field(default=1_000_000.0, gt=0, le=1e12)

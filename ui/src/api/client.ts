@@ -2,7 +2,7 @@ import type {
   AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, Experiment, ExperimentDetail,
   FactorCorrelationResult, FactorResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
   CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperOrder,
-  PaperSessionDetail, PaperSessionSummary, PBOResult,
+  PaperSessionDetail, PaperSessionSummary, PBOResult, PluginBacktestAccepted, PluginInfo, PluginValidation,
   ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityProfile, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
   Template, ValidationResult, WalkForwardResult,
 } from "./types";
@@ -143,6 +143,10 @@ export const api = {
   buildSnapshot: () => request<{ job_id: string; status: string }>("/api/data/snapshot", { method: "POST", body: JSON.stringify({ require_qpanel: true }) }),
   bootstrap: (payload: Record<string, unknown>) => request<Record<string, unknown>>("/api/onboarding/bootstrap", { method: "POST", body: JSON.stringify(payload) }),
 
+  plugins: () => request<PluginInfo[]>("/api/strategies/plugins"),
+  validatePlugin: (name: string) => request<PluginValidation>(`/api/strategies/plugins/${encodeURIComponent(name)}/validate`, { method: "POST" }),
+  runPlugin: (name: string, payload: Record<string, unknown>) =>
+    request<PluginBacktestAccepted>(`/api/strategies/plugins/${encodeURIComponent(name)}/backtest`, { method: "POST", body: JSON.stringify(payload) }),
   paperSessions: () => request<PaperSessionSummary[]>("/api/paper/sessions"),
   createPaperSession: (payload: Record<string, unknown>) =>
     request<PaperSessionSummary>("/api/paper/sessions", { method: "POST", body: JSON.stringify(payload) }),
