@@ -15,6 +15,7 @@ jobs:
     env:
       UV_DEFAULT_INDEX: https://pypi.tuna.tsinghua.edu.cn/simple
       PIP_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
+      PYTHONPATH: python
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,19 +24,29 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - name: Install
         run: |
-          uv sync --all-extras --no-editable --python 3.12
+          uv sync --all-extras --python 3.12
           cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DQC_BUILD_PYTHON=OFF -DQC_BUILD_TESTS=ON -DQC_BUILD_BENCH=ON
           cmake --build build/cmake -j 4
       - name: Lint
         run: |
-          uv run --no-sync ruff check python tests
-          uv run --no-sync mypy python/quantcore
+          uv run ruff check python tests
+          uv run mypy python/quantcore
+      - name: Stage extension in source tree
+        run: |
+          uv run python - <<'PY'
+          import pathlib, shutil, site
+          target = pathlib.Path("python/quantcore")
+          for sp in site.getsitepackages():
+              for so in pathlib.Path(sp).glob("quantcore/_qcore*"):
+                  shutil.copy2(so, target / so.name)
+                  print(f"staged {so} -> {target / so.name}")
+          PY
       - name: Test
         run: |
-          uv run --no-sync pytest -q
+          uv run pytest -q
           ctest --test-dir build/cmake --output-on-failure
       - name: Verify C++ backend
-        run: uv run --no-sync python scripts/verify_cpp.py
+        run: uv run python scripts/verify_cpp.py
 
 # Windows is a target platform but not yet CI-verified (mmap layer + MSVC wide-integer
 # portability); see docs/PROGRESS.md known gaps.  Do not advertise Windows as tested.
