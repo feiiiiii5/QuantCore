@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.uv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+# C++
+build/
+dist/
+*.o
+*.so
+*.dylib
+*.dll
+*.a
+compile_commands.json
+# Node
+node_modules/
+ui/dist/
+desktop/dist/
+# Runtime data
+data/
+experiments/
+*.qpanel
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.parquet
+!tests/golden/**/*.parquet
+!tests/golden/**/*.json
+# OS
+.DS_Store
