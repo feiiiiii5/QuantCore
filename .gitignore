@@ -23,8 +23,8 @@ node_modules/
 ui/dist/
 desktop/dist/
 # Runtime data
-data/
-experiments/
+/data/
+/experiments/
 *.qpanel
 *.sqlite
 *.sqlite-wal
