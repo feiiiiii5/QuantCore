@@ -37,3 +37,7 @@ desktop/dist/
 
 # TS build cache
 *.tsbuildinfo
+
+# Playwright artifacts
+ui/test-results/
+ui/playwright-report/

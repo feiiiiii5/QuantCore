@@ -44,9 +44,9 @@ verify-cpp: build
 	$(UV) run python scripts/verify_cpp.py
 
 e2e:
-	@echo "e2e requires M5/M6 (FastAPI + UI); see docs/PROGRESS.md"
-	$(UV) run pytest -q -m e2e
+	@$(UV) run pytest -q -m e2e; code=$$?; if [ $$code -ne 0 ] && [ $$code -ne 5 ]; then exit $$code; fi
 	pnpm -C ui test
+	bash scripts/e2e.sh
 
 ci-local: setup lint test verify-cpp
 	@echo "ci-local passed"
