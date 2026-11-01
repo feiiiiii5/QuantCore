@@ -1,5 +1,7 @@
 # QuantCore
 
+[![ci](https://github.com/feiiiiii5/QuantCore/actions/workflows/ci.yml/badge.svg)](https://github.com/feiiiiii5/QuantCore/actions) · [GitHub](https://github.com/feiiiiii5/QuantCore)
+
 > 本地 A 股量化研究与回测工作台：行情 → 选股 → 策略 → 回测 → 复盘 → 实验复现。
 > **历史表现不代表未来，不构成投资建议；本项目仅用于研究与模拟交易，不含真实下单。**
 
