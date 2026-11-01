@@ -28,14 +28,14 @@ jobs:
           cmake --build build/cmake -j 4
       - name: Lint
         run: |
-          uv run ruff check python tests
-          uv run mypy python/quantcore
+          uv run --no-sync ruff check python tests
+          uv run --no-sync mypy python/quantcore
       - name: Test
         run: |
-          uv run pytest -q
+          uv run --no-sync pytest -q
           ctest --test-dir build/cmake --output-on-failure
       - name: Verify C++ backend
-        run: uv run python scripts/verify_cpp.py
+        run: uv run --no-sync python scripts/verify_cpp.py
 
 # Windows is a target platform but not yet CI-verified (mmap layer + MSVC wide-integer
 # portability); see docs/PROGRESS.md known gaps.  Do not advertise Windows as tested.
