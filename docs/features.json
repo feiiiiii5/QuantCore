@@ -735,8 +735,8 @@
       "id": "M9-004",
       "milestone": "M9",
       "title": "multi-strategy portfolio",
-      "passes": false,
-      "evidence": "not implemented: continuous live feed/alerts/multi-strategy/plugin are M9 next scope"
+      "passes": true,
+      "evidence": "Read-only paper portfolio aggregation over 2..10 sessions: strict date intersection, weights sum=1, rebased equity, metrics/contributions; /api/paper/portfolio + tests/test_paper_portfolio.py + PaperPortfolioPanel Playwright"
     },
     {
       "id": "M9-005",

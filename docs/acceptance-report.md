@@ -1,7 +1,7 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02。M0–M3 核心完成，M5/M6 工作台接通，M7 基础研究能力与 M9 基础模拟交易完成；M8、M9 进阶与部分 M10 未实现。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **102/117**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **103/117**）。
 
 ## 里程碑
 | 阶段 | 状态 | 证据 |
@@ -15,7 +15,7 @@
 | M6 UI V1 | ✅ | 八页工作台接通真实 API；Playwright **15** 条；浅/深色、移动端、无横向溢出、性能预算 |
 | M7 研究工具 | ✅ 大部分 | IC/RankIC/ICIR、分层、衰减、扫描、滚动、归因、DSR/PBO、成本敏感性、Monte Carlo、容量；因子相关/随机扫描未做 |
 | M8 V2 数据 | ❌ | 未实现 |
-| M9 V3 模拟交易 | 🟡 大部分 | 虚拟账户/逐日回放/委托撤单/成交/信号 CSV/提醒/本地插件；持续实时/多策略组合未做 |
+| M9 V3 模拟交易 | 🟡 大部分 | 虚拟账户/逐日回放/委托撤单/成交/信号 CSV/提醒/本地插件/只读多策略组合；持续实时未做 |
 | M10 发布 | 🟡 部分 | wheel + 静态 UI + 中文文档 + 许可；Electron/安装包/SBOM 未做 |
 
 ## 本轮实际门禁
@@ -24,7 +24,7 @@ make lint
 # ruff check/format 通过；mypy 69 files 无问题
 
 uv run pytest -q -p no:warnings
-# 172 collected；170 passed / 2 skipped
+# 176 collected；174 passed / 2 skipped
 
 pnpm -C ui test
 # 7 passed (4 files)
@@ -34,7 +34,7 @@ pnpm -C ui build
 
 make e2e   # 需要本机 Chrome；会构建 UI、启动隔离 qc serve
 # pytest e2e marker + vitest + Playwright
-# 17 passed: 行情/选股/回测/实验/笔记/数据/策略/设置/研究/onboarding/暗色/性能/全局搜索/移动端
+# 18 passed: 行情/选股/回测/实验/笔记/数据/策略/设置/研究/onboarding/暗色/性能/全局搜索/移动端
 
 make verify-cpp
 # C++ backend、差分 6/6、open/20 factors/engine/ratio 门禁通过

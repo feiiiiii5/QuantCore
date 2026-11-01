@@ -610,3 +610,33 @@ export interface PluginBacktestAccepted {
   status: string;
   plugin: string;
 }
+
+export interface PaperPortfolioAllocation {
+  session_id: string;
+  name: string;
+  snapshot: string | null;
+  synthetic: boolean;
+  weight: number;
+}
+
+export interface PaperPortfolioResult {
+  allocations: PaperPortfolioAllocation[];
+  dates: number[];
+  equity: number[];
+  normalized_equity?: number[];
+  metrics: {
+    total_return: number;
+    annualized_return: number;
+    volatility: number;
+    sharpe: number;
+    max_drawdown: number;
+  };
+  contributions: Array<{
+    session_id: string;
+    name: string;
+    weight: number;
+    total_return: number;
+    contribution: number;
+  }>;
+  note: string;
+}

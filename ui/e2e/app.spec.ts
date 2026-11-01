@@ -300,3 +300,33 @@ test("local strategy plugin lists, audits and runs through the job queue", async
   expect(errors).toEqual([]);
   await page.screenshot({ path: "/tmp/qc-plugin.png", fullPage: true });
 });
+
+test("paper portfolio aggregates two simulated sessions", async ({ page, request }) => {
+  const errors = await prepare(page);
+  const auth = { Authorization: `Bearer ${token}` };
+  const bootstrap = await request.post("/api/onboarding/bootstrap", { headers: auth, data: { n_sec: 24, start: "2023-01-03", end: "2024-12-31", seed: 71 } });
+  expect(bootstrap.ok()).toBeTruthy();
+  const ids: string[] = [];
+  for (const name of ["组合策略A", "组合策略B"]) {
+    const created = await request.post("/api/paper/sessions", { headers: auth, data: { initial_cash: 1_000_000, name } });
+    expect(created.status()).toBe(201);
+    const id = String((await created.json()).id);
+    ids.push(id);
+    const step = await request.post(`/api/paper/sessions/${id}/step`, { headers: auth, data: { days: 2 } });
+    expect(step.ok()).toBeTruthy();
+  }
+  await page.goto("/paper");
+  await expect(page.getByRole("heading", { name: "模拟交易" })).toBeVisible();
+  await expect(page.getByText("多策略组合视图")).toBeVisible();
+  await page.getByRole("checkbox", { name: /组合策略A/ }).check();
+  await page.getByRole("checkbox", { name: /组合策略B/ }).check();
+  await page.getByLabel("组合策略A 权重").fill("0.5");
+  await page.getByLabel("组合策略B 权重").fill("0.5");
+  await page.getByRole("button", { name: "计算组合" }).click();
+  await expect(page.getByText("组合收益")).toBeVisible({ timeout: 30_000 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: "/tmp/qc-portfolio.png", fullPage: true });
+  void ids;
+});

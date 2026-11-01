@@ -15,7 +15,13 @@ from fastapi.responses import Response
 
 from ..errors import QuantCoreError
 from ..paper import PaperError, PaperMarketData, PaperSession, PaperSessionEngine, PaperStore
-from .schemas import PaperOrderRequest, PaperSessionCreateRequest, PaperStepRequest
+from ..paper.portfolio import build_portfolio
+from .schemas import (
+    PaperOrderRequest,
+    PaperPortfolioRequest,
+    PaperSessionCreateRequest,
+    PaperStepRequest,
+)
 from .workspace import Workspace, json_safe
 
 
@@ -101,6 +107,31 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
     @app.get("/api/paper/sessions")
     def list_sessions() -> Any:
         return json_safe([session.session_view() for session in store.list()])
+
+    @app.post("/api/paper/portfolio")
+    def paper_portfolio(payload: PaperPortfolioRequest) -> Any:
+        sessions: list[PaperSession] = []
+        seen: set[str] = set()
+        for allocation in payload.allocations:
+            session_id = allocation.session_id
+            if session_id in seen:
+                raise HTTPException(
+                    status_code=400, detail=f"duplicate paper session: {session_id}"
+                )
+            seen.add(session_id)
+            try:
+                sessions.append(store.load(session_id))
+            except PaperError as exc:
+                _fail(exc)
+        try:
+            report = build_portfolio(
+                sessions,
+                [float(item.weight) for item in payload.allocations],
+                float(payload.initial_cash),
+            )
+        except PaperError as exc:
+            _fail(exc)
+        return json_safe(report)
 
     @app.get("/api/paper/sessions/{session_id}")
     def get_session(session_id: str) -> Any:

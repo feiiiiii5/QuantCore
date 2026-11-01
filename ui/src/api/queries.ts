@@ -129,6 +129,9 @@ export function useDeleteExperiment() {
   });
 }
 
+export function usePaperPortfolio() {
+  return useMutation({ mutationFn: api.paperPortfolio });
+}
 export function useOverfitting() {
   return useMutation({ mutationFn: api.overfitting });
 }

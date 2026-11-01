@@ -101,3 +101,7 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 ## Risk limits (M3)
 - Backtest `config.risk` accepts `{max_positions?: int, max_weight?: float (0,1], long_only?: bool=true}`.
 - Target weights are clamped/limited before the C++ engine runs; long-only by default, negative targets set to 0. Output/metrics remain engine-native.
+
+## Paper portfolio (M9, read-only)
+- `POST /api/paper/portfolio` `{allocations:[{session_id,weight>0}] (2..10), initial_cash?}` → `{allocations,dates,equity,normalized_equity,metrics:{total_return,annualized_return,volatility,sharpe,max_drawdown},contributions,note}`.
+- Strict intersection of session equity-curve dates; each session normalized by starting cash, weighted, rebased to `initial_cash` on the first common date. Read-only: no mutation, no orders, weights must sum to 1 (400 otherwise); unknown/duplicate session 404/400.

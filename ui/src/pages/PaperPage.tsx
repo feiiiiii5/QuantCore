@@ -11,6 +11,7 @@ import type {
 import Chart from "../components/Chart";
 import { notify } from "../lib/notify";
 import StatePanel from "../components/StatePanel";
+import PaperPortfolioPanel from "../components/PaperPortfolioPanel";
 
 const money = (value: number) => `¥${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 const pct = (value: number) => `${(Number(value || 0) * 100).toFixed(2)}%`;
@@ -288,6 +289,7 @@ export default function PaperPage() {
           )}
         </div>
       </div>
+      <PaperPortfolioPanel sessions={sessions} />
     </>
   );
 }

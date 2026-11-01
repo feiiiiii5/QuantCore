@@ -252,3 +252,17 @@ class PluginBacktestRequest(BaseModel):
     start: int | str | None = None
     end: int | str | None = None
     initial_cash: float = Field(default=1_000_000.0, gt=0, le=1e12)
+
+
+class PaperPortfolioAllocation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    session_id: str = Field(min_length=1, max_length=64)
+    weight: float = Field(gt=0, le=10)
+
+
+class PaperPortfolioRequest(BaseModel):
+    """Read-only aggregation of existing paper sessions (no new storage)."""
+
+    model_config = ConfigDict(extra="forbid")
+    allocations: list[PaperPortfolioAllocation] = Field(min_length=2, max_length=10)
+    initial_cash: float = Field(default=1_000_000.0, gt=0, le=1e12)

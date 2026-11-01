@@ -1,7 +1,7 @@
 import type {
   AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, Experiment, ExperimentDetail,
   FactorCorrelationResult, FactorResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
-  CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperOrder,
+  CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperOrder, PaperPortfolioResult,
   PaperSessionDetail, PaperSessionSummary, PBOResult, PluginBacktestAccepted, PluginInfo, PluginValidation,
   ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityProfile, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
   Template, ValidationResult, WalkForwardResult,
@@ -147,6 +147,8 @@ export const api = {
   validatePlugin: (name: string) => request<PluginValidation>(`/api/strategies/plugins/${encodeURIComponent(name)}/validate`, { method: "POST" }),
   runPlugin: (name: string, payload: Record<string, unknown>) =>
     request<PluginBacktestAccepted>(`/api/strategies/plugins/${encodeURIComponent(name)}/backtest`, { method: "POST", body: JSON.stringify(payload) }),
+  paperPortfolio: (payload: Record<string, unknown>) =>
+    request<PaperPortfolioResult>("/api/paper/portfolio", { method: "POST", body: JSON.stringify(payload) }),
   paperSessions: () => request<PaperSessionSummary[]>("/api/paper/sessions"),
   createPaperSession: (payload: Record<string, unknown>) =>
     request<PaperSessionSummary>("/api/paper/sessions", { method: "POST", body: JSON.stringify(payload) }),
