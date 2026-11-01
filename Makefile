@@ -15,6 +15,9 @@ setup:
 	$(UV) sync --all-extras --python $(PYTHON_VERSION)
 	$(MAKE) build
 
+setup-ui:
+	pnpm -C ui install
+
 build:
 	$(UV) sync --reinstall-package quantcore --python $(PYTHON_VERSION)
 	$(CMAKE) -S . -B $(BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=Release -DQC_BUILD_PYTHON=OFF -DQC_BUILD_TESTS=ON -DQC_BUILD_BENCH=ON
@@ -43,6 +46,7 @@ verify-cpp: build
 e2e:
 	@echo "e2e requires M5/M6 (FastAPI + UI); see docs/PROGRESS.md"
 	$(UV) run pytest -q -m e2e
+	pnpm -C ui test
 
 ci-local: setup lint test verify-cpp
 	@echo "ci-local passed"

@@ -51,3 +51,18 @@ qc serve [--port 0]
 qc bench
 ```
 所有命令输出 JSON 时字段稳定；`--json` 便于脚本。
+
+## 因子表达式 DSL（`_qcore.Expression`）
+```python
+expr = _qcore.Expression.parse("rank(ts_mean(close,5)/ts_mean(close,20))")
+expr.eval(panel, sec, time)        # 单点
+expr.eval_cross(panel, sec, time)  # 单点，rank/zscore 用 t 时刻全截面
+_qcore.evaluate_panel(panel, expr, layout="sec_time")  # 全面板 numpy
+expr.explain()                     # DAG/CSE 可读摘要
+```
+- 语法：数字、字段（open/high/low/close/volume/amount/returns）、`+ - * /`、比较、and/or/not；
+  `ts_mean/ts_std/ts_sum/ts_min/ts_max/ts_rank(x,n)`、`rank/zscore`、`delay(x,n)`、`abs/log/sqrt/min/max/pow`。
+- NaN 统一传播；除零/log 非法/sqrt 负/溢出 → NaN；ts_* 要求完整窗口且无 NaN；ts_std 为样本 std（ddof=1）；
+  rank/ts_rank 为 average-rank 百分位；zscore 用截面样本 std；字段只读到 t（delay/rolling 不读未来）。
+- 窗口参数必须是整数字面量（≤5000）；非法语法抛 `ValueError`（含 1-based 位置）。
+- 注意：当前 `evaluate_panel` 每次重新编译（µs 级）；全面板性能优化列入 M7。

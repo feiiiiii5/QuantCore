@@ -44,6 +44,7 @@ qc = "quantcore.cli:main"
 cmake.build-type = "Release"
 wheel.packages = ["python/quantcore"]
 build-dir = "build/{wheel_tag}"
+
 sdist.include = ["cpp/**", "python/**"]
 
 [tool.pytest.ini_options]

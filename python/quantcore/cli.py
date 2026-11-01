@@ -1,4 +1,5 @@
 """qc CLI entry point (M0 stub; expanded in M4)."""
+
 from __future__ import annotations
 
 import sys

@@ -39,3 +39,15 @@
 ## ADR-008 仅研究与模拟
 - 状态：accepted
 - 不实现真实下单；BrokerGateway 默认禁用；所有界面/报告带免责声明。
+
+## ADR-009 .qpanel 打开校验分级
+- 状态：accepted（M1）
+- 默认 `Panel::open(path)` 只做 O(1) 级结构校验（魔数/版本/大小/section 边界/64B 对齐/dates/security/字段表），
+  满足“打开快照 <200ms”；`Panel::open(path, true)` 或 `Panel::validate(path)` 做全量内容哈希校验（O(file size)）。
+- 理由：4GB 面板全量哈希约 5s，不能作为热路径默认；写入端仍计算并存储内容哈希，快照完整性可用 validate/CI 校验。
+
+## ADR-010 表达式 DSL 语义
+- 状态：accepted（M4）
+- NaN 统一传播；ts_* 严格窗口；rank/ts_rank 为 average-rank 百分位；delay(x,n)=x[t-n]；字段只读 ≤t。
+- 窗口必须字面量整数；截面函数在 t 时刻对全部证券计算；非法输入抛 std::invalid_argument（Python ValueError）。
+- 性能：当前逐点/按列求值，未达“20 因子 <3s”门禁；优化路径为 DAG 节点物化 + 增量滚动，排入 M7。

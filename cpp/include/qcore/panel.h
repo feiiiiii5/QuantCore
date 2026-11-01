@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "qcore/types.h"
 
@@ -58,8 +59,12 @@ class PanelWriter {
 
 class Panel {
  public:
-  static Panel open(const std::string& path);
-  static void validate(const std::string& path);
+  // Fast open (default): mmaps read-only and validates header/magic/version/size, section
+  // bounds+64B alignment, dates, security directory and the field table (O(n_time+n_sec)).
+  // verify_content == true additionally hashes the whole payload against content_hash
+  // (O(file size), ~hundreds of MiB/s) and rejects corrupted/truncated data bytes.
+  static Panel open(const std::string& path, bool verify_content = false);
+  static void validate(const std::string& path);  // full content-hash validation
   ~Panel();
   Panel(Panel&&) noexcept;
   Panel& operator=(Panel&&) noexcept;
