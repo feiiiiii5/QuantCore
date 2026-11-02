@@ -390,8 +390,18 @@ def test_doctor_cli_custom_roots_and_strict(tmp_path: Path) -> None:
 
 
 def test_doctor_cli_help_lists_options() -> None:
+    from typer.main import get_command
+
     result = runner.invoke(app, ["doctor", "--help"])
     assert result.exit_code == 0
+    # Inspect the declared options instead of parsing rich help text: the rendered
+    # help wraps/hides option names on narrow terminals (e.g. some CI runners).
+    doctor_cmd = get_command(app).commands["doctor"]
+    options = {
+        opt
+        for param in doctor_cmd.params
+        for opt in (*getattr(param, "opts", ()), *getattr(param, "secondary_opts", ()))
+    }
     for option in (
         "--json-output",
         "--no-json-output",
@@ -400,7 +410,7 @@ def test_doctor_cli_help_lists_options() -> None:
         "--snapshots-root",
         "--port",
     ):
-        assert option in result.stdout, option
+        assert option in options, option
 
 
 def test_doctor_import_surface() -> None:

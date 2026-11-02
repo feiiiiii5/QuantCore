@@ -238,5 +238,15 @@ def test_demo_cli_help_lists_options() -> None:
         assert option in parameters, option
     result = runner.invoke(app, ["demo", "--help"])
     assert result.exit_code == 0
+    # Inspect the declared options instead of parsing rich help text: the rendered
+    # help wraps/hides option names on narrow terminals (e.g. some CI runners).
+    from typer.main import get_command
+
+    demo_cmd = get_command(app).commands["demo"]
+    options = {
+        opt
+        for param in demo_cmd.params
+        for opt in (*getattr(param, "opts", ()), *getattr(param, "secondary_opts", ()))
+    }
     for option in ("--data-root", "--n-sec", "--seed", "--template", "--json-output"):
-        assert option in result.stdout, option
+        assert option in options, option
