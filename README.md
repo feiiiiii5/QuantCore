@@ -49,7 +49,8 @@ QuantCore 把这四件事做成默认流程，而不是留给用户自己补的�
 ```bash
 git clone https://github.com/feiiiiii5/QuantCore.git
 cd QuantCore
-make setup                            # 安装依赖 + 构建 C++ 引擎 + 前端依赖
+make setup                            # Python 依赖 + 构建 C++ 引擎
+make setup-ui                         # 前端依赖（pnpm install）
 make demo                             # 合成数据 → 快照 → 示例回测 → HTML 报告（约 2–3 秒）
 pnpm -C ui build                      # 构建界面（首次或改前端后）
 uv run qc serve --port 8000 --open    # 打开本地工作台
