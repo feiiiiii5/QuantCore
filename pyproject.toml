@@ -5,7 +5,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "quantcore"
 version = "0.1.0"
-description = "QuantCore — local A-share quantitative research and backtesting workbench"
+description = "QuantCore — a local-first A-share research workbench for retail investors (research and simulation only)"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
