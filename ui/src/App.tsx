@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Moon, Sparkles, Sun } from "lucide-react";
 import AppBar from "./components/AppBar";
 import Rail, { MobileTabBar } from "./components/Rail";
@@ -46,6 +47,11 @@ export default function App() {
   const location = useLocation();
   const setLastPath = useWorkspace((state) => state.setLastPath);
   const pendingG = useRef(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const reduceMotion = useReducedMotion();
+  const pageTransition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.2, ease: [0.32, 0.72, 0, 1] as const };
 
   useEffect(() => {
     setAppearanceState(applyAppearance());
@@ -56,6 +62,9 @@ export default function App() {
     setLastPath(location.pathname);
     const label = titleForPath(location.pathname);
     document.title = label ? `${label} · ${t.appName}` : t.appName;
+    if (typeof contentRef.current?.scrollTo === "function") {
+      contentRef.current.scrollTo({ top: 0, behavior: "auto" });
+    }
   }, [location.pathname, setLastPath]);
 
   useEffect(() => {
@@ -146,27 +155,39 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">跳到主要内容</a>
       <AppBar theme={appearance.theme} onToggleTheme={() => setAppearanceState(toggleTheme())} />
       <Rail />
-      <main className="app-main">
-        <div className="app-content">
+      <main className="app-main" id="main-content">
+        <div className="app-content" ref={contentRef}>
           <div className="content-inner">
             <ErrorBoundary>
               <Suspense fallback={<div className="state-panel" role="status">加载页面…</div>}>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/today" replace />} />
-                  <Route path="/today" element={<HomePage />} />
-                  <Route path="/market" element={<MarketPage />} />
-                  <Route path="/screener" element={<ScreenerPage />} />
-                  <Route path="/strategy" element={<StrategyPage />} />
-                  <Route path="/backtest" element={<BacktestPage />} />
-                  <Route path="/experiments" element={<ExperimentPage />} />
-                  <Route path="/research" element={<ResearchPage />} />
-                  <Route path="/paper" element={<PaperPage />} />
-                  <Route path="/data" element={<DataPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="*" element={<Navigate to="/today" replace />} />
-                </Routes>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={location.pathname}
+                    className="page-transition"
+                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+                    transition={pageTransition}
+                  >
+                    <Routes location={location}>
+                      <Route path="/" element={<Navigate to="/today" replace />} />
+                      <Route path="/today" element={<HomePage />} />
+                      <Route path="/market" element={<MarketPage />} />
+                      <Route path="/screener" element={<ScreenerPage />} />
+                      <Route path="/strategy" element={<StrategyPage />} />
+                      <Route path="/backtest" element={<BacktestPage />} />
+                      <Route path="/experiments" element={<ExperimentPage />} />
+                      <Route path="/research" element={<ResearchPage />} />
+                      <Route path="/paper" element={<PaperPage />} />
+                      <Route path="/data" element={<DataPage />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="*" element={<Navigate to="/today" replace />} />
+                    </Routes>
+                  </motion.div>
+                </AnimatePresence>
               </Suspense>
             </ErrorBoundary>
           </div>

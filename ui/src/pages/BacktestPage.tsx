@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Download, GitCompare, Play, RotateCcw, SlidersHorizontal, Square } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { EChartsOption } from "echarts";
 import {
   useBars, useCancelJob, useDataIntegrity, useDataStatus, useExperimentResult,
-  useReplayExperiment, useSecurities, useSubmitBacktest, useTemplates,
+  useOnboardingPresets, useReplayExperiment, useSecurities, useSubmitBacktest, useTemplates,
 } from "../api/queries";
 import { downloadWithAuth, isApiError } from "../api/client";
-import type { BacktestResultPayload, Trade } from "../api/types";
-import { Badge, ChartCard, Chart, EmptyState, KLineChart, Panel, Skeleton, StatTile, Tabs, VirtualTable, defaultsFromSchema } from "../components";
+import type { BacktestResultPayload, StrategyPreset, Trade } from "../api/types";
+import {
+  Badge, Button, Callout, Chart, ChartCard, EmptyState, Field, Input, KLineChart, PageHeader, Panel, ProgressBar,
+  Select, Skeleton, StatTile, Tabs, Textarea, VirtualTable, defaultsFromSchema, type ChartSeries,
+} from "../components";
 import { useJobProgress } from "../hooks/useJobProgress";
 import { dateInt, fixedToYuan, money, monthKey, num, pct } from "../lib/format";
 import { notify } from "../lib/notify";
@@ -49,6 +51,7 @@ export default function BacktestPage() {
   const palette = useChartPalette();
   const beginner = useBeginner();
   const templates = useTemplates();
+  const presets = useOnboardingPresets();
   const submit = useSubmitBacktest();
   const cancel = useCancelJob();
   const replay = useReplayExperiment();
@@ -66,11 +69,11 @@ export default function BacktestPage() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [experimentId, setExperimentId] = useState("");
   const [error, setError] = useState("");
-  const [advanced, setAdvanced] = useState(false);
   const [tab, setTab] = useState("equity");
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [replayMessage, setReplayMessage] = useState("");
   const [notice, setNotice] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState("");
   const setDraftStore = useWorkspace((state) => state.setBacktestDraft);
   const progress = useJobProgress(jobId);
   const resetSubmit = submit.reset;
@@ -101,7 +104,12 @@ export default function BacktestPage() {
   const selectTemplate = (id: string) => {
     const found = templates.data?.find((item) => item.id === id);
     const defaults = found ? defaultsFromSchema(found.params_schema) : {};
+    setSelectedPreset("");
     setDraft((current) => ({ ...current, template: id, paramsText: JSON.stringify(defaults) }));
+  };
+  const applyPreset = (preset: StrategyPreset) => {
+    setSelectedPreset(preset.id);
+    setDraft((current) => ({ ...current, template: preset.template, paramsText: JSON.stringify(preset.params ?? {}) }));
   };
   const run = () => {
     setError(""); setNotice(""); setReplayMessage(""); setExperimentId("");
@@ -138,41 +146,32 @@ export default function BacktestPage() {
   };
   const scrollToWizard = () => document.getElementById("bt-wizard")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-  const equityOption = useMemo<EChartsOption | null>(() => {
-    if (!result) return null;
+  const equitySeries = useMemo<ChartSeries[]>(() => {
+    if (!result) return [];
     const drawdown = result.equity.map((value, index) => {
       const peak = Math.max(...result.equity.slice(0, index + 1));
       return peak > 0 ? (value / peak - 1) * 100 : 0;
     });
-    const benchmark = result.benchmark?.equity ?? null;
-    return {
-      animation: false, tooltip: { trigger: "axis" }, legend: { data: benchmark ? ["净值", "基准", "回撤"] : ["净值", "回撤"], top: 0, textStyle: { fontSize: 11 } },
-      grid: [{ left: 70, right: 24, top: 30, height: "55%" }, { left: 70, right: 24, top: "76%", height: "15%" }],
-      xAxis: [
-        { type: "category", data: result.dates.map(dateInt), axisLabel: { fontSize: 10 } },
-        { type: "category", data: result.dates.map(dateInt), gridIndex: 1, axisLabel: { show: false }, axisTick: { show: false } },
-      ],
-      yAxis: [
-        { type: "value", scale: true, splitLine: { lineStyle: { color: palette.grid } } },
-        { type: "value", gridIndex: 1, axisLabel: { formatter: "{value}%", fontSize: 10 }, splitNumber: 2 },
-      ],
-      dataZoom: [{ type: "inside", xAxisIndex: [0, 1] }, { type: "inside", xAxisIndex: [0, 1], orient: "vertical", yAxisIndex: [0] }],
-      series: [
-        { name: "净值", type: "line", data: result.equity, showSymbol: false, lineStyle: { width: 1.7, color: palette.accent }, areaStyle: { opacity: 0.06 } },
-        ...(benchmark ? [{ name: "基准", type: "line" as const, data: benchmark, showSymbol: false, lineStyle: { width: 1.1, color: palette.text, opacity: 0.65 } }] : []),
-        { name: "回撤", type: "line", xAxisIndex: 1, yAxisIndex: 1, data: drawdown, showSymbol: false, lineStyle: { width: 1, color: palette.down }, areaStyle: { opacity: 0.16 } },
-      ],
-    };
+    const series: ChartSeries[] = [
+      { kind: "area", title: "净值", data: result.dates.map((date, index) => ({ time: date, value: result.equity[index] })) },
+      { kind: "area", title: "回撤（%）", pane: 1, color: palette.down, data: result.dates.map((date, index) => ({ time: date, value: drawdown[index] })) },
+    ];
+    if (result.benchmark?.equity) {
+      const benchmark = result.benchmark.equity;
+      series.push({
+        kind: "line", title: "基准", color: palette.text, lineWidth: 1,
+        data: result.dates.flatMap((date, index) => benchmark[index] == null ? [] : [{ time: date, value: benchmark[index] as number }]),
+      });
+    }
+    return series;
   }, [result, palette]);
-  const monthlyOption = useMemo<EChartsOption | null>(() => {
-    if (!result) return null;
+  const monthlySeries = useMemo<ChartSeries[]>(() => {
+    if (!result) return [];
     const monthly = monthlyReturns(result).slice(-36);
-    return {
-      animation: false, tooltip: { trigger: "axis" }, grid: { left: 48, right: 16, top: 20, bottom: 40 },
-      xAxis: { type: "category", data: monthly.map((item) => item.month), axisLabel: { fontSize: 10, rotate: 40 } },
-      yAxis: { type: "value", axisLabel: { formatter: "{value}%" } },
-      series: [{ type: "bar", data: monthly.map((item) => ({ value: item.value * 100, itemStyle: { color: item.value >= 0 ? palette.up : palette.down } })) }],
-    };
+    return [{
+      kind: "histogram", title: "月度收益（%）",
+      data: monthly.map((item) => ({ time: item.month + "-01", value: item.value * 100, color: item.value >= 0 ? palette.up : palette.down })),
+    }];
   }, [result, palette]);
   const tradeCode = useMemo(() => selectedTrade ? securities.data?.find((item) => item.sec_id === selectedTrade.sec_id)?.code ?? "" : "", [selectedTrade, securities.data]);
   const tradeBars = useBars(tradeCode || null);
@@ -198,151 +197,224 @@ export default function BacktestPage() {
       ? { tone: integrity.data.status === "ok" ? "ok" as const : integrity.data.status === "warn" ? "warn" as const : "danger" as const, text: `数据体检 ${integrity.data.status === "ok" ? "通过" : integrity.data.status === "warn" ? "有警告" : "未通过"} · 覆盖 ${integrity.data.coverage.coverage_pct.toFixed(1)}%` }
       : { tone: "neutral" as const, text: "数据体检：加载中" };
   const conclusionTone = result && result.metrics.total_return >= 0 ? "tone-ok" : "tone-danger";
-  const benchmarkDiff = result?.benchmark ? result.metrics.total_return - result.benchmark.total_return : null;
+  const benchmarkDiff = useMemo(() => {
+    if (!result?.benchmark) return null;
+    const total = result.benchmark.total_return;
+    if (Number.isFinite(total)) return result.metrics.total_return - total;
+    const equity = (result.benchmark.equity ?? []).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+    if (equity.length > 1 && equity[0] > 0) return result.metrics.total_return - (equity[equity.length - 1] / equity[0] - 1);
+    return null;
+  }, [result]);
+  const presetCards = presets.data ?? [];
 
   return (
     <div className="page">
-      <header className="page-head">
-        <div><h1>回测</h1><p className="page-lead">三步跑一次可复现、带数据体检的回测；结果先给结论，再展开细节。</p></div>
-        <div className="page-head-actions">
-          <button className="btn" onClick={() => void onReplay()} disabled={!experimentId}><RotateCcw size={15} /> 复现</button>
-          <button className="btn" onClick={() => experimentId && void downloadWithAuth(`/api/experiments/${experimentId}/report`, `${experimentId}.html`)} disabled={!experimentId}><Download size={15} /> 报告</button>
-          <button className="btn ghost" onClick={() => experimentId && void downloadWithAuth(`/api/experiments/${experimentId}/report.pdf`, `${experimentId}.pdf`)} disabled={!experimentId} title="需要本机 Chrome/Chromium；无可用浏览器时后端返回 503">PDF</button>
-          {running ? <button className="btn danger" onClick={() => void onCancel()}><Square size={15} /> 取消</button> : <button className="btn primary" onClick={run} disabled={submit.isPending}><Play size={15} /> 运行回测</button>}
-        </div>
-      </header>
-      {screenerNote ? <Panel dense tone="info"><span className="muted small">来自选股的条件：<span className="mono">{screenerNote}</span>（当前回测按策略模板在全市场选股；该条件仅作研究记录，不改变回测股票池。）</span></Panel> : null}
+      <PageHeader
+        title="回测"
+        subtitle="三步跑一次可复现、带数据体检的回测；结果先给结论，再展开细节。"
+        actions={(
+          <>
+            <Button variant="secondary" icon={RotateCcw} onClick={() => void onReplay()} disabled={!experimentId}>复现</Button>
+            <Button variant="secondary" icon={Download} onClick={() => experimentId && void downloadWithAuth(`/api/experiments/${experimentId}/report`, `${experimentId}.html`)} disabled={!experimentId}>报告</Button>
+            <Button variant="ghost" onClick={() => experimentId && void downloadWithAuth(`/api/experiments/${experimentId}/report.pdf`, `${experimentId}.pdf`)} disabled={!experimentId}>PDF</Button>
+            {running
+              ? <Button variant="danger" icon={Square} onClick={() => void onCancel()}>取消</Button>
+              : <Button variant="primary" icon={Play} loading={submit.isPending} onClick={run}>运行回测</Button>}
+          </>
+        )}
+      />
+      {screenerNote ? <Callout tone="info" title="来自选股的条件">「{screenerNote}」——当前回测按策略模板在全市场选股，该条件仅作研究记录，不改变回测股票池。</Callout> : null}
 
-      <div className="bt-wizard" id="bt-wizard">
-        <section className={`bt-step ${phase === 1 ? "active" : "done"}`}>
-          <div className="bt-step-head"><span className="bt-step-num">1</span><div><h2>选策略</h2><p>内置模板都有白话说明；先用默认参数跑通，再调参。</p></div><div className="bt-step-head-actions"><Badge tone="neutral">{draft.template}</Badge></div></div>
-          {templates.isLoading ? <Skeleton rows={3} /> : templates.error ? (
-            <EmptyState title="策略模板加载失败" hint={templates.error.message} action={<button className="btn" onClick={() => void templates.refetch()}>重试</button>} />
+      <div className="wizard" id="bt-wizard">
+        <section className={`wizard-step ${phase === 1 ? "active" : "done"}`}>
+          <div className="wizard-head">
+            <span className="wizard-num">1</span>
+            <div className="wizard-head-main"><h2 className="wizard-title">选策略</h2><p className="wizard-sub">白话模板默认参数即可运行；先用默认跑通，再调参。</p></div>
+            <div className="wizard-head-actions"><Badge tone="neutral">{draft.template}</Badge></div>
+          </div>
+          {presets.isLoading || templates.isLoading ? <Skeleton rows={3} /> : templates.error ? (
+            <EmptyState title="策略模板加载失败" hint={templates.error.message} action={<Button variant="secondary" onClick={() => void templates.refetch()}>重试</Button>} />
+          ) : presetCards.length ? (
+            <div className="grid grid-3">
+              {presetCards.map((preset) => (
+                <button key={preset.id} type="button" className="template-card" aria-pressed={selectedPreset === preset.id} onClick={() => applyPreset(preset)}>
+                  <span className="template-name">{preset.name}</span>
+                  <span className="template-desc">{preset.tagline}</span>
+                  <span className="template-meta">适合：{preset.suitable_for} · 周期 {preset.horizon}</span>
+                  <span className="template-foot"><Badge tone={selectedPreset === preset.id ? "info" : "neutral"}>{selectedPreset === preset.id ? "已选择" : preset.template}</Badge></span>
+                  <span className="template-risk">风险：{preset.risk_note}</span>
+                </button>
+              ))}
+            </div>
           ) : (
-            <div className="tpl-grid">
+            <div className="grid grid-3">
               {(templates.data ?? []).map((item) => (
-                <button key={item.id} type="button" className={`tpl-card ${draft.template === item.id ? "active" : ""}`} onClick={() => selectTemplate(item.id)}>
-                  <strong>{item.name || item.id}</strong>
-                  <small>{item.description}</small>
-                  <span className="tpl-foot">{beginner ? <Badge tone="info">默认参数即可运行</Badge> : <Badge tone="neutral">{item.id}</Badge>}</span>
+                <button key={item.id} type="button" className="template-card" aria-pressed={draft.template === item.id} onClick={() => selectTemplate(item.id)}>
+                  <span className="template-name">{item.name || item.id}</span>
+                  <span className="template-desc">{item.description}</span>
+                  <span className="template-foot"><Badge tone="neutral">{item.id}</Badge></span>
                 </button>
               ))}
             </div>
           )}
           {!beginner ? (
-            <details className="advanced">
-              <summary><ChevronDown size={15} /> 专业：模板参数 JSON</summary>
-              <textarea className="code-input" rows={4} value={draft.paramsText} onChange={(event) => update("paramsText", event.target.value)} spellCheck={false} aria-label="模板参数 JSON" />
-              <p className="muted small">参数经后端 JSON Schema 校验；非法值会在运行时报错。</p>
-            </details>
-          ) : <p className="muted small">参数：<span className="mono">{draft.paramsText}</span> · 切换到专业模式可编辑。</p>}
+            <Field label="模板参数 JSON" hint="参数经后端 JSON Schema 校验；非法值会在运行时报错。">
+              <Textarea rows={4} value={draft.paramsText} onChange={(event) => update("paramsText", event.target.value)} spellCheck={false} aria-label="模板参数 JSON" style={{ fontFamily: "var(--font-mono)", fontSize: "var(--fs-footnote)" }} />
+            </Field>
+          ) : <p className="page-note-sm">参数：<span className="mono">{draft.paramsText}</span> · 切换到专业模式可编辑。</p>}
         </section>
 
-        <section className={`bt-step ${phase === 2 ? "active" : phase > 2 ? "done" : ""}`}>
-          <div className="bt-step-head"><span className="bt-step-num">2</span><div><h2>选数据与区间</h2><p>快照决定用哪份历史数据；区间越短跑得越快。</p></div></div>
-          <div className="form-grid">
-            <label>数据快照<select value={snapshot} onChange={(event) => setSnapshot(event.target.value)}>
-              <option value="">内置 SYNTHETIC（无需导入）</option>
-              {(dataStatus.data?.snapshots ?? []).map((item) => <option key={item.id} value={item.id}>{item.id.slice(0, 18)} · {item.n_sec} 券 · {dateInt(item.start)}–{dateInt(item.end)}{item.synthetic ? " · SYNTHETIC" : ""}</option>)}
-            </select></label>
-            <label>开始<input value={draft.start} onChange={(event) => update("start", event.target.value)} placeholder="YYYY-MM-DD" /></label>
-            <label>结束<input value={draft.end} onChange={(event) => update("end", event.target.value)} placeholder="YYYY-MM-DD" /></label>
-            <label>初始资金（元）<input value={draft.cash} onChange={(event) => update("cash", event.target.value)} inputMode="decimal" /></label>
-            {!beginner ? <label>成交规则<select value={draft.exec} onChange={(event) => update("exec", event.target.value)}><option value="next_open">次日开盘</option><option value="next_close">次日收盘</option><option value="next_vwap">次日 VWAP</option><option value="after_hours_fixed">盘后固定价</option></select></label> : null}
-            {!beginner ? <label>滑点（bp）<input value={draft.slippageBps} onChange={(event) => update("slippageBps", event.target.value)} inputMode="decimal" /></label> : null}
+        <section className={`wizard-step ${phase === 2 ? "active" : phase > 2 ? "done" : ""}`}>
+          <div className="wizard-head">
+            <span className="wizard-num">2</span>
+            <div className="wizard-head-main"><h2 className="wizard-title">选数据与区间</h2><p className="wizard-sub">快照决定用哪份历史数据；区间越短跑得越快。</p></div>
+          </div>
+          <div className="grid grid-3">
+            <Field label="数据快照" hint="默认内置 SYNTHETIC，无需导入">
+              <Select value={snapshot} onChange={(event) => setSnapshot(event.target.value)} options={[{ value: "", label: "内置 SYNTHETIC" }, ...(dataStatus.data?.snapshots ?? []).map((item) => ({ value: item.id, label: `${item.id.slice(0, 18)} · ${item.n_sec} 券 · ${dateInt(item.start)}–${dateInt(item.end)}${item.synthetic ? " · SYNTHETIC" : ""}` }))]} />
+            </Field>
+            <Field label="开始日期"><Input value={draft.start} onChange={(event) => update("start", event.target.value)} placeholder="YYYY-MM-DD" aria-label="开始日期" /></Field>
+            <Field label="结束日期"><Input value={draft.end} onChange={(event) => update("end", event.target.value)} placeholder="YYYY-MM-DD" aria-label="结束日期" /></Field>
+            <Field label="初始资金（元）"><Input value={draft.cash} onChange={(event) => update("cash", event.target.value)} inputMode="decimal" aria-label="初始资金（元）" /></Field>
+            {!beginner ? (
+              <>
+                <Field label="成交规则">
+                  <Select value={draft.exec} onChange={(event) => update("exec", event.target.value)} options={[{ value: "next_open", label: "次日开盘" }, { value: "next_close", label: "次日收盘" }, { value: "next_vwap", label: "次日 VWAP" }, { value: "after_hours_fixed", label: "盘后固定价" }]} />
+                </Field>
+                <Field label="滑点（bp）"><Input value={draft.slippageBps} onChange={(event) => update("slippageBps", event.target.value)} inputMode="decimal" /></Field>
+              </>
+            ) : null}
           </div>
           {!beginner ? (
-            <details className="advanced" open={advanced} onToggle={(event) => setAdvanced((event.target as HTMLDetailsElement).open)}>
-              <summary><ChevronDown size={15} /> 专业：费用 / 成交 / 风险 / 调试</summary>
-              <div className="form-grid two">
-                <label>佣金率（%）<input value={draft.commissionRate} onChange={(event) => update("commissionRate", event.target.value)} inputMode="decimal" /></label>
-                <label>最低佣金（元）<input value={draft.minCommission} onChange={(event) => update("minCommission", event.target.value)} inputMode="decimal" /></label>
-                <label>印花税（%）<input value={draft.stampDutyRate} onChange={(event) => update("stampDutyRate", event.target.value)} inputMode="decimal" /></label>
-                <label>最大参与率<input value={draft.maxParticipation} onChange={(event) => update("maxParticipation", event.target.value)} inputMode="decimal" /></label>
-                <label>最小调仓额（元）<input value={draft.minRebalanceValue} onChange={(event) => update("minRebalanceValue", event.target.value)} inputMode="decimal" /></label>
-                <label>trace<select value={draft.trace} onChange={(event) => update("trace", event.target.value)}><option value="off">off</option><option value="summary">summary</option><option value="full">full</option></select></label>
-                <label>seed<input value={draft.seed} onChange={(event) => update("seed", event.target.value)} inputMode="numeric" /></label>
-                <label>基准代码<input value={draft.benchmarkCode} onChange={(event) => update("benchmarkCode", event.target.value)} placeholder="如 000300（后端未支持时不生效）" /></label>
-                <label>最大持仓数<input value={draft.maxPositions} onChange={(event) => update("maxPositions", event.target.value)} inputMode="numeric" placeholder="不限" /></label>
-                <label>单票最大权重<input value={draft.maxWeight} onChange={(event) => update("maxWeight", event.target.value)} inputMode="decimal" placeholder="0-1，如 0.1" /></label>
+            <details>
+              <summary className="row" style={{ cursor: "pointer", color: "var(--text-2)" }}><ChevronDown size={15} /> 专业：费用 / 成交 / 风险 / 调试</summary>
+              <div className="grid grid-3" style={{ marginTop: "var(--sp-5)" }}>
+                <Field label="佣金率（%）"><Input value={draft.commissionRate} onChange={(event) => update("commissionRate", event.target.value)} inputMode="decimal" /></Field>
+                <Field label="最低佣金（元）"><Input value={draft.minCommission} onChange={(event) => update("minCommission", event.target.value)} inputMode="decimal" /></Field>
+                <Field label="印花税（%）"><Input value={draft.stampDutyRate} onChange={(event) => update("stampDutyRate", event.target.value)} inputMode="decimal" /></Field>
+                <Field label="最大参与率"><Input value={draft.maxParticipation} onChange={(event) => update("maxParticipation", event.target.value)} inputMode="decimal" /></Field>
+                <Field label="最小调仓额（元）"><Input value={draft.minRebalanceValue} onChange={(event) => update("minRebalanceValue", event.target.value)} inputMode="decimal" /></Field>
+                <Field label="trace"><Select value={draft.trace} onChange={(event) => update("trace", event.target.value)} options={[{ value: "off", label: "off" }, { value: "summary", label: "summary" }, { value: "full", label: "full" }]} /></Field>
+                <Field label="seed"><Input value={draft.seed} onChange={(event) => update("seed", event.target.value)} inputMode="numeric" /></Field>
+                <Field label="基准代码" hint="后端未支持时不生效"><Input value={draft.benchmarkCode} onChange={(event) => update("benchmarkCode", event.target.value)} placeholder="如 000300" /></Field>
+                <Field label="最大持仓数"><Input value={draft.maxPositions} onChange={(event) => update("maxPositions", event.target.value)} inputMode="numeric" placeholder="不限" /></Field>
+                <Field label="单票最大权重"><Input value={draft.maxWeight} onChange={(event) => update("maxWeight", event.target.value)} inputMode="decimal" placeholder="0-1，如 0.1" /></Field>
               </div>
-              <p className="muted small">费用按百分比输入并换算为小数；风险限制在目标权重生成后应用（long-only、最大持仓、单票最大权重）。</p>
+              <p className="page-note-sm" style={{ marginTop: "var(--sp-4)" }}>费用按百分比输入并换算为小数；风险限制在目标权重生成后应用（long-only、最大持仓、单票最大权重）。</p>
             </details>
           ) : null}
-          <div className="bt-summary"><span>区间 <strong>{draft.start} → {draft.end}</strong></span><span>资金 <strong>{money(Number(draft.cash))}</strong></span><span>数据 <strong>{snapshot ? snapshot.slice(0, 18) : "内置 SYNTHETIC"}</strong></span><Badge tone={integrityBadge.tone}>{integrityBadge.text}</Badge></div>
+          <div className="wizard-summary">
+            <span>区间 <strong>{draft.start} → {draft.end}</strong></span>
+            <span>资金 <strong>{money(Number(draft.cash))}</strong></span>
+            <span>数据 <strong>{snapshot ? snapshot.slice(0, 18) : "内置 SYNTHETIC"}</strong></span>
+            <Badge tone={integrityBadge.tone}>{integrityBadge.text}</Badge>
+          </div>
         </section>
 
-        <section className={`bt-step ${phase === 3 ? "active" : ""}`}>
-          <div className="bt-step-head"><span className="bt-step-num">3</span><div><h2>运行</h2><p>提交本地任务；进度通过 WS 推送，失败或太慢可随时取消。</p></div></div>
-          <div className="bt-summary"><span>策略 <strong>{draft.template}</strong></span><span>快照 <strong>{snapshot || "内置 SYNTHETIC"}</strong></span><span>区间 <strong>{draft.start} → {draft.end}</strong></span><span>初始资金 <strong>{money(Number(draft.cash))}</strong></span></div>
-          <div className="bt-progress-actions">
-            {running ? <button className="btn danger" onClick={() => void onCancel()}><Square size={15} /> 取消任务</button> : <button className="btn primary" onClick={run} disabled={submit.isPending}><Play size={15} /> 运行回测</button>}
-            {progress.job ? <div className="progress" role="status" style={{ flex: 1, margin: 0 }}><div className="progress-bar" style={{ width: `${Math.round(progress.job.progress * 100)}%` }} /><span>{progress.job.status} · {Math.round(progress.job.progress * 100)}% · {progress.transport ?? "等待"}</span></div> : <span className="muted small">实验会自动保存到 experiments/；结果仅用于研究。</span>}
+        <section className={`wizard-step ${phase === 3 ? "active" : ""}`}>
+          <div className="wizard-head">
+            <span className="wizard-num">3</span>
+            <div className="wizard-head-main"><h2 className="wizard-title">运行</h2><p className="wizard-sub">提交本地任务；进度通过 WS 推送，失败或太慢可随时取消。</p></div>
           </div>
-          {error ? <p className="error" role="alert">{error}</p> : null}
-          {notice ? <p className="success-text">{notice}</p> : null}
-          {replayMessage ? <p className={replayMessage.startsWith("复现一致") ? "success-text" : "error"}>{replayMessage}</p> : null}
+          <div className="wizard-summary">
+            <span>策略 <strong>{draft.template}</strong></span>
+            <span>快照 <strong>{snapshot || "内置 SYNTHETIC"}</strong></span>
+            <span>区间 <strong>{draft.start} → {draft.end}</strong></span>
+            <span>初始资金 <strong>{money(Number(draft.cash))}</strong></span>
+          </div>
+          <div className="run-bar">
+            {running ? <Button variant="danger" icon={Square} onClick={() => void onCancel()}>取消任务</Button> : <Button variant="primary" icon={Play} loading={submit.isPending} onClick={run}>运行回测</Button>}
+            {progress.job ? <ProgressBar className="spacer" value={Math.round(progress.job.progress * 100)} label={`${progress.job.status} · ${progress.transport ?? "等待"}`} /> : <span className="page-note-sm">实验会自动保存到 experiments/；结果仅用于研究。</span>}
+          </div>
+          {error ? <Callout tone="danger" title={error} /> : null}
+          {notice ? <Callout tone="success" title={notice} /> : null}
+          {replayMessage ? <p className={replayMessage.startsWith("复现一致") ? "success-text" : "error-text"}>{replayMessage}</p> : null}
         </section>
       </div>
 
-      {!result && !experimentId && !running ? <Panel><EmptyState title="还没有回测结果" hint="上面三步填好后点「运行回测」；完成后这里会先给结论和 4 个关键数字，再给图表与交易明细。" action={<button className="btn primary" onClick={scrollToWizard}><SlidersHorizontal size={15} /> 回到三步向导</button>} /></Panel> : null}
+      {!result && !experimentId && !running ? <Panel><EmptyState title="还没有回测结果" hint="上面三步填好后点「运行回测」；完成后这里会先给结论和 4 个关键数字，再给图表与交易明细。" action={<Button variant="primary" icon={SlidersHorizontal} onClick={scrollToWizard}>回到三步向导</Button>} /></Panel> : null}
       {experimentId && resultQuery.isLoading ? <Panel><Skeleton rows={6} /></Panel> : null}
-      {experimentId && resultQuery.error ? <Panel><EmptyState title="结果加载失败" hint={resultQuery.error.message} action={<button className="btn" onClick={() => void resultQuery.refetch()}>重试</button>} /></Panel> : null}
+      {experimentId && resultQuery.error ? <Panel><EmptyState title="结果加载失败" hint={resultQuery.error.message} action={<Button variant="secondary" onClick={() => void resultQuery.refetch()}>重试</Button>} /></Panel> : null}
       {result ? (
         <>
           <div className={`conclusion ${conclusionTone}`}>
-            <h2>结论：{result.metrics.total_return >= 0 ? "本次回测取得正收益" : "本次回测亏损"}，最大回撤 {pct(result.metrics.max_drawdown)}</h2>
-            <p>总收益 <strong>{pct(result.metrics.total_return)}</strong>（年化 {pct(result.metrics.annualized_return)}），Sharpe <strong>{num(result.metrics.sharpe)}</strong>，交易 <strong>{result.trades.length}</strong> 笔，已扣成本 <strong>{money(fixedToYuan(result.metrics.total_fees))}</strong>。{benchmarkDiff == null ? "未设置基准。" : benchmarkDiff >= 0 ? `跑赢基准 ${pct(benchmarkDiff)}。` : `跑输基准 ${pct(Math.abs(benchmarkDiff))}。`}</p>
-            <div className="row" style={{ marginTop: 8, gap: 6 }}>
+            <div className="conclusion-head"><h2 className="conclusion-title">结论：{result.metrics.total_return >= 0 ? "本次回测取得正收益" : "本次回测亏损"}，最大回撤 {pct(result.metrics.max_drawdown)}</h2></div>
+            <p className="conclusion-text">总收益 <strong>{pct(result.metrics.total_return)}</strong>（年化 {pct(result.metrics.annualized_return)}），Sharpe <strong>{num(result.metrics.sharpe)}</strong>，交易 <strong>{result.trades.length}</strong> 笔，已扣成本 <strong>{money(fixedToYuan(result.metrics.total_fees))}</strong>。{benchmarkDiff == null ? "未设置基准。" : benchmarkDiff >= 0 ? `跑赢基准 ${pct(benchmarkDiff)}。` : `跑输基准 ${pct(Math.abs(benchmarkDiff))}。`}</p>
+            <div className="row">
               <Badge tone={integrityBadge.tone}>{integrityBadge.text}</Badge>
               <Badge tone="ok">成本后口径 · 已扣费用</Badge>
               <Badge tone="warn">样本内 · 未做样本外验证</Badge>
               <Badge tone="neutral">引擎 {result.engine_backend} {result.engine_version}</Badge>
             </div>
             <div className="conclusion-actions">
-              <button className="btn primary" onClick={scrollToWizard}><SlidersHorizontal size={15} /> 改参数再跑</button>
-              <button className="btn" onClick={() => experimentId && navigate(`/experiments?run=${encodeURIComponent(experimentId)}`)} disabled={!experimentId}><GitCompare size={15} /> 加入对比</button>
-              <button className="btn" onClick={() => experimentId && void downloadWithAuth(`/api/experiments/${experimentId}/report`, `${experimentId}.html`)} disabled={!experimentId}><Download size={15} /> 查看报告</button>
-              <button className="btn ghost" onClick={() => experimentId && navigate(`/research?run=${encodeURIComponent(experimentId)}`)} disabled={!experimentId}>做样本外验证</button>
+              <Button variant="primary" icon={SlidersHorizontal} onClick={scrollToWizard}>改参数再跑</Button>
+              <Button variant="secondary" icon={GitCompare} disabled={!experimentId} onClick={() => experimentId && navigate(`/experiments?run=${encodeURIComponent(experimentId)}`)}>加入对比</Button>
+              <Button variant="secondary" icon={Download} disabled={!experimentId} onClick={() => experimentId && void downloadWithAuth(`/api/experiments/${experimentId}/report`, `${experimentId}.html`)}>查看报告</Button>
+              <Button variant="ghost" disabled={!experimentId} onClick={() => experimentId && navigate(`/research?run=${encodeURIComponent(experimentId)}`)}>做样本外验证</Button>
             </div>
           </div>
-          <div className="stat-grid">
+          <div className="metric-grid">
             <StatTile label="总收益" value={pct(result.metrics.total_return)} trend={result.metrics.total_return >= 0 ? "up" : "down"} tone={result.metrics.total_return >= 0 ? "up" : "down"} hint={`年化 ${pct(result.metrics.annualized_return)} · 胜率 ${pct(result.metrics.win_rate)}`} />
             <StatTile label="最大回撤" value={pct(result.metrics.max_drawdown)} tone="down" hint={`Calmar ${num(result.metrics.calmar ?? 0)}`} />
             <StatTile label="夏普" value={num(result.metrics.sharpe)} hint={`波动 ${pct(result.metrics.volatility ?? 0)} · Sortino ${num(result.metrics.sortino ?? 0)}`} />
             <StatTile label="交易次数" value={num(result.metrics.trade_count, 0)} hint={`换手 ${pct(result.metrics.turnover)} · 费用 ${money(fixedToYuan(result.metrics.total_fees))}`} />
           </div>
           <Tabs items={TAB_ITEMS.map((item) => item.id === "trades" ? { ...item, badge: result.trades.length } : item)} value={tab} onChange={setTab} ariaLabel="回测结果视图" />
-          {tab === "equity" ? <ChartCard title="净值与回撤" subtitle="上方净值（含基准，如后端返回），下方回撤" height={380}>{equityOption ? <Chart option={equityOption} height={380} /> : null}</ChartCard> : null}
+          {tab === "equity" ? (
+            <ChartCard title="净值与回撤" subtitle="上方净值（含基准，如后端返回），下方回撤" height={400}>
+              {equitySeries.length ? <Chart series={equitySeries} height={400} ariaLabel="净值与回撤曲线" valueFormatter={(value) => value.toFixed(2)} /> : null}
+            </ChartCard>
+          ) : null}
           {tab === "monthly" ? (
-            <div className="grid two-col">
-              <ChartCard title="月度收益" subtitle="最近 36 个月" height={280}>{monthlyOption ? <Chart option={monthlyOption} height={280} /> : null}</ChartCard>
-              <Panel title="费用构成" subtitle="逐笔交易费用汇总"><div className="fee-list"><span>佣金 <strong>{money(fees.commission)}</strong></span><span>印花税 <strong>{money(fees.stamp)}</strong></span><span>过户费 <strong>{money(fees.transfer)}</strong></span><span>其他 <strong>{money(fees.other)}</strong></span><span>合计 <strong>{money(fees.total)}</strong></span></div><h3 style={{ marginTop: 12 }}>原因码</h3><div className="reason-list">{Object.entries(result.reasons).length ? Object.entries(result.reasons).map(([key, value]) => <span key={key} className="badge">{key}: {value}</span>) : <span className="muted small">无 trace 原因码</span>}</div><p className="muted small">期末：现金 {money(result.cash.at(-1))} · 持仓市值 {money(result.market_value.at(-1))} · 总权益 {money(result.equity.at(-1))}。后端不返回逐证券持仓明细，这里不生成假持仓。</p></Panel>
+            <div className="chart-row">
+              <ChartCard title="月度收益" subtitle="最近 36 个月" height={300}>
+                {monthlySeries.length ? <Chart series={monthlySeries} height={300} ariaLabel="月度收益柱状图" valueFormatter={(value) => `${value.toFixed(2)}%`} /> : null}
+              </ChartCard>
+              <Panel title="费用构成" subtitle="逐笔交易费用汇总">
+                <div className="stack-tight">
+                  <div className="kv"><span>佣金</span><strong>{money(fees.commission)}</strong></div>
+                  <div className="kv"><span>印花税</span><strong>{money(fees.stamp)}</strong></div>
+                  <div className="kv"><span>过户费</span><strong>{money(fees.transfer)}</strong></div>
+                  <div className="kv"><span>其他</span><strong>{money(fees.other)}</strong></div>
+                  <div className="kv"><span>合计</span><strong>{money(fees.total)}</strong></div>
+                  <div className="row" style={{ marginTop: "var(--sp-5)" }}>
+                    {Object.entries(result.reasons).length ? Object.entries(result.reasons).map(([key, value]) => <Badge key={key} tone="neutral">{key}: {value}</Badge>) : <span className="page-note-sm">无 trace 原因码</span>}
+                  </div>
+                  <p className="page-note-sm">期末：现金 {money(result.cash.at(-1))} · 持仓市值 {money(result.market_value.at(-1))} · 总权益 {money(result.equity.at(-1))}。后端不返回逐证券持仓明细，这里不生成假持仓。</p>
+                </div>
+              </Panel>
             </div>
           ) : null}
-          {tab === "trades" ? <Panel title="逐笔交易" subtitle={`${result.trades.length} 笔 · ${result.engine_backend} ${result.engine_version}`} actions={<span className="muted small">点击行查看交易解释与 K 线</span>}><VirtualTable data={result.trades} columns={tradeColumns} rowKey={(trade) => `${trade.date}-${trade.sec_id ?? trade.sec_index ?? ""}-${trade.side}-${trade.qty}`} height={320} onRowClick={(trade) => { setSelectedTrade(trade); setTab("explain"); }} initialSorting={[{ id: "date", desc: true }]} ariaLabel="逐笔交易" empty={<span className="muted">该回测没有成交。</span>} /></Panel> : null}
+          {tab === "trades" ? (
+            <Panel title="逐笔交易" subtitle={`${result.trades.length} 笔 · ${result.engine_backend} ${result.engine_version}`} actions={<span className="page-note-sm">点击行查看交易解释与 K 线</span>}>
+              <VirtualTable data={result.trades} columns={tradeColumns} rowKey={(trade) => `${trade.date}-${trade.sec_id ?? trade.sec_index ?? ""}-${trade.side}-${trade.qty}`} height={320} onRowClick={(trade) => { setSelectedTrade(trade); setTab("explain"); }} initialSorting={[{ id: "date", desc: true }]} ariaLabel="逐笔交易" empty={<span className="text-3">该回测没有成交。</span>} />
+            </Panel>
+          ) : null}
           {tab === "explain" ? (
-            <Panel title="交易解释" subtitle={selectedTrade ? "费用拆分与原因码；K 线定位买卖点" : "从「交易明细」选择一笔交易"} actions={selectedTrade ? <button className="btn ghost" onClick={() => setSelectedTrade(null)}>关闭</button> : null}>
+            <Panel title="交易解释" subtitle={selectedTrade ? "费用拆分与原因码；K 线定位买卖点" : "从「交易明细」选择一笔交易"} actions={selectedTrade ? <Button variant="ghost" size="sm" onClick={() => setSelectedTrade(null)}>关闭</Button> : null}>
               {!selectedTrade ? <EmptyState title="还没有选择交易" hint="在「交易明细」点任意一行，这里会显示费用拆分、原因码和该证券的 K 线。" /> : (
-                <>
-                  <div className="trade-detail-grid">
-                    <span>日期 <strong>{dateInt(selectedTrade.date)}</strong></span><span>证券 <strong>{selectedTrade.sec_id || selectedTrade.sec_index}</strong></span>
-                    <span>方向 <strong className={selectedTrade.side === 0 ? "up" : "down"}>{selectedTrade.side === 0 ? "买入" : "卖出"}</strong></span>
-                    <span>价格 <strong>{money(selectedTrade.px_yuan)}</strong></span><span>数量 <strong>{num(selectedTrade.qty, 0)}</strong></span>
-                    <span>成交额 <strong>{money(selectedTrade.amount_yuan)}</strong></span><span>费用 <strong>{money(fixedToYuan(selectedTrade.fee_total))}</strong></span>
-                    <span>方向现金流 <strong>{money((selectedTrade.side === 1 ? 1 : -1) * (selectedTrade.amount_yuan ?? 0))}</strong></span>
+                <div className="stack">
+                  <div className="grid grid-4">
+                    <div className="kv"><span>日期</span><strong>{dateInt(selectedTrade.date)}</strong></div>
+                    <div className="kv"><span>证券</span><strong>{selectedTrade.sec_id || selectedTrade.sec_index}</strong></div>
+                    <div className="kv"><span>方向</span><strong className={selectedTrade.side === 0 ? "up" : "down"}>{selectedTrade.side === 0 ? "买入" : "卖出"}</strong></div>
+                    <div className="kv"><span>价格</span><strong>{money(selectedTrade.px_yuan)}</strong></div>
+                    <div className="kv"><span>数量</span><strong>{num(selectedTrade.qty, 0)}</strong></div>
+                    <div className="kv"><span>成交额</span><strong>{money(selectedTrade.amount_yuan)}</strong></div>
+                    <div className="kv"><span>费用</span><strong>{money(fixedToYuan(selectedTrade.fee_total))}</strong></div>
+                    <div className="kv"><span>方向现金流</span><strong>{money((selectedTrade.side === 1 ? 1 : -1) * (selectedTrade.amount_yuan ?? 0))}</strong></div>
                   </div>
-                  <p className="muted small">费用：佣金 {money(fixedToYuan(selectedTrade.commission))} · 印花税 {money(fixedToYuan(selectedTrade.stamp_duty))} · 过户费 {money(fixedToYuan(selectedTrade.transfer_fee))} · 其他 {money(fixedToYuan(selectedTrade.other_fee))}。原因码 {selectedTrade.reason}（{selectedTrade.reason_name || "—"}）。</p>
-                  <p className="muted small">后端逐笔结果没有已实现盈亏字段，因此不伪造「收益贡献」；方向现金流只是买卖成交额的符号，不是盈亏。</p>
-                  {tradeCode ? (tradeBars.data ? <KLineChart bars={tradeBars.data} palette={palette} height={280} /> : tradeBars.error ? <EmptyState title="K 线加载失败" hint={tradeBars.error.message} /> : <Skeleton rows={3} />) : <p className="muted small">无法从证券列表定位该交易代码（sec_id={selectedTrade.sec_id}）。</p>}
-                </>
+                  <p className="page-note-sm">费用：佣金 {money(fixedToYuan(selectedTrade.commission))} · 印花税 {money(fixedToYuan(selectedTrade.stamp_duty))} · 过户费 {money(fixedToYuan(selectedTrade.transfer_fee))} · 其他 {money(fixedToYuan(selectedTrade.other_fee))}。原因码 {selectedTrade.reason}（{selectedTrade.reason_name || "—"}）。</p>
+                  <p className="page-note-sm">后端逐笔结果没有已实现盈亏字段，因此不伪造「收益贡献」；方向现金流只是买卖成交额的符号，不是盈亏。</p>
+                  {tradeCode ? (tradeBars.data ? <KLineChart bars={tradeBars.data} palette={palette} height={280} /> : tradeBars.error ? <EmptyState title="K 线加载失败" hint={tradeBars.error.message} /> : <Skeleton rows={3} />) : <p className="page-note-sm">无法从证券列表定位该交易代码（sec_id={selectedTrade.sec_id}）。</p>}
+                </div>
               )}
             </Panel>
           ) : null}
-          <p className="muted small">实验 {experimentId || "—"} · 引擎 {result.engine_backend} · seed {result.seed}。{t.disclaimer}</p>
+          <p className="page-note-sm">实验 {experimentId || "—"} · 引擎 {result.engine_backend} · seed {result.seed}。{t.disclaimer}</p>
         </>
       ) : null}
-      <p className="muted small">{t.disclaimer}</p>
+      <p className="page-note-sm">{t.disclaimer}</p>
     </div>
   );
 }

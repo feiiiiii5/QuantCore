@@ -43,6 +43,7 @@ make test-quick  # 快速回归（排除 e2e / bench / network）
 | 关键字过滤 | `uv run pytest -q -k "snapshot and not slow"` | 秒级 | pytest `-k` 表达式 |
 | UI 单测 | `pnpm -C ui test` | 数十秒 | vitest |
 | UI 构建 | `pnpm -C ui build` | 数十秒 | tsc + vite build；`make e2e` 与 `qc serve` 静态资源需要 |
+| UI 审计 | `QC_BASE=http://127.0.0.1:8000 QC_TOKEN=... node ui/scripts/ui-audit.mjs` | 数十秒；需 Chrome | 截图 + 10 路由 status/横向溢出/console error/h1/aria/图表数检查 |
 
 提示：不确定某个 target 会执行什么时，先用 `make -n <target>` 展开命令（不执行）。
 
@@ -143,7 +144,7 @@ uv run python scripts/scale_bench.py --n-sec 5500 --json    # 全市场规模，
 | `engine_backend == "missing"`，大量用例 skip | C++ 扩展未构建/未就绪 | `make build`，再 `uv run python -c "import quantcore; print(quantcore.engine_backend())"` 应输出 `cpp` |
 | 页面空白 / API 401 | token 不匹配或服务未启动 | 用启动日志里的 token；访问 `/?token=<token>`；或用 `QC_SERVER_TOKEN` 固定后重启 |
 | `Address already in use` | 端口被占用 | `lsof -nP -iTCP:8123 -sTCP:LISTEN` 找到进程并结束，或换 `--port` / `QC_E2E_PORT` |
-| 打开页面 404 / 无前端 | UI 未构建 | `pnpm -C ui build`（开发时改用 `pnpm -C ui dev` 代理到后端） |
+| 打开页面 404 / 无前端 | UI 未构建 | `pnpm -C ui build`（开发时改用 `pnpm -C ui dev`：Vite proxy 会把 Origin 重写为 `QC_DEV_API` 指向的 qc serve 源，默认 8000） |
 | `make e2e` 报浏览器缺失 | `channel: "chrome"` 需要本机 Google Chrome | 安装 Chrome；或 `pnpm -C ui exec playwright install chromium` 并临时改用 Chromium |
 | `No module named quantcore` / Python 版本不对 | 用了系统 python3（可能是 3.11） | 一律用 `uv run ...`；项目 .venv 是 3.12 |
 | bench 用例全部 skip | 默认关闭性能测试 | 需要时 `QC_BENCH=1` |

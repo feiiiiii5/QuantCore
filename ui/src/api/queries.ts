@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
+import { subscribeLiveQuotes } from "../lib/liveStream";
+import type { LiveQuotesPayload } from "./types";
 
 export const qk = {
   health: ["health"] as const,
@@ -181,15 +184,32 @@ export function useLiveStatus() {
 export function useLiveIndices(enabled = true) {
   return useQuery({ queryKey: qk.liveIndices, queryFn: api.liveIndices, refetchInterval: 5_000, staleTime: 2_000, retry: false, enabled });
 }
+/** Live quotes: one shared WebSocket per code set, with HTTP polling as a safety net. */
 export function useLiveQuotes(codes: string[], enabled = true) {
-  return useQuery({
+  const client = useQueryClient();
+  const codeKey = codes.join(",");
+  const [streamData, setStreamData] = useState<LiveQuotesPayload | null>(null);
+  useEffect(() => {
+    if (!enabled || codes.length === 0) {
+      setStreamData(null);
+      return;
+    }
+    return subscribeLiveQuotes(codes, (message) => {
+      client.setQueryData(qk.liveQuotes(codes), message.quotes);
+      setStreamData(message.quotes);
+    });
+    // codeKey captures the code list; codes is re-read from the closure of this render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeKey, enabled, client]);
+  const query = useQuery({
     queryKey: qk.liveQuotes(codes),
     queryFn: () => api.liveQuotes(codes),
-    refetchInterval: 5_000,
+    refetchInterval: streamData ? false : 15_000,
     staleTime: 2_000,
     retry: false,
-    enabled: enabled && codes.length > 0,
+    enabled: enabled && codes.length > 0 && streamData == null,
   });
+  return streamData ? { ...query, data: streamData, isStreaming: true } : query;
 }
 export function useWatchlist() {
   return useQuery({ queryKey: qk.watchlist, queryFn: api.watchlist, staleTime: 30_000 });

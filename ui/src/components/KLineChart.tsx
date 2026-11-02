@@ -4,13 +4,13 @@ import {
   type CandlestickData, type HistogramData, type IChartApi, type ISeriesApi, type LineData, type Time,
 } from "lightweight-charts";
 import type { Bars } from "../api/types";
-import type { ChartPalette } from "../theme";
+import { useChartPalette, type ChartPalette } from "../theme";
 import { num } from "../lib/format";
 import { chartToken } from "../lib/tokens";
 
 interface Props {
   bars: Bars;
-  palette: ChartPalette;
+  palette?: ChartPalette;
   height?: number;
   showMA5?: boolean;
   showMA20?: boolean;
@@ -18,7 +18,9 @@ interface Props {
 }
 
 /** Local-only TradingView Lightweight Charts wrapper; no remote assets. */
-export default function KLineChart({ bars, palette, height = 430, showMA5 = true, showMA20 = true, showVolume = true }: Props) {
+export default function KLineChart({ bars, palette: paletteProp, height = 430, showMA5 = true, showMA20 = true, showVolume = true }: Props) {
+  const hookPalette = useChartPalette();
+  const palette = paletteProp ?? hookPalette;
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -57,11 +59,15 @@ export default function KLineChart({ bars, palette, height = 430, showMA5 = true
     ma5Ref.current = ma5;
     ma20Ref.current = ma20;
     volumeRef.current = volume;
+    let frame = 0;
     const resize = new ResizeObserver(() => {
       chart.applyOptions({ width: Math.max(container.clientWidth, 320), height: Math.max(container.clientHeight, 240) });
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => chart.timeScale().fitContent());
     });
     resize.observe(container);
     return () => {
+      window.cancelAnimationFrame(frame);
       resize.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -90,6 +96,7 @@ export default function KLineChart({ bars, palette, height = 430, showMA5 = true
     ma5.setData(line(bars.ma5));
     ma20.setData(line(bars.ma20));
     chartRef.current?.timeScale().fitContent();
+    window.requestAnimationFrame(() => chartRef.current?.timeScale().fitContent());
   }, [bars]);
 
   useEffect(() => {

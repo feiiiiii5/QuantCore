@@ -1,70 +1,95 @@
-# UI — 交互与页面（重构轮）
+# UI — 交互与页面（v2 / Apple 设计语言）
 
-前端 `ui/`：React 19 + Vite + TypeScript；设计规范见 `docs/DESIGN-SPEC.md`，产品理念见 `docs/PRODUCT.md`。
-构建：`pnpm -C ui build`；开发：`pnpm -C ui dev`（Vite 代理 `/api` `/ws` `/health` 到 `127.0.0.1:8000`）。
-生产：`qc serve` 同源托管 `ui/dist`，无 CORS、无 CDN；Monaco/ECharts/Lightweight Charts 全部本地 bundle。
-仅研究与模拟，不连接券商、不下真实单；所有结果页与报告保留"历史表现不代表未来，不构成投资建议"。
+前端 `ui/`：React 19 + Vite + TypeScript。设计规范见 `docs/DESIGN-SPEC.md`（v2，Apple HIG），
+产品理念见 `docs/PRODUCT.md`。工程原则：**优先使用 GitHub 上成熟开源方案**，不重复造轮子。
+
+```
+pnpm -C ui dev     # Vite dev（/api /ws /health 代理到 127.0.0.1:8000）
+pnpm -C ui build   # tsc -b + vite build → ui/dist，由 qc serve 同源托管
+pnpm -C ui test    # vitest（jsdom）
+pnpm -C ui exec playwright test   # 或 make e2e（隔离 qc serve + Chrome）
+node ui/scripts/ui-audit.mjs      # 本地截图/溢出/console/a11y 审计（需 QC_BASE/QC_TOKEN）
+```
+
+## 技术栈（成熟方案）
+
+| 领域 | 方案 | 用途 |
+|---|---|---|
+| 无障碍原语 | `@radix-ui/react-*` | Dialog/Sheet/Menu/Popover/Select/Switch/Tabs/ToggleGroup/Tooltip（WAI-ARIA）|
+| 动效 | `framer-motion` | 页面转场、弹层、通知；`prefers-reduced-motion` 关闭 |
+| 通知 | `sonner` | 统一 toast；保留 `lib/notify.ts` 旧 API 与桌面通知 |
+| 命令面板 | `cmdk` | ⌘K 模糊搜索 + 键盘导航 |
+| 移动抽屉 | `vaul` | iOS 风格 bottom sheet（更多导航）|
+| 图表 | `lightweight-charts`（TradingView）| K 线、净值/回撤、月度柱状；已移除 echarts |
+| 表格/虚拟滚动 | `@tanstack/react-table` + `@tanstack/react-virtual` | 选股/交易/持仓等大表 |
+| 数据请求 | `@tanstack/react-query` | 缓存、轮询、任务进度 |
+| 路由/状态 | `react-router-dom` + `zustand` | 路由、UI/工作区状态 |
+| 图标/样式 | `lucide-react` + 设计 token CSS | 统一 1.5px 图标；不引入远程字体/CDN |
 
 ## 信息架构（IA）
-一级导航 6 组（左侧 68px 图标 rail；≤900px 变底部 tab）：
 
 | 组 | 路由 |
 |---|---|
-| 今日 | `/today`（默认；`/` 重定向到 `/today`） |
+| 今日 | `/today`（默认；`/` 重定向） |
 | 行情 | `/market` |
 | 研究 | `/screener` `/strategy` `/backtest` `/experiments` `/research` |
 | 模拟 | `/paper` |
 | 数据 | `/data` |
 | 设置 | `/settings` |
 
-## 应用外壳
-- **AppBar（56px）**：品牌 · 实时指数条（上证/深成/创业板/科创50，涨跌色 + 实时/休市/离线状态点）· ⌘K 命令面板 · 新手模式开关 · 主题切换。
-- **Rail（68px）**：图标 + 文字分组导航；当前页高亮；Alt+1…9 / Alt+0 与 `g`+`数字` 跳页。
-- **StatusBar（28px）**：实时状态 · 数据源 · 快照日期 · 引擎 · 任务 · API 地址 · 免责声明。
-- **CommandPalette（⌘K / Ctrl-K / `/`）**：跳页、搜索证券（快照列表）、运行命令（主题/新手模式/新手引导/实时设置/数据体检）。
-- 新手引导弹窗改为 2 步（生成示例数据 → 跑示例回测），由首页 CTA 或命令面板打开。
+## 应用外壳（Apple 风格）
+
+- **AppBar 52px**：毛玻璃材质 + 滚动阴影；品牌 · 实时指数条（实时）/「实时未开启」入口（离线）· ⌘K · 新手模式 Switch · 主题切换。
+- **Rail 64px**：分组图标导航（今日/行情/研究×5/模拟/数据/设置）；当前页高亮；Alt+1…9 / Alt+0 与 `g`+数字快捷跳页。
+- **StatusBar 28px**：实时状态 · 数据源 · 快照日期 · 引擎 · 任务 · 网络 · 免责声明。
+- **MobileTabBar（<1024px）**：今日/行情/回测/数据/我的 5 入口；「我的」用 vaul sheet 展开二级导航。
+- **CommandPalette（⌘K / Ctrl-K / `/`）**：跳页、证券、命令（主题/新手模式/引导/实时设置/数据体检）；cmdk 分组 + 键盘。
+- **页面转场**：framer-motion 200ms（`cubic-bezier(0.32,0.72,0,1)`），路由切换滚动复位，reduced-motion 关闭。
+- **跳转链接**：`skip-link` 键盘可达；焦点环 3px accent 30%。
 
 ## 设计系统
-- tokens 全部在 `ui/src/styles/tokens.css`（浅/深色、紧凑密度、红涨/绿涨/色盲蓝橙）；组件与页面只消费 `var(--*)`，禁止硬编码颜色。
-- 样式拆分：`styles/{tokens,base,layout,components,overlays,views,legacy}.css`，`styles.css` 只做 @import；单文件 <500 行。
-- 通用组件（`ui/src/components/index.ts` barrel）：Panel、StatTile、SectionHeader、Toolbar、Segmented、Badge/Tag、DataTable、Sparkline、ChartCard、EmptyState、Skeleton、StepList、Tabs、MetricPill、QuoteRow、CommandPalette；既有组件（Chart、KLineChart、VirtualTable、ParamForm、StatePanel、MetricCard、RobustnessPanel、PaperPortfolioPanel、Toasts、ErrorBoundary、GlobalSearch、StatusBar）保持导出名与 props 兼容。
-- 三态约定：每个数据区块必须实现 loading（骨架）/ empty（带下一步）/ error（重试 + 提示）；实时关闭或数据过期显示 stale 标注。
-- 无障碍：`:focus-visible` 焦点环、aria-label、tabular-nums、`prefers-reduced-motion` 关闭动画。
+
+- 全部 tokens 在 `ui/src/styles/tokens.css`（Apple 浅/深色、毛玻璃 material、hairline、34px 标题阶梯、8pt 网格、
+  radius/shadow/motion/density；`data-theme` / `data-density` / `data-color-mode` 三套选择器；保留 v1 别名）。
+- 样式拆分：`styles/{tokens,base,layout,components,business,overlays,views}.css` + `styles.css` 汇总；单文件 <500 行。
+- 组件（`ui/src/components/index.ts`）：
+  - 原语：`Button` `Field` `Input` `Textarea` `Select` `Switch` `Segmented` `Tabs` `PageHeader` `Callout`
+    `List/ListRow/ListSep` `ProgressBar` `Dialog` `Sheet` `Menu` `Tooltip` `Popover` `Toaster`。
+  - 业务：`Panel/Card` `StatTile` `DataTable` `VirtualTable` `Chart` `KLineChart` `ChartCard` `Sparkline`
+    `EmptyState` `Skeleton` `StepList` `Badge/Tag` `SectionHeader` `Toolbar` `MetricPill` `QuoteRow`
+    `CommandPalette` `AppBar` `Rail/MobileTabBar` `StatusBar` `Onboarding` `ParamForm` `RobustnessPanel`
+    `PaperPortfolioPanel` `ErrorBoundary`。
+- 图表使用 `Chart` 声明式 API：`<Chart series={[{ kind: "area", data, title }]} />`；`time` 支持 YYYYMMDD/ISO/epoch。
+- 三态：每个数据区块有 loading（骨架）/ empty（带下一步）/ error（重试）；实时关闭显示 stale 标注。
+- 无障碍：`:focus-visible`、aria-label/role、tabular-nums、对比度 ≥4.5:1、reduced-motion 关闭动画。
 
 ## 页面
 
 ### 今日 `/today`
-- 市场状态带：四大指数（实时优先，关闭实时时用最近快照 + 明确状态点）、涨跌色、迷你走势、休市/离线提示。
-- 我的自选：6 位代码添加/移除；实时开启时显示实时报价，否则显示快照报价；空态引导去行情页。
-- 新手进度：后端 `/api/onboarding` 四步（生成示例数据 → 跑第一个回测 → 看懂结果 → 数据体检），完成打勾；不可用时回退到静态步骤。
-- 最近研究：最近 6 个实验卡片（策略、总收益/Sharpe/最大回撤、SYNTHETIC 与数据体检徽章、时间），空态给"一键示例"。
-- 数据体检摘要：状态徽章 + 覆盖率/标的数/交易日/缺口 + warn/fail 检查项；失败醒目提示。
-- 主 CTA「开始一次研究」→ `/backtest`；新手模式显示"怎么看这一页"三句话说明。
+市场状态 4 指数（实时优先/离线快照 + Sparkline）→ 主 CTA「开始一次研究」→ 我的自选 → 新手 4 步清单 →
+最近研究（结论徽章）→ 数据体检摘要。
 
 ### 行情 `/market`
-- 指数卡（实时优先）→ 证券搜索/自选/全部列表 → K 线主图（MA5/MA20/成交量/分钟切换）→ 右侧实时读数（现价、涨跌、今开/高/低/昨收、成交额、振幅、涨跌停、换手、更新时间）。
-- 实时开启：绿点 + 最后更新时间；未开启：黄色"离线快照" + 去设置开启提示；实时失败回退快照并提示。
-- 底部/右栏：数据源、快照 ID 与日期、数据体检徽章与覆盖率；保留证券资料、PIT 财务、涨跌分布与 SYNTHETIC 标注。
-- 「加入自选」写入本地 watchlist；「开始一次研究」带代码去回测页。
+指数带 → 证券列表（全部/自选 + 搜索，虚拟滚动）→ K 线（MA5/MA20/成交量/分钟切换）→ 实时读数网格 →
+涨跌分布 → 数据体检入口；实时开启显示绿点/更新时间，关闭显示「离线快照」与开启指引。
 
-### 研究工作台（选股/策略/回测/实验/研究）
-- 结论先行、三态齐全；新手模式隐藏高级参数并给"下一步建议"；结果带数据体检/可信度徽章。细节见各页面实现与 DESIGN-SPEC §6.3。
+### 研究（选股/策略/回测/实验/研究）
+- 回测：三步 wizard（白话策略卡 → 数据与区间 → 运行）→ 结论 banner + 4 KPI + Tabs（净值与回撤双 pane / 月度 / 交易明细 / 交易解释+K线）+ 数据体检徽章。
+- 研究：5 tab（因子诊断/参数扫描/滚动验证/归因/稳健性）；先结论后图表；参数扫描用 heatmap 工具类。
+- 选股：条件/预设 → 虚拟表格 → 「用这个结果回测」；策略：模板卡 + JSON Sheet + 插件；实验：卡片 + 对比 Sheet。
 
 ### 模拟 `/paper` / 数据 `/data` / 设置 `/settings`
-- 模拟：会话 → 持仓/委托/成交/权益曲线 → 下单面板；partial 状态显示"部分成交 成交/委托"；明确不连接券商。
-- 数据：数据体检优先 → 导入真实数据（网络默认关，开启需显式确认）→ 快照列表 → 合成示例入口（SYNTHETIC）。
-- 设置：服务/Token、实时行情开关、自检、主题/密度/涨跌色、新手模式、免责声明。
+- 模拟：会话 → 2×2 KPI → 权益曲线 → 持仓/委托/成交 → 下单面板 → 提醒/组合；partial 显示「成交/委托」。
+- 数据：体检 hero（覆盖率/缺口/准确性 + 检查列表）→ 导入真实数据（网络关闭明确说明）→ 快照表（质量报告 Dialog）→ V2 数据集。
+- 设置：Apple 分组列表（本地服务/数据与网络/外观/新手模式/自检/关于）。
 
-## 新手模式
-- 默认开启，状态存 localStorage `qc_beginner`（`ui/src/store/ui.ts`：`useBeginner()` / `setBeginner()`）；AppBar 与设置页可切换。
-- 开启时：隐藏高级参数、术语白话解释、突出"下一步"、空态优先"一键示例"、结果页"怎么看这个结果"。
-
-## 实时行情规则
-- 网络能力只在运行时显式开启（服务端 `QC_ALLOW_NETWORK=1`）；测试用录制 fixture，不联网。
-- 状态：`实时`（绿点 + 更新时间）/ `休市`（灰点 + 最近收盘）/ `离线`（黄点 + 快照日期）；未开启时全站不发起行情网络请求。
-- 数据源、延迟、最后更新时间在行情页与 StatusBar 可见；价格变化用 ≤200ms 轻闪动画，尊重 reduced-motion。
+## 实时行情
+- 服务端 `QC_ALLOW_NETWORK=1` 才联网；测试全程录制 fixture。
+- 实时报价走共享 WebSocket：`lib/liveStream.ts` 每个代码集只开一个 `/ws/live` 连接（退避重连），
+  写入 react-query 缓存；失败自动回退 HTTP 轮询（15s），不阻塞页面。
+- 状态：`实时`（绿点 + 更新时间）/ `休市`（灰点 + 最近收盘）/ `离线`（黄点 + 快照日期）；价格变化 ≤200ms。
 
 ## 验证
-- `pnpm -C ui exec tsc -p tsconfig.json`、`pnpm -C ui test`、`pnpm -C ui build`。
-- Playwright（Lead 统一更新选择器）：新首页 `/today`、行情 `/market`、⌘K 命令面板、新手模式开关、实时/离线徽章为新增锚点。
-- 关键 DOM：`.app-shell/.appbar/.rail/.statusbar/.panel/.stat-tile/.badge/.segmented/.step-list/.tabs/.quote-row/.research-card/.readings-grid`；首页标题「今日」、行情标题「行情」。
+- `pnpm -C ui exec tsc -p tsconfig.json`、`pnpm -C ui test`、`pnpm -C ui build` 全绿。
+- `make e2e`：18 条 Playwright（新首页/行情/回测任务/数据体检/命令面板/移动端/暗色/插件/模拟…）。
+- `node scripts/ui-audit.mjs`：10 路由 + 移动端 + 暗色，检查 status/overflow/console/h1/aria/图表数。

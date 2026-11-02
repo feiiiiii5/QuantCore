@@ -1,5 +1,7 @@
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
+import type { LucideIcon } from "lucide-react";
+import clsx from "clsx";
 
 export interface SegmentedOption {
   value: string;
@@ -9,8 +11,14 @@ export interface SegmentedOption {
   disabled?: boolean;
 }
 
+/** v2 alias kept for pages that describe the same item shape as `items`. */
+export type SegmentedItem = SegmentedOption;
+
 export interface SegmentedProps {
-  options: SegmentedOption[];
+  /** v2 preferred list of items. */
+  items?: SegmentedOption[];
+  /** v1 compatibility alias (Market/Paper/Strategy pages still pass this). */
+  options?: SegmentedOption[];
   value: string;
   onChange: (value: string) => void;
   size?: "sm" | "md";
@@ -18,30 +26,33 @@ export interface SegmentedProps {
   className?: string;
 }
 
-/** Small mode switch (2–4 options). */
-export default function Segmented({ options, value, onChange, size = "md", ariaLabel, className }: SegmentedProps) {
-  const classes = ["segmented"];
-  if (size === "sm") classes.push("sm");
-  if (className) classes.push(className);
+/** Radix single-select toggle group (Apple segmented control). */
+export default function Segmented({ items, options, value, onChange, size = "md", ariaLabel, className }: SegmentedProps) {
+  const list = items ?? options ?? [];
   return (
-    <div className={classes.join(" ")} role="group" aria-label={ariaLabel}>
-      {options.map((option) => {
-        const Icon = option.icon;
+    <ToggleGroup.Root
+      type="single"
+      value={value}
+      onValueChange={(next) => { if (next) onChange(next); }}
+      className={clsx("segmented", size === "sm" && "segmented-sm", className)}
+      aria-label={ariaLabel}
+      disabled={false}
+    >
+      {list.map((item) => {
+        const Icon = item.icon;
         return (
-          <button
-            key={option.value}
-            type="button"
-            className={option.value === value ? "active" : ""}
-            aria-pressed={option.value === value}
-            title={option.hint}
-            disabled={option.disabled}
-            onClick={() => onChange(option.value)}
+          <ToggleGroup.Item
+            key={item.value}
+            value={item.value}
+            className="segmented-item"
+            disabled={item.disabled}
+            title={item.hint}
           >
-            {Icon ? <Icon size={13} aria-hidden="true" /> : null}
-            {option.label}
-          </button>
+            {Icon ? <Icon size={14} aria-hidden="true" /> : null}
+            {item.label}
+          </ToggleGroup.Item>
         );
       })}
-    </div>
+    </ToggleGroup.Root>
   );
 }

@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { Command } from "cmdk";
+import { AnimatePresence, motion } from "framer-motion";
 import { Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "../api/client";
@@ -24,15 +26,15 @@ export interface CommandPaletteProps {
   placeholder?: string;
 }
 
+const EASE = [0.32, 0.72, 0, 1] as const;
+
 /**
- * ⌘K palette: jump to pages, search securities (snapshot list) and run commands.
+ * ⌘K command palette built on cmdk (fuzzy filter + keyboard nav) with framer-motion depth.
  * Securities are fetched only while the palette is open.
  */
 export default function CommandPalette({ open, onClose, items = [], placeholder = "搜索证券、页面或命令…" }: CommandPaletteProps) {
-  const [query, setQuery] = useState("");
-  const [cursor, setCursor] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const [query, setQuery] = useState("");
   const securities = useQuery({
     queryKey: qk.securities("palette:1000"),
     queryFn: () => api.securities("", 1000),
@@ -42,18 +44,31 @@ export default function CommandPalette({ open, onClose, items = [], placeholder 
   });
 
   useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    setCursor(0);
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 10);
-    return () => window.clearTimeout(timer);
+    if (open) setQuery("");
   }, [open]);
 
-  const needle = query.trim().toLowerCase();
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  const groups = useMemo(() => {
+    const ordered: { name: string; items: CommandPaletteItem[] }[] = [];
+    for (const item of items) {
+      const name = item.group ?? "命令";
+      const bucket = ordered.find((group) => group.name === name);
+      if (bucket) bucket.items.push(item);
+      else ordered.push({ name, items: [item] });
+    }
+    return ordered;
+  }, [items]);
+
   const securityItems = useMemo<CommandPaletteItem[]>(() => {
+    const needle = query.trim().toLowerCase();
     if (!needle) return [];
-    const rows = securities.data ?? [];
-    return rows
+    return (securities.data ?? [])
       .filter((row) => `${row.code}${row.name}${row.industry}${row.board}`.toLowerCase().includes(needle))
       .slice(0, 6)
       .map((row) => ({
@@ -64,85 +79,88 @@ export default function CommandPalette({ open, onClose, items = [], placeholder 
         keywords: row.industry,
         run: () => { onClose(); navigate(`/market?code=${encodeURIComponent(row.code)}`); },
       }));
-  }, [needle, securities.data, navigate, onClose]);
+  }, [query, securities.data, navigate, onClose]);
 
-  const filtered = useMemo(() => {
-    const base = needle
-      ? items.filter((item) => `${item.label}${item.keywords ?? ""}${item.group ?? ""}`.toLowerCase().includes(needle))
-      : items;
-    return [...base, ...securityItems];
-  }, [items, needle, securityItems]);
-
-  useEffect(() => { setCursor(0); }, [query]);
-  useEffect(() => {
-    if (cursor > filtered.length - 1) setCursor(Math.max(filtered.length - 1, 0));
-  }, [cursor, filtered.length]);
-
-  if (!open) return null;
-
-  const runAt = (index: number) => {
-    const item = filtered[index];
-    if (!item) return;
-    item.run();
-  };
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
-    if (event.key === "ArrowDown") { event.preventDefault(); setCursor((index) => Math.min(index + 1, Math.max(filtered.length - 1, 0))); return; }
-    if (event.key === "ArrowUp") { event.preventDefault(); setCursor((index) => Math.max(index - 1, 0)); return; }
-    if (event.key === "Enter") { event.preventDefault(); runAt(cursor); }
-  };
-
-  let lastGroup = "";
   return (
-    <div className="palette-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div className="palette" role="dialog" aria-modal="true" aria-label="命令面板">
-        <div className="palette-input">
-          <Search size={16} className="muted" aria-hidden="true" />
-          <input
-            ref={inputRef}
-            role="combobox"
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          className="cmdk-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: EASE }}
+          onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+        >
+          <motion.div
+            className="cmdk-root"
+            role="dialog"
+            aria-modal="true"
             aria-label="命令面板"
-            aria-expanded="true"
-            aria-controls="command-palette-list"
-            aria-autocomplete="list"
-            value={query}
-            placeholder={placeholder}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={onKeyDown}
-          />
-          <span className="kbd">Esc</span>
-        </div>
-        <div className="palette-list" id="command-palette-list" role="listbox" aria-label="命令结果">
-          {filtered.length === 0 ? <div className="palette-empty">没有匹配结果。试试代码、页面名或「主题」。</div> : null}
-          {filtered.map((item, index) => {
-            const Icon = item.icon;
-            const showGroup = item.group && item.group !== lastGroup;
-            lastGroup = item.group ?? lastGroup;
-            return (
-              <div key={item.id}>
-                {showGroup ? <div className="palette-group-label">{item.group}</div> : null}
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={index === cursor}
-                  className={index === cursor ? "palette-item active" : "palette-item"}
-                  onMouseEnter={() => setCursor(index)}
-                  onClick={() => runAt(index)}
-                >
-                  {Icon ? <Icon size={15} aria-hidden="true" /> : null}
-                  <span className="label">{item.label}</span>
-                  {item.hint ? <span className="hint">{item.hint}</span> : null}
-                </button>
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: 4 }}
+            transition={{ duration: 0.18, ease: EASE }}
+          >
+            <Command label="命令面板" loop>
+              <div className="cmdk-input-wrap">
+                <Search size={16} className="text-3" aria-hidden="true" />
+                <Command.Input
+                  className="cmdk-input"
+                  autoFocus
+                  value={query}
+                  onValueChange={setQuery}
+                  placeholder={placeholder}
+                  aria-label="命令面板"
+                />
+                <span className="kbd">Esc</span>
               </div>
-            );
-          })}
-        </div>
-        <div className="palette-foot">
-          <span>↑↓ 选择</span><span>Enter 打开</span><span>Esc 关闭</span>
-          <span className="spacer" />
-          <span>⌘K / Ctrl-K</span>
-        </div>
-      </div>
-    </div>
+              <Command.List className="cmdk-list">
+                <Command.Empty className="cmdk-empty">没有匹配结果。试试代码、页面名或「主题」。</Command.Empty>
+                {groups.map((group) => (
+                  <Command.Group key={group.name} heading={group.name} className="cmdk-group">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Command.Item
+                          key={item.id}
+                          value={`${item.label} ${item.keywords ?? ""} ${item.group ?? ""}`}
+                          className="cmdk-item"
+                          onSelect={() => { onClose(); item.run(); }}
+                        >
+                          {Icon ? <span className="cmdk-item-icon"><Icon size={15} aria-hidden="true" /></span> : null}
+                          <span className="cmdk-item-label">{item.label}</span>
+                          {item.hint ? <span className="cmdk-item-hint">{item.hint}</span> : null}
+                        </Command.Item>
+                      );
+                    })}
+                  </Command.Group>
+                ))}
+                {securityItems.length ? (
+                  <Command.Group heading="证券" className="cmdk-group">
+                    {securityItems.map((item) => (
+                      <Command.Item
+                        key={item.id}
+                        value={`${item.label} ${item.keywords ?? ""} 证券`}
+                        className="cmdk-item"
+                        onSelect={() => { onClose(); item.run(); }}
+                      >
+                        <span className="cmdk-item-label">{item.label}</span>
+                        {item.hint ? <span className="cmdk-item-hint">{item.hint}</span> : null}
+                      </Command.Item>
+                    ))}
+                  </Command.Group>
+                ) : null}
+              </Command.List>
+              <div className="cmdk-footer">
+                <span>↑↓ 选择</span><span>Enter 打开</span><span>Esc 关闭</span>
+                <span className="spacer" />
+                <span>⌘K / Ctrl-K</span>
+              </div>
+            </Command>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }

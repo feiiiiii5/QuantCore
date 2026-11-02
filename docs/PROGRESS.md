@@ -10,8 +10,8 @@
 - M2：Synthetic/LocalFile/Tushare(fixture+live API 代码路径)/AKShare/mootdx + **Sina 公开真实数据源**；摄取/质量/快照(内容寻址+PIT 元数据)/Parquet+DuckDB+SQLite；PIT 财务视图；**数据体检**(覆盖率/缺口/OHLC/量额/涨跌停/复权/跨源)；真实 Sina 3 只样本 import→snapshot→integrity=ok→C++ 回测已跑通；真实 Tushare Token 未验证。
 - M3：event-driven 引擎，规则/费用/T+1/手数/涨跌停/停牌/除权除息/trace/指标；差分 6/6；风险限制/基准比较；引擎 300×965 月度调仓约 2.6ms。
 - M4：DSL/7 模板/lookahead/实验存储/HTML+可选 PDF 报告/CLI/replay/子进程 sandbox worker/C++ parallel engine batch sweep。
-- M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI；本地 toast/桌面通知；R3 增 live 行情 REST/WS、数据体检、onboarding/presets/watchlist API。
-- M6：R3 重构——`/today` 驾驶舱 + `/market` 实时优先行情 + 8 页重做（结论先行/三态/新手模式），token 化设计系统与 17 个组件，AppBar/⌘K/移动端；Playwright **19** 条通过（含真实回测任务、数据体检、命令面板、移动端）。
+- M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI；本地 toast/桌面通知；R3 增 live 行情 REST/WS、数据体检、onboarding/presets/watchlist API；R4 真实 XSHG 交易日历（exchange-calendars）、live/provider 正确性修复、UI 共享 WS 消费。
+- M6：R4 重构——Apple HIG 设计系统 v2（毛玻璃/34px 标题/8pt 网格/克制动效），Radix UI + framer-motion + sonner + cmdk + vaul + lightweight-charts（移除 echarts，初始 JS 1.09MB→0.60MB），10 页重写；Playwright **18** 条、ui-audit 10 路由 0 console/0 溢出；R3 的 /today、/market、结论先行与新手模式保留。
 - M7：因子 IC/RankIC/ICIR、分层、衰减；参数扫描 + Sharpe 热力图；滚动验证；行业 FIFO 归因；Deflated Sharpe/PBO、成本敏感性、block bootstrap Monte Carlo、容量估计（近似口径）。
 - M9：完成——虚拟账户/回放/委托撤单/成交/T+1/费用/信号 CSV/提醒/JSON 持久化/本地插件/只读多策略组合/服务端模拟时钟连续推进；R3 提供可选实时行情（公开网页源、仅展示），无授权 vendor feed、无真实下单。
 - M8：完成——证券资料/PIT/ETF+可转债/合成分钟线/V2 dataset catalog；C++ 回测仍按 board 手数。
@@ -25,19 +25,19 @@
 
 ## 常用门禁与当前基线
 ```bash
-uv run pytest                                      # 321 collected / 319 passed / 2 skipped
+uv run pytest                                      # 354 collected / 352 passed / 2 skipped
 ctest --test-dir build/cmake --output-on-failure   # 95/95
 pnpm -C ui test                                    # UI vitest 10 passed（5 files）
-make lint                                          # ruff check/format + mypy 104 files 全绿
+make lint                                          # ruff check/format + mypy 105 files 全绿
 make verify-cpp                                    # C++ backend、差分 6/6、性能门禁（ratio 165x）
-make e2e                                           # UI 构建 + 隔离 qc serve + Playwright 19/19（需 Chrome）
+make e2e                                           # UI 构建 + 隔离 qc serve + Playwright 18/18（需 Chrome）
 make doctor                                        # 只读环境自检（本机 pass=13 warn=0 fail=0 skip=1）
 make demo                                          # 一条命令合成数据→快照→回测（约 2–3s，engine=cpp）
 make test-quick                                    # 快速回归（排除 e2e/bench/network）
 make ci-local                                      # 本地完整门禁
 ```
 - CI 最近 5 个 job 全绿：`test (macos-latest)`、`test (ubuntu-latest)`、`windows-smoke`、`ui`、`desktop-windows-package`；Playwright E2E 只在本地 `make e2e` 跑，不进 GitHub CI。
-- `docs/features.json` **128/128** 表示功能门禁有代码+证据，不等于授权实时行情/全市场真实数据/签名安装包已完成。
+- `docs/features.json` **134/134** 表示功能门禁有代码+证据，不等于授权实时行情/全市场真实数据/签名安装包已完成。
 
 ## 开发/提交流程
 - Conventional Commits；只 stage 明确路径（禁止 `git add -A` / `git add .`）；push 前复跑相关门禁（至少 `make lint` + `make test`，UI 改动跑 `make e2e`，C++ 改动跑 `make verify-cpp`）。
@@ -110,15 +110,25 @@ make bench-scale
 - 零基础引导：`/api/onboarding` 4 步自动检测、6 个白话预设、`/api/watchlist`、首页新手清单、设置页新手模式；新增 `docs/TUTORIAL.md`（163 行零基础教程）。
 - 测试：pytest 321 collected / 319 passed / 2 skipped；Playwright 19/19；UI vitest 10；`make lint` / `make verify-cpp` / `make doctor` / `make demo` 全绿。
 
+## 成熟方案重构轮（2026-11-02 R4：Apple 设计语言 + GitHub 成熟库）
+- 设计系统 v2：`docs/DESIGN-SPEC.md` 重写为 Apple HIG 落地规范；`ui/src/styles/**` 全量重写（tokens/base/layout/components/business/overlays/views，删除 legacy），16 个新原语；毛玻璃 AppBar/StatusBar/Rail、34px 大标题、8pt 网格、hairline、reduced-motion、focus-visible。
+- 成熟开源栈：@radix-ui/react-*、framer-motion、sonner、cmdk、vaul、lightweight-charts（统一图表并移除 echarts）、TanStack Table/Virtual/Query、lucide-react；10 页重写为 Apple 风格（今日/行情/回测/数据/模拟/研究/选股/策略/实验/设置）。
+- 真实交易日历：`trading_calendar.py`（exchange-calendars XSHG）替换 `realtime/clock.py` 的星期几启发式；2024 春节/国庆、跨节假日 next_open、节后 last_trade_date 均有离线测试。
+- 实时正确性修复：920xxx 北交所映射、盘前误标停牌、非自选股报价不刷新、异常路径、闭市轮询 3s→15s、东财 turnover、qfq/raw 去重、Sina 时区、并发钳制；provider→quality 集成回归。
+- UI 实时链路：`lib/liveStream.ts` 共享 WebSocket（每代码集一个连接、退避重连、写 react-query 缓存），失败回退 15s 轮询；真实网络 + WS 帧已验证。
+- 前端工程：Vite dev proxy 重写 Origin（修复 dev 403）、manualChunks、`ui/scripts/ui-audit.mjs` 审计脚本；tsc/vitest/build 全绿。
+- 验证：pytest 352 passed/2 skipped、ctest 95/95、Playwright 18/18、vitest 10、ruff/mypy 105 files；真实联网行情 /api/live/status=live + WS 帧（浦发 10.14 / 平安 11.58 + 4 指数）。
+
 ## 已知缺口
-1. M9：实时行情来自公开网页接口（未授权、约 3 秒轮询、无 L2），仅展示；部分成交按「日成交量参与率上限」近似（无盘口/排队/滑点），公司行为未实现；不得声称可实盘。
+1. M9：实时行情来自公开网页接口（未授权、约 3 秒轮询、无 L2），仅展示；UI 已用共享 WS 消费，但数据源本身仍非授权 feed；部分成交按「日成交量参与率上限」近似（无盘口/排队/滑点），公司行为未实现；不得声称可实盘。
 2. M8：分钟线是 SYNTHETIC 视图（由日线拆桶），C++ 引擎仍只做日线、无分钟级回测/撮合；C++ 回测仍按
    board 手数（ETF/可转债 paper 手数已实现，不能宣称完整回测规则）。
 3. M10：unsigned macOS/Windows zip 可构建（Windows zip 由 CI `windows-latest` 构建），但无签名/公证/自动更新，未做 Windows 安装/运行验证；后端不随包捆绑（默认需本地 `qc serve` 或 `QC_DESKTOP_URL`）。
 4. M2：Sina 公开接口非官方，约 2000 根日线、成交额按 OHLC×volume 估算、复权/公司行为为近似（`SINA_APPROX`）；全市场 5576 只导入未端到端验证（估算 30–45 分钟），本轮只验证 3 只样本；Eastmoney 在本机网络被限流；Tushare live 路径仅 fake Pro 契约测试，真实 Token 未验证；全市场 5500×20y 基准与 10k sweep 未测，默认规模（800×1208）已实测（见 `docs/PERFORMANCE.md`），不构成全市场结论。
+   exchange-calendars XSHG 数据到 2026-12-31，之后回退星期几；增量 ingest 不重算历史 adj_factor（分红季建议全量重建）；qfq 跳点过滤存在末端/大送转/20% 判板边界（详见 `docs/AUDIT-R3.md`）。
 5. M7 口径：行业 FIFO 归因、DSR/PBO/成本敏感性/MC/容量均为研究近似。
 6. 规则 TODO(verify) 仍需外部官方来源核实（ST 幅度、盘后固定价历史、新股/退市整理、分红个税、部分费率）。
-7. `docs/features.json` **128/128**；功能门禁全 true，但上述限制意味着不得宣称授权实时行情/全市场真实数据/生产级实盘/签名安装包已完成。
+7. `docs/features.json` **134/134**；功能门禁全 true，但上述限制意味着不得宣称授权实时行情/全市场真实数据/生产级实盘/签名安装包已完成。
 
 ## 续跑方法
 ```bash
@@ -138,4 +148,8 @@ QC_ALLOW_NETWORK=1 uv run qc data update --provider sina --codes 600000,000001,3
   --start 2024-01-01 --end 2026-10-31 --data-root data
 uv run qc snapshot build --data-root data --snapshots-root data/snapshots
 uv run qc data integrity --snapshots-root data/snapshots
+
+# 前端开发（Vite proxy 已重写 Origin，可直接使用）
+pnpm -C ui dev                  # 另开 qc serve --port 8000
+node ui/scripts/ui-audit.mjs    # QC_BASE/QC_TOKEN：截图 + overflow/console/a11y 审计
 ```

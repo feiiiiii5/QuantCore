@@ -7,7 +7,7 @@ import { zhCN as t } from "../i18n/zh-CN";
 
 const DOT_CLASS: Record<string, string> = { live: "dot live", closed: "dot closed", offline: "dot offline", error: "dot error" };
 
-/** Bottom status bar: live source · snapshot date · engine · jobs · disclaimer. */
+/** 28px glass status bar: live source · snapshot · engine · jobs · disclaimer. */
 export default function StatusBar() {
   const health = useHealth();
   const meta = useMeta();
@@ -34,7 +34,7 @@ export default function StatusBar() {
     : t.status.offline;
 
   return (
-    <footer className={`statusbar${connected ? "" : " offline"}`} aria-label="工作区状态">
+    <footer className={connected ? "statusbar" : "statusbar offline"} aria-label="工作区状态">
       <span className="statusbar-item">
         <span className={DOT_CLASS[tone] ?? "dot"} aria-hidden="true" />
         {liveText}

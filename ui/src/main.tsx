@@ -3,7 +3,11 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
+import { applyAppearance } from "./lib/appearance";
 import "./styles.css";
+
+// Apply the persisted theme/density/colour mode before the first paint (no flash).
+applyAppearance();
 
 // `qc serve --open` appends ?token=...; persist it and remove it from the URL/referrer.
 const initial = new URLSearchParams(window.location.search);

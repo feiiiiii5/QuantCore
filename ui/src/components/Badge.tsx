@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import clsx from "clsx";
 
 export type Tone = "neutral" | "ok" | "warn" | "danger" | "info" | "up" | "down";
 
@@ -12,10 +13,8 @@ export interface BadgeProps {
 
 /** Compact status badge; tone maps to semantic tokens only. */
 export function Badge({ tone = "neutral", dot, title, children, className }: BadgeProps) {
-  const classes = ["badge", `tone-${tone}`];
-  if (className) classes.push(className);
   return (
-    <span className={classes.join(" ")} title={title}>
+    <span className={clsx("badge", `badge-${tone}`, className)} title={title}>
       {dot ? <span className="badge-dot" aria-hidden="true" /> : null}
       {children}
     </span>
@@ -34,9 +33,6 @@ export interface TagProps {
 
 /** Filter chip / removable tag. */
 export function Tag({ tone = "neutral", active, onClick, onRemove, children, className, title }: TagProps) {
-  const classes = ["tag"];
-  if (active) classes.push("active");
-  if (className) classes.push(className);
   const content = (
     <>
       {children}
@@ -47,9 +43,9 @@ export function Tag({ tone = "neutral", active, onClick, onRemove, children, cla
       ) : null}
     </>
   );
-  if (!onClick) return <span className={classes.join(" ")} data-tone={tone} title={title}>{content}</span>;
+  if (!onClick) return <span className={clsx("tag", active && "active", className)} data-tone={tone} title={title}>{content}</span>;
   return (
-    <button type="button" className={classes.join(" ")} data-tone={tone} title={title} onClick={onClick} aria-pressed={active}>
+    <button type="button" className={clsx("tag", active && "active", className)} data-tone={tone} title={title} onClick={onClick} aria-pressed={active}>
       {content}
     </button>
   );

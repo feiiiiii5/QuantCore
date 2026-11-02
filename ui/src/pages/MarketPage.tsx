@@ -8,7 +8,7 @@ import {
 } from "../api/queries";
 import type { SecurityRow } from "../api/types";
 import {
-  Badge, KLineChart, Panel, Segmented, Sparkline, StatePanel, VirtualTable,
+  Badge, Button, Input, KLineChart, PageHeader, Panel, Segmented, Skeleton, Sparkline, StatePanel, VirtualTable,
 } from "../components";
 import { compact, dateInt, num, signedPct } from "../lib/format";
 import {
@@ -19,6 +19,7 @@ import { notify } from "../lib/notify";
 import { useChartPalette } from "../theme";
 import { useWorkspace } from "../store/workspace";
 import { zhCN as t } from "../i18n/zh-CN";
+import "./pages.css";
 
 const DOT_CLASS: Record<string, string> = { live: "dot live pulse", closed: "dot closed", offline: "dot offline", error: "dot error" };
 
@@ -88,7 +89,6 @@ export default function MarketPage() {
     void liveStatus.refetch();
     if (liveEnabled) void liveQuotes.refetch();
   };
-
   const toggleWatch = () => {
     if (!code) return;
     const next = inWatchlist ? codes.filter((item) => item !== code) : [...codes, code];
@@ -121,62 +121,47 @@ export default function MarketPage() {
 
   return (
     <div className="page">
-      <header className="page-head">
-        <div>
-          <h1>{t.market.title}</h1>
-          <p>{t.market.subtitle}</p>
-        </div>
-        <div className="page-head-actions">
-          <button className="btn" onClick={refresh} disabled={loading}><RefreshCw size={15} /> {t.common.refresh}</button>
-          <Link className="btn" to="/backtest"><SlidersHorizontal size={15} /> {t.home.cta}</Link>
-        </div>
-      </header>
+      <PageHeader
+        title={t.market.title}
+        subtitle={t.market.subtitle}
+        actions={(
+          <>
+            <Button variant="secondary" icon={RefreshCw} onClick={refresh} disabled={loading}>刷新</Button>
+            <Button variant="primary" icon={SlidersHorizontal} href={`/backtest?code=${encodeURIComponent(code)}`}>开始一次研究</Button>
+          </>
+        )}
+      />
 
       {fatalError && !overview.data && !rows.length ? (
         <StatePanel error={`${t.emptyStates.serviceOffline}：${fatalError.message}`} onRetry={refresh} />
       ) : null}
-      {loading && !fatalError ? <StatePanel loading /> : null}
+      {loading && !fatalError ? <Skeleton rows={6} /> : null}
 
       {overview.data ? (
-        <>
-          <div className="grid kpis market-index-grid">
+        <div className="stack">
+          <div className="grid grid-4">
             {views.map((view) => (
               <div className="index-card" key={view.key}>
                 <div className="index-top">
                   <h3>{view.name}</h3>
                   <span className={changeTone(view.changePct)}>{signedPct(view.changePct == null ? null : view.changePct / 100)}</span>
                 </div>
-                <div className="kpi">{view.close == null ? "—" : num(view.close)}</div>
+                <div className="kpi-value">{view.close == null ? "—" : num(view.close)}</div>
                 <Sparkline values={view.spark.length ? view.spark : view.close != null ? [view.close, view.close] : []} positive={(view.changePct ?? 0) >= 0} height={28} />
-                <small className="muted">{view.source === "live" ? t.appbar.live : view.source === "snapshot" ? t.common.snapshot : t.common.notAvailable}</small>
+                <small>{view.source === "live" ? t.appbar.live : view.source === "snapshot" ? t.common.snapshot : t.common.notAvailable}</small>
               </div>
             ))}
           </div>
 
-          <div className="grid market-main">
+          <div className="grid grid-2-1">
             <div className="stack">
               <Panel
                 title={t.market.listTitle}
-                subtitle={`${filtered.length} / ${rows.length} · ${t.market.listAll}`}
+                subtitle={`${filtered.length} / ${rows.length} · ${listMode === "watch" ? t.market.listWatch : t.market.listAll}`}
                 actions={(
                   <div className="row">
-                    <input
-                      className="input compact"
-                      placeholder={t.market.searchPlaceholder}
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      aria-label={t.market.searchPlaceholder}
-                    />
-                    <Segmented
-                      ariaLabel="证券范围"
-                      size="sm"
-                      value={listMode}
-                      onChange={(value) => setListMode(value as "all" | "watch")}
-                      options={[
-                        { value: "all", label: t.market.listAll },
-                        { value: "watch", label: `${t.market.listWatch} ${codes.length}` },
-                      ]}
-                    />
+                    <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.market.searchPlaceholder} aria-label={t.market.searchPlaceholder} size="sm" style={{ width: 200 }} />
+                    <Segmented ariaLabel="证券范围" size="sm" value={listMode} onChange={(value) => setListMode(value as "all" | "watch")} items={[{ value: "all", label: t.market.listAll }, { value: "watch", label: `${t.market.listWatch} ${codes.length}` }]} />
                   </div>
                 )}
               >
@@ -185,15 +170,7 @@ export default function MarketPage() {
                 ) : securitiesQuery.isError ? (
                   <StatePanel error={securitiesQuery.error.message} onRetry={() => void securitiesQuery.refetch()} />
                 ) : (
-                  <VirtualTable
-                    data={filtered}
-                    columns={columns}
-                    rowKey={(row) => row.sec_id}
-                    height={286}
-                    onRowClick={select}
-                    ariaLabel={t.market.listTitle}
-                    empty={<span className="muted">{t.market.listEmpty}</span>}
-                  />
+                  <VirtualTable data={filtered} columns={columns} rowKey={(row) => row.sec_id} height={286} onRowClick={select} ariaLabel={t.market.listTitle} empty={<span className="text-3">{t.market.listEmpty}</span>} />
                 )}
               </Panel>
 
@@ -214,7 +191,7 @@ export default function MarketPage() {
                 ) : <StatePanel empty emptyHint={t.market.chartEmpty} />)}
                 {minuteMode ? (
                   <div className="minute-panel" data-testid="minute-panel">
-                    <div className="card-head"><h3>{t.market.minutesTitle} <span className="muted small">{t.market.minutesHint}</span></h3></div>
+                    <div className="row-between" style={{ marginBottom: "var(--sp-4)" }}><span className="switch-title">{t.market.minutesTitle}</span><span className="page-note-sm">{t.market.minutesHint}</span></div>
                     {minuteBars.isLoading ? <StatePanel loading /> : minuteBars.error ? <StatePanel error={minuteBars.error.message} onRetry={() => void minuteBars.refetch()} /> : minuteBars.data ? (
                       <div className="table-wrap" style={{ maxHeight: 260 }}>
                         <table>
@@ -251,24 +228,22 @@ export default function MarketPage() {
 
               {financials.data?.latest ? (
                 <Panel title={`${t.market.financial} · 最近公告 ${String(financials.data.latest.ann_date)}`} subtitle={financials.data.note} dense>
-                  <div className="financial-panel" style={{ marginTop: 0, borderTop: 0, paddingTop: 0 }}>
-                    <div className="table-wrap" style={{ maxHeight: 180 }}>
-                      <table>
-                        <thead><tr><th>报告期</th><th>公告日</th><th className="num">ROE</th><th className="num">EPS</th><th className="num">营收</th><th className="num">净利润</th></tr></thead>
-                        <tbody>
-                          {financials.data.rows.slice(0, 6).map((row) => (
-                            <tr key={`${row.end_date}-${row.ann_date}`}>
-                              <td className="mono">{String(row.end_date)}</td>
-                              <td className="mono">{String(row.ann_date)}</td>
-                              <td className="num">{row.roe == null ? "—" : `${(row.roe * 100).toFixed(2)}%`}</td>
-                              <td className="num">{row.eps?.toFixed(2) ?? "—"}</td>
-                              <td className="num">{row.revenue == null ? "—" : compact(row.revenue)}</td>
-                              <td className="num">{row.net_profit == null ? "—" : compact(row.net_profit)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                  <div className="table-wrap" style={{ maxHeight: 180 }}>
+                    <table>
+                      <thead><tr><th>报告期</th><th>公告日</th><th className="num">ROE</th><th className="num">EPS</th><th className="num">营收</th><th className="num">净利润</th></tr></thead>
+                      <tbody>
+                        {financials.data.rows.slice(0, 6).map((row) => (
+                          <tr key={`${row.end_date}-${row.ann_date}`}>
+                            <td className="mono">{String(row.end_date)}</td>
+                            <td className="mono">{String(row.ann_date)}</td>
+                            <td className="num">{row.roe == null ? "—" : `${(row.roe * 100).toFixed(2)}%`}</td>
+                            <td className="num">{row.eps?.toFixed(2) ?? "—"}</td>
+                            <td className="num">{row.revenue == null ? "—" : compact(row.revenue)}</td>
+                            <td className="num">{row.net_profit == null ? "—" : compact(row.net_profit)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </Panel>
               ) : null}
@@ -281,13 +256,9 @@ export default function MarketPage() {
                 actions={liveBadge}
               >
                 <div className="readings-price">
-                  <div className={`readings-price-value ${changeTone(readings.changePct)}`} key={readings.price ?? "none"}>
-                    {readings.price == null ? "—" : num(readings.price)}
-                  </div>
+                  <div className={`readings-price-value ${changeTone(readings.changePct)}`} key={readings.price ?? "none"}>{readings.price == null ? "—" : num(readings.price)}</div>
                   <div className={`readings-price-delta ${changeTone(readings.changePct)}`}>
-                    {readings.change == null ? "—" : `${readings.change >= 0 ? "+" : ""}${num(readings.change)}`}
-                    {" · "}
-                    {signedPct(readings.changePct == null ? null : readings.changePct / 100)}
+                    {readings.change == null ? "—" : `${readings.change >= 0 ? "+" : ""}${num(readings.change)}`}{" · "}{signedPct(readings.changePct == null ? null : readings.changePct / 100)}
                   </div>
                 </div>
                 <div className="readings-grid">
@@ -302,19 +273,12 @@ export default function MarketPage() {
                   <div className="reading-item"><span>{t.market.turnover}</span><strong>{readings.turnoverPct == null ? "—" : `${num(readings.turnoverPct)}%`}</strong></div>
                   <div className="reading-item"><span>{t.market.updatedAt}</span><strong>{updatedAtLabel(readings)}</strong></div>
                 </div>
-                {!liveEnabled ? (
-                  <div className="notice warn" style={{ marginTop: "var(--sp-2)" }}>
-                    {t.market.liveOff} <Link to="/settings">{t.common.openSettings}</Link>
-                  </div>
-                ) : null}
-                {liveEnabled && liveQuotes.isError ? <p className="warn-text" style={{ marginTop: "var(--sp-2)" }}>{t.market.quoteFailed}</p> : null}
-                {readings.suspended ? <p className="warn-text" style={{ marginTop: "var(--sp-2)" }}>{t.market.suspendedLabel}</p> : null}
-                <div className="button-row" style={{ marginTop: "var(--sp-3)" }}>
-                  <button className="btn" onClick={toggleWatch} disabled={!code || saveWatchlist.isPending}>
-                    {inWatchlist ? <StarOff size={14} /> : <Star size={14} />}
-                    {inWatchlist ? t.market.removeWatch : t.market.addWatch}
-                  </button>
-                  <Link className="btn" to={`/backtest?code=${encodeURIComponent(code)}`}>{t.home.cta} <ArrowRight size={14} /></Link>
+                {!liveEnabled ? <p className="page-note-sm" style={{ marginTop: "var(--sp-4)" }}>{t.market.liveOff} <Link to="/settings">{t.common.openSettings}</Link></p> : null}
+                {liveEnabled && liveQuotes.isError ? <p className="warn-text" style={{ marginTop: "var(--sp-4)" }}>{t.market.quoteFailed}</p> : null}
+                {readings.suspended ? <p className="warn-text" style={{ marginTop: "var(--sp-4)" }}>{t.market.suspendedLabel}</p> : null}
+                <div className="row" style={{ marginTop: "var(--sp-6)" }}>
+                  <Button variant="secondary" icon={inWatchlist ? StarOff : Star} onClick={toggleWatch} disabled={!code} loading={saveWatchlist.isPending}>{inWatchlist ? t.market.removeWatch : t.market.addWatch}</Button>
+                  <Button variant="primary" iconRight={ArrowRight} href={`/backtest?code=${encodeURIComponent(code)}`}>{t.home.cta}</Button>
                 </div>
               </Panel>
 
@@ -335,39 +299,37 @@ export default function MarketPage() {
               </Panel>
 
               <Panel
-                title={<><ShieldCheck size={14} aria-hidden="true" />{t.market.integrity}</>}
+                title={<><ShieldCheck size={16} aria-hidden="true" />{t.market.integrity}</>}
                 subtitle={snapshot ? `${t.market.snapshot} ${snapshot.id ?? "—"} · ${dateInt(snapshot.end)}` : t.market.snapshotDate}
-                actions={<Link className="btn sm" to="/data">{t.nav.data} <ArrowRight size={13} /></Link>}
+                actions={<Button variant="ghost" size="sm" iconRight={ArrowRight} href="/data">{t.nav.data}</Button>}
               >
-                <div className="stack tight">
+                <div className="stack-tight">
                   <div className="row">
                     <Badge tone={integrityBadgeTone} dot>{integrityLabel(integrity.data?.status)}</Badge>
-                    <Badge tone={snapshot?.synthetic ? "warn" : "neutral"}>
-                      {snapshot?.synthetic ? "SYNTHETIC" : snapshot?.source && snapshot.source !== "unknown" ? snapshot.source : t.common.snapshot}
-                    </Badge>
+                    <Badge tone={snapshot?.synthetic ? "warn" : "neutral"}>{snapshot?.synthetic ? "SYNTHETIC" : snapshot?.source && snapshot.source !== "unknown" ? snapshot.source : t.common.snapshot}</Badge>
                   </div>
                   {integrity.data ? (
                     <>
                       <div className="row">
-                        <span className="muted small">{t.integrity.coverage}</span>
+                        <span className="page-note-sm">{t.integrity.coverage}</span>
                         <strong>{num(integrity.data.coverage.coverage_pct)}%</strong>
-                        <span className="muted small">· {t.integrity.gaps} {compact(integrity.data.gaps.missing_days)}</span>
-                        <span className="muted small">· {integrity.data.gaps.symbols_with_gaps} {t.market.symbolsWithGaps}</span>
+                        <span className="page-note-sm">· {t.integrity.gaps} {compact(integrity.data.gaps.missing_days)}</span>
+                        <span className="page-note-sm">· {integrity.data.gaps.symbols_with_gaps} {t.market.symbolsWithGaps}</span>
                       </div>
                       {(integrity.data.checks ?? []).filter((check) => check.status !== "pass").slice(0, 3).map((check) => (
-                        <p key={check.id} className={check.status === "fail" ? "error" : "warn-text"}>{check.title}：{check.detail}</p>
+                        <p key={check.id} className={check.status === "fail" ? "error-text" : "warn-text"}>{check.title}：{check.detail}</p>
                       ))}
                     </>
-                  ) : <p className="hint-text">{integrity.isError ? integrity.error.message : t.integrity.notRun}</p>}
+                  ) : <p className="page-note-sm">{integrity.isError ? integrity.error.message : t.integrity.notRun}</p>}
                 </div>
               </Panel>
             </div>
           </div>
 
-          {snapshot?.synthetic ? <p className="notice">{t.market.synthetic}</p> : null}
-        </>
+          {snapshot?.synthetic ? <p className="page-note-sm">{t.market.synthetic}</p> : null}
+        </div>
       ) : null}
-      <p className="muted small">{t.disclaimer}</p>
+      <p className="page-note-sm">{t.disclaimer}</p>
     </div>
   );
 }

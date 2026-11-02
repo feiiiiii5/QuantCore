@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import clsx from "clsx";
 import EmptyState from "./EmptyState";
 import Skeleton from "./Skeleton";
 
@@ -19,23 +20,27 @@ export interface ChartCardProps {
 export default function ChartCard({ title, subtitle, actions, height = 320, loading, error, onRetry, empty, children, className }: ChartCardProps) {
   const hasContent = children != null && children !== false;
   return (
-    <section className={className ? `chart-card ${className}` : "chart-card"}>
-      {title || actions ? (
-        <header className="chart-card-head">
-          <div>
-            {title ? <h3 className="panel-title">{title}</h3> : null}
-            {subtitle ? <div className="panel-subtitle">{subtitle}</div> : null}
+    <section className={clsx("chart-card", className)}>
+      {title != null || actions != null ? (
+        <header className="card-head">
+          <div style={{ minWidth: 0 }}>
+            {title != null ? <div className="card-title">{title}</div> : null}
+            {subtitle != null ? <div className="card-sub">{subtitle}</div> : null}
           </div>
-          {actions ? <div className="panel-actions">{actions}</div> : null}
+          {actions != null ? <div className="card-actions">{actions}</div> : null}
         </header>
       ) : null}
-      <div className="chart-card-body" style={{ minHeight: height }}>
+      <div className="chart-body" style={{ minHeight: height }}>
         {loading ? <Skeleton variant="tile" rows={1} height={Math.min(height, 220)} /> : null}
-        {!loading && error ? (
-          <EmptyState compact icon={undefined} title="图表加载失败" hint={String(error)} action={onRetry ? <button className="btn sm" onClick={onRetry}>重试</button> : undefined} />
+        {!loading && error != null ? (
+          <div className="chart-empty">
+            <EmptyState compact title="图表加载失败" hint={String(error)} action={onRetry ? <button className="btn btn-secondary btn-sm" onClick={onRetry}>重试</button> : undefined} />
+          </div>
         ) : null}
-        {!loading && !error && !hasContent ? (empty ?? <EmptyState compact title="暂无图表数据" hint="选择数据后显示。" />) : null}
-        {!loading && !error && hasContent ? children : null}
+        {!loading && error == null && !hasContent ? (
+          <div className="chart-empty">{empty ?? <EmptyState compact title="暂无图表数据" hint="选择数据后显示。" />}</div>
+        ) : null}
+        {!loading && error == null && hasContent ? children : null}
       </div>
     </section>
   );

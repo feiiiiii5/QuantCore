@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><path d="M18 42V22h8.5c6 0 9.5 3.2 9.5 8.6 0 3.9-1.8 6.8-4.9 8.1L36 42h-6l-4.3-3.2H24V42h-6zm6-8h2.4c2.5 0 3.9-1.2 3.9-3.4 0-2.2-1.4-3.4-3.9-3.4H24V34zM42 42l6.5-20H42l-4 13.6L34 22h-6l6.6 20H42z" fill="#fff"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="qc-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3AA0FF"/>
+      <stop offset="1" stop-color="#0062C4"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#qc-bg)"/>
+  <g fill="#FFFFFF">
+    <rect x="15" y="34" width="8" height="14" rx="2.5"/>
+    <rect x="28" y="26" width="8" height="22" rx="2.5"/>
+    <rect x="41" y="16" width="8" height="32" rx="2.5"/>
+  </g>
+</svg>

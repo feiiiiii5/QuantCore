@@ -18,7 +18,7 @@ function readPalette(): ChartPalette {
     up: value("--up", "#e5484d"),
     down: value("--down", "#12a150"),
     text: value("--text", "#1a1d21"),
-    grid: value("--line", "#e5e7eb"),
+    grid: value("--separator", value("--line", "#e5e7eb")),
     accent: value("--accent", "#2563eb"),
   };
 }

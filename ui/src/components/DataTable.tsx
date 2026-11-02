@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import clsx from "clsx";
 import Skeleton from "./Skeleton";
 import EmptyState from "./EmptyState";
 
@@ -31,26 +32,27 @@ export interface DataTableProps<T> {
 export default function DataTable<T>({
   columns, rows, rowKey, dense, onRowClick, selectedKey, empty, loading, maxHeight, ariaLabel, footer, className,
 }: DataTableProps<T>) {
-  const classes = ["data-table"];
-  if (dense) classes.push("dense");
-  if (className) classes.push(className);
   return (
-    <div className={classes.join(" ")}>
+    <div className="data-table">
       {loading ? (
-        <div style={{ padding: "var(--sp-3)" }}><Skeleton variant="row" rows={Math.min(rows.length || 6, 8)} /></div>
+        <div style={{ padding: "var(--sp-4)" }}><Skeleton variant="row" rows={Math.min(rows.length || 6, 8)} /></div>
       ) : rows.length === 0 ? (
-        <div className="data-table-empty">{empty ?? <EmptyState compact title="暂无数据" hint="调整筛选条件或先运行一次任务。" />}</div>
+        <div className="table-empty">{empty ?? <EmptyState compact title="暂无数据" hint="调整筛选条件或先运行一次任务。" />}</div>
       ) : (
-        <div className="data-table-scroll" style={maxHeight ? { maxHeight } : undefined}>
+        <div
+          className={clsx("table-wrap", "table-row-hover", dense && "dense", className)}
+          style={maxHeight ? { maxHeight, overflowY: "auto" } : undefined}
+        >
           <table aria-label={ariaLabel}>
             <thead>
               <tr>
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className={[column.align ?? "left", column.className ?? ""].join(" ").trim()}
+                    className={clsx(column.align === "right" && "num", column.align === "center" && "center", column.className)}
                     style={column.width ? { width: column.width } : undefined}
                     scope="col"
+                    align={column.align === "center" ? "center" : undefined}
                   >
                     {column.header}
                   </th>
@@ -60,17 +62,17 @@ export default function DataTable<T>({
             <tbody>
               {rows.map((row, index) => {
                 const key = rowKey(row);
-                const rowClasses = [onRowClick ? "clickable" : "", selectedKey === key ? "selected" : ""].join(" ").trim();
+                const selected = selectedKey === key;
                 return (
                   <tr
                     key={key}
-                    className={rowClasses || undefined}
+                    className={clsx(selected && "selected", onRowClick && "row-hover")}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                     tabIndex={onRowClick ? 0 : undefined}
                     onKeyDown={onRowClick ? (event) => { if (event.key === "Enter") onRowClick(row); } : undefined}
                   >
                     {columns.map((column) => (
-                      <td key={column.key} className={[column.align ?? "left", column.className ?? ""].join(" ").trim()}>
+                      <td key={column.key} className={clsx(column.align === "right" && "num", column.align === "center" && "center", column.className)}>
                         {column.render ? column.render(row, index) : String((row as Record<string, unknown>)[column.key] ?? "—")}
                       </td>
                     ))}
@@ -81,7 +83,7 @@ export default function DataTable<T>({
           </table>
         </div>
       )}
-      {footer ? <div className="data-table-foot">{footer}</div> : null}
+      {footer ? <div className="caption2 text-3" style={{ padding: "var(--sp-2) 0" }}>{footer}</div> : null}
     </div>
   );
 }

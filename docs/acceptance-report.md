@@ -1,7 +1,7 @@
 # 验收报告 — 对照任务书
 
-> 状态：2026-11-02（产品/UI 重构轮 R3）。M0–M10 功能门禁完成且第一轮增量（交接轮 R2：qc doctor/demo、部分成交、本地测试工具链）保持全绿；R3 新增产品理念与设计系统、UI 全面重构、可选实时行情、真实 A 股数据源与数据体检、零基础引导与教程。真实 vendor 授权行情、签名/公证安装包仍是文档化限制。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **128/128**）。
+> 状态：2026-11-02（Apple 设计语言 + 成熟开源方案重构轮 R4）。M0–M10 功能门禁完成；R2（qc doctor/demo、部分成交、本地工具链）与 R3（产品理念、UI 重构、实时行情、真实数据、零基础引导）保持全绿；R4 按 Apple HIG 重做前端设计系统（Radix UI / framer-motion / sonner / cmdk / vaul / lightweight-charts），以 exchange-calendars 真实 XSHG 日历替换启发式，修复实时行情与 provider 的一组正确性问题，并端到端验证真实联网行情（REST + WebSocket）。授权 vendor 行情、签名/公证安装包仍是文档化限制。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **134/134**）。
 
 > **交接记录（2026-11-02）**：上一会话留下的迁移交接文档（377 行）的独有内容已吸收进
 > `docs/PROGRESS.md`（开发环境/门禁基线/提交流程/工作边界）与 `README.md` 文档索引，交接文件已删除；
@@ -16,12 +16,52 @@
 | M2 数据中心 | ✅ 基本 | Synthetic/LocalFile/Tushare fixture+live code path/AKShare/mootdx + **Sina 公开真实数据源**（未 Token，全 universe/日线/近似复权）；Parquet+DuckDB+SQLite；快照/质量/PIT 财务；数据体检 API/CLI；真实 3 只样本 import→snapshot→integrity=ok→回测已跑通；Tushare 真实 Token 未验证 |
 | M3 回测引擎 | ✅ | ctest 95/95；C++/参考差分 6/6；规则/费用/T+1/手数/涨跌停/停牌/trace/指标/风险限制/基准比较 |
 | M4 SDK/CLI/策略 | ✅ 大部分 | DSL/模板/实验/HTML+可选 PDF/子进程 sandbox worker/C++ parallel sweep/CLI/replay |
-| M5 服务层 | ✅ | FastAPI 契约、Bearer/Host/Origin/no-CORS、SQLite 任务队列、WebSocket、取消/崩溃恢复、GZip、本地通知；R3 增 live 行情 REST/WS、数据体检、onboarding/presets/watchlist API |
-| M6 UI V1 | ✅ | R3 重构：/today 驾驶舱 + /market 实时优先行情 + 8 页重做（结论先行、三态、新手模式）；token 化设计系统与组件库；Playwright **19** 条；浅/深色、移动端、无横向溢出、真实回测任务、数据体检、命令面板 |
+| M5 服务层 | ✅ | FastAPI 契约、Bearer/Host/Origin/no-CORS、SQLite 任务队列、WebSocket、取消/崩溃恢复、GZip、本地通知；R3 增 live 行情 REST/WS、数据体检、onboarding/presets/watchlist API；R4 真实 XSHG 交易日历、live/provider 正确性修复、UI 共享 WS 消费 |
+| M6 UI V1 | ✅ | R4：Apple 设计语言 v2（毛玻璃/34px 标题/8pt 网格/克制动效），Radix+framer-motion+sonner+cmdk+vaul+lightweight-charts 成熟栈，10 页重写，echarts 移除（初始 JS 1.09 MB→0.60 MB）；Playwright **18** 条；ui-audit 10 路由 0 console/0 溢出 |
 | M7 研究工具 | ✅ | IC/RankIC/ICIR、分层、衰减、因子相关、grid/random 扫描、滚动、归因、DSR/PBO、成本敏感性、Monte Carlo、容量 |
 | M8 V2 数据 | ✅ 大部分 | 证券资料/PIT/ETF+可转债/合成分钟线/V2 数据集目录已做；C++ 回测仍按 board 手数，分钟线为 SYNTHETIC |
 | M9 V3 模拟交易 | ✅ | 虚拟账户/逐日回放/委托撤单/成交（含按成交量参与率的部分成交）/信号 CSV/提醒/本地插件/只读多策略组合/服务端模拟时钟自动推进；R3 提供可选实时行情（公开网页源，展示用、无真实下单）；无授权 vendor 实时 feed |
 | M10 发布 | 🟡 大部分 | wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS zip + Windows zip（windows-latest CI 构建）；无签名/公证、未做安装运行验证 |
+
+## 成熟方案重构轮门禁（R4）
+```bash
+make lint
+# ruff check/format 通过；mypy 105 files 无问题
+
+uv run pytest
+# 354 collected；352 passed / 2 skipped
+
+ctest --test-dir build/cmake --output-on-failure
+# 95/95 passed
+
+pnpm -C ui test
+# 10 passed (5 files)
+
+pnpm -C ui build
+# 通过；initial index 595 kB raw / 176 kB gzip，charts/motion/overlays 分包，Monaco 懒加载
+
+make e2e
+# 构建 UI + 隔离 qc serve + Playwright 18 passed（Apple 风格新 UI）
+
+node ui/scripts/ui-audit.mjs   # QC_BASE=:8150 已 seed 演示服务
+# 10 路由 + 移动端 + 深色：全部 200、0 console error、0 横向溢出、0 个无可访问名称控件
+
+# 真实联网行情（服务端显式开启网络）
+QC_ALLOW_NETWORK=1 uv run qc serve --port 8151 --ui-dir ui/dist
+# GET /api/live/status → {"enabled":true,"state":"live","source":"sina","latency_ms":~205,"market":{"phase":"lunch",...}}
+# WS /ws/live?codes=600000,000001 → 收到 snapshot 帧：浦发银行 10.14 (+1.20%)、平安银行 11.58 (-0.52%)、4 个指数
+# 浏览器实测：AppBar 指数与行情页读数随 WS 更新（3,635.67 → 3,635.66），0 console error
+```
+
+## R4 增量（Apple 设计语言 + 成熟方案）
+
+- **设计系统 v2**：`docs/DESIGN-SPEC.md` 重写为 Apple HIG 落地规范（Clarity/Deference/Depth、系统字体栈、34px 标题阶梯、8pt 网格、毛玻璃材质、hairline、120–260ms purposeful 动效、reduced-motion、对比度）；`ui/src/styles/**` 全部重写（tokens/base/layout/components/business/overlays/views，删除 legacy 兼容层），16 个新原语（Button/Field/Input/Textarea/Select/Switch/PageHeader/Callout/List/ListRow/ProgressBar/Dialog/Sheet/Menu/Tooltip/Popover/Toaster）。
+- **成熟开源方案**：@radix-ui/react-*（无障碍原语）、framer-motion（页面转场/弹层）、sonner（通知）、cmdk（⌘K 面板）、vaul（移动 bottom sheet）、lightweight-charts（统一图表，移除 echarts：初始 JS 1.09 MB → 0.60 MB）、TanStack Table/Virtual/Query、lucide-react。
+- **页面**：10 页按 Apple 风格重写（今日/行情/回测/数据/模拟/研究/选股/策略/实验/设置）；结论先行、分组列表、KPI tile、三态、新手模式、移动端 tabbar + vaul「更多」；无横向溢出、0 console error。
+- **真实交易日历**：`trading_calendar.py` 封装 exchange-calendars XSHG（交易所节假日/周末/会话），替换 `realtime/clock.py` 的星期几启发式；2024 春节/国庆、跨节假日 next_open、节后首日 last_trade_date 均有离线测试。
+- **实时行情正确性修复**：920xxx 北交所映射、盘前误标停牌、非自选股报价不刷新、异常路径 UnboundLocalError、闭市轮询 3s→15s、东财 turnover 被清零、qfq/raw 重复日期、Sina 历史窗口时区、provider 并发上限与 quota 一致；新增 provider→quality 集成回归。
+- **UI 实时链路**：`lib/liveStream.ts` 共享 WebSocket（每个代码集一个连接、退避重连、写入 react-query 缓存），失败回退 15s HTTP 轮询；已用真实网络 + WS 帧验证。
+- **前端工程**：Vite dev 代理重写 Origin（修复 dev 模式 403）、manualChunks 拆包、`ui/scripts/ui-audit.mjs`（截图 + overflow/console/a11y 审计）、tsc/vitest/build 全绿。
 
 ## 重构轮门禁（R3）
 ```bash
@@ -106,10 +146,11 @@ make bench-scale
 - [x] 仅研究与模拟：无真实下单；`BrokerGateway` 未实现；界面与报告有“不构成投资建议”。
 - [x] 认证：Bearer token、Host/Origin 校验、无 CORS、loopback only；token 从 `qc serve --open` URL 持久化后立即从地址栏移除。
 - [x] 合成数据标 `SYNTHETIC`；真实 A 股数据可经 Sina 公开接口导入（`QC_ALLOW_NETWORK=1`，非商用、不得再分发），Tushare 真实网络需 Token，未验证。
-- [x] features.json 全 true：**128/128**（R3 新增 7 项：Sina provider、数据体检、实时行情、onboarding/watchlist、产品理念/设计系统、页面重构、零基础教程，均有测试或实测证据）。
+- [x] features.json 全 true：**134/134**（R4 新增 6 项：XSHG 真实日历、provider/live 正确性修复、Apple 设计系统 v2、统一 lightweight-charts、UI 共享 WebSocket、前端工程/dev proxy/audit harness）。
 - [x] 网络默认关闭：实时行情与真实数据导入均需显式 `QC_ALLOW_NETWORK=1`；测试只走录制 fixtures，不联网。
 - [x] 真实数据准确性实测（2026-11-02）：Sina 3 只样本 2049 根日线，质量门禁 passed、0 告警、0 隔离行；`qc data integrity` status=ok、coverage=100%、accuracy 全 0；真实快照上 C++ 回测成功（synthetic=false/source=SINA）。
-- [x] 实时行情：REST/WS、双源降级、市场时钟、离线/休市/异常显式状态；仅展示用途，不参与下单。
+- [x] 实时行情：REST/WS、双源降级、真实 XSHG 日历、离线/休市/异常显式状态；UI 通过共享 WebSocket 消费并回退轮询；仅展示用途，不参与下单。
+- [x] 真实联网验证（2026-11-02）：QC_ALLOW_NETWORK=1 下 /api/live/status=live、source=sina、WS 帧含真实个股与 4 指数，浏览器读数实时更新且 0 console error。
 - [x] M8 分钟线（SYNTHETIC）/V2 dataset catalog、M9 模拟时钟连续模拟已完成（限制见下）。
 - [ ] 真实 Tushare 数据跑通：无 Token，未验证（Sina 公开接口已跑通，作为替代真实源）。
 - [ ] 全市场 5500×20y / 10000 组 sweep：未测；默认规模（800 证券 × 1208 天）的耗时与峰值 RSS 已由 `make bench-scale` 实测（见 `docs/PERFORMANCE.md`），不外推为全市场结论。
@@ -122,10 +163,11 @@ make bench-scale
 5. **M10 发布**：Electron dev shell、unsigned macOS/Windows zip 已完成；签名/公证、安装运行验证未做；SBOM/audit/perf gate 已完成。
 6. **性能验证**：全市场 5500×20y 基准与 10k sweep 未测；默认规模（800×1208）已实测（`make bench-scale`），不构成全市场结论。
 7. **规则 TODO(verify)**：ST 各板块幅度、盘后固定价历史范围、新股/退市整理期、分红个税、部分费率。
+8. **日历/增量口径（docs/AUDIT-R3.md）**：exchange-calendars XSHG 当前数据到 2026-12-31，之后只能回退星期几判断（已在 live status 记日志，不会 500）；增量 ingest 不会在新除权后重算历史 adj_factor（建议分红季做一次全量重建，或后续实现因子重算）；qfq 跳点过滤在窗口末端/大比例送转/创业板 20% 判板处有已知边界；ST 历史涨跌停不可得，按当前名称与规则表近似。
 
 ## 下一步
 1. 做 macOS/Windows 签名、公证与安装运行验证；若要商用实时行情，接入授权 vendor feed（替换公开网页源）。
 2. 全市场真实数据端到端验证（5576 只 × 20y）：导入→体检→快照→回测，并把覆盖率/耗时回填 `docs/PERFORMANCE.md`；`uv run python scripts/scale_bench.py --n-sec 5500` 已可用（需 ≥16 GiB 空闲内存）。
-3. 真实数据准确性继续加固：成交额获取（替代估算）、公司行为与除权参考价核验、更多样本与跨源抽样（需网络时开启）。
+3. 真实数据准确性继续加固：成交额获取（替代估算）、公司行为与除权参考价核验、更多样本与跨源抽样（需网络时开启）；实现增量 ingest 的 adj_factor 重算提示/自动全量重建；定期升级 exchange-calendars 以覆盖未来年份。
 4. 保持无真实下单与本地优先；每轮 make ci-local/e2e/verify-cpp 后再 push；features.json 全 true，“授权实时 feed/签名安装包”作为文档化限制。
 5. Windows 包已在 CI 构建但未做安装运行验证。

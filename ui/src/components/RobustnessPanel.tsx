@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import type { EChartsOption } from "echarts";
+import { useEffect, useState } from "react";
 import { Gauge, Play, ShieldCheck } from "lucide-react";
 import type { Experiment } from "../api/types";
 import {
@@ -9,11 +8,25 @@ import {
   useOverfitting,
   usePBO,
 } from "../api/queries";
-import Chart from "./Chart";
-import { chartToken } from "../lib/tokens";
+import Chart, { type ChartSeries } from "./Chart";
+import Button from "./Button";
+import Callout from "./Callout";
+import Field from "./Field";
+import Input from "./Input";
+import Panel from "./Panel";
+import Select from "./Select";
+import StatTile from "./StatTile";
 
 const pct = (value: number | undefined) => `${((value ?? 0) * 100).toFixed(2)}%`;
 const money = (value: number | undefined) => `¥${Number(value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+/** English verdict → short Chinese label (raw value kept as hint). */
+function verdictLabel(verdict: string): string {
+  if (verdict === "robust") return "稳健";
+  if (verdict === "likely_overfit") return "可能过拟合";
+  if (verdict === "inconclusive") return "不确定";
+  return verdict;
+}
 
 export default function RobustnessPanel({ experiments }: { experiments: Experiment[] }) {
   const [runId, setRunId] = useState("");
@@ -55,10 +68,8 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
   const runCost = () => {
     if (!runId) { setFormError("请先选择实验"); return; }
     setFormError("");
-    try {
-      const values = multipliers.split(",").map((part) => Number(part.trim())).filter((value) => Number.isFinite(value));
-      cost.mutate({ run_id: runId, multipliers: values });
-    } catch (reason) { setFormError(reason instanceof Error ? reason.message : "成本倍数无效"); }
+    const values = multipliers.split(",").map((part) => Number(part.trim())).filter((value) => Number.isFinite(value));
+    cost.mutate({ run_id: runId, multipliers: values });
   };
   const runMonteCarlo = () => {
     if (!runId) { setFormError("请先选择实验"); return; }
@@ -72,119 +83,184 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
   };
 
   const overResult = overfitting.data;
-  const costOption = useMemo<EChartsOption | null>(() => {
-    if (!cost.data?.points.length) return null;
-    return {
-      animation: false, tooltip: { trigger: "axis" }, legend: { top: 0, data: ["总收益", "Sharpe"] },
-      grid: { left: 50, right: 50, top: 30, bottom: 34 },
-      xAxis: { type: "category", data: cost.data.points.map((point) => `${point.multiplier}×`) },
-      yAxis: [
-        { type: "value", axisLabel: { formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(148,163,184,.18)" } } },
-        { type: "value", splitLine: { show: false } },
-      ],
-      series: [
-        { name: "总收益", type: "bar", data: cost.data.points.map((point) => point.total_return * 100), itemStyle: { color: chartToken("--primary", "#2563eb") } },
-        { name: "Sharpe", type: "line", yAxisIndex: 1, data: cost.data.points.map((point) => point.sharpe), lineStyle: { color: chartToken("--warn", "#eab308") }, symbolSize: 5 },
-      ],
-    };
-  }, [cost.data]);
-  const mcOption = useMemo<EChartsOption | null>(() => {
-    if (!monteCarlo.data?.paths.length) return null;
-    const paths = monteCarlo.data.paths.slice(0, 12);
-    return {
-      animation: false, tooltip: { trigger: "axis" }, legend: { top: 0, data: ["路径", "中位路径"] },
-      grid: { left: 50, right: 20, top: 30, bottom: 30 },
-      xAxis: { type: "category", data: Array.from({ length: monteCarlo.data.horizon + 1 }, (_, index) => String(index)) },
-      yAxis: { type: "value", axisLabel: { formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(148,163,184,.18)" } } },
-      series: [
-        ...paths.map((path, index) => ({ name: `路径${index + 1}`, type: "line" as const, data: path.map((value) => value * 100), showSymbol: false, lineStyle: { width: 1, opacity: 0.35 }, silent: true })),
-        { name: "中位路径", type: "line" as const, data: (() => {
-          const rows = monteCarlo.data?.paths ?? [];
-          if (!rows.length) return [];
-          const length = Math.min(...rows.map((row) => row.length));
-          return Array.from({ length }, (_, index) => {
-            const values = rows.map((row) => row[index]).sort((a, b) => a - b);
-            return values[Math.floor(values.length / 2)] * 100;
-          });
-        })(), showSymbol: false, lineStyle: { width: 2, color: chartToken("--primary", "#2563eb") } },
-      ],
-    };
-  }, [monteCarlo.data]);
+  const experimentOptions = experiments.map((item) => ({
+    value: item.run_id,
+    label: `${item.strategy_name || item.template} · ${item.run_id.slice(-8)}`,
+  }));
+
+  const costSeries: ChartSeries[] = cost.data?.points.length
+    ? [
+        {
+          kind: "histogram",
+          title: "总收益 %",
+          data: cost.data.points.map((point) => ({ time: point.multiplier, value: point.total_return * 100 })),
+        },
+        {
+          kind: "line",
+          title: "Sharpe",
+          data: cost.data.points.map((point) => ({ time: point.multiplier, value: point.sharpe })),
+          pane: 1,
+        },
+      ]
+    : [];
+  const mcSeries: ChartSeries[] = monteCarlo.data?.paths.length
+    ? [
+        ...monteCarlo.data.paths.slice(0, 12).map((path, index): ChartSeries => ({
+          kind: "line",
+          title: index === 0 ? "路径" : undefined,
+          data: path.map((value, step) => ({ time: step, value: value * 100 })),
+          lineWidth: 1,
+        })),
+        {
+          kind: "line",
+          title: "中位路径",
+          data: (() => {
+            const rows = monteCarlo.data?.paths ?? [];
+            if (!rows.length) return [];
+            const length = Math.min(...rows.map((row) => row.length));
+            return Array.from({ length }, (_, index) => {
+              const values = rows.map((row) => row[index]).sort((a, b) => a - b);
+              return { time: index, value: values[Math.floor(values.length / 2)] * 100 };
+            });
+          })(),
+          lineWidth: 2,
+        },
+      ]
+    : [];
 
   return (
-    <div className="grid two-col">
-      {error ? <p className="error" role="alert" style={{ gridColumn: "1 / -1" }}>{error}</p> : null}
-      <div className="card">
-        <div className="card-head"><h3><ShieldCheck size={16} /> 实验与过拟合</h3></div>
-        <label className="field-label">实验</label>
-        <select value={runId} onChange={(event) => setRunId(event.target.value)}>
-          {experiments.map((item) => <option key={item.run_id} value={item.run_id}>{item.strategy_name || item.template} · {item.run_id.slice(-8)}</option>)}
-        </select>
-        <div className="form-grid two" style={{ marginTop: 10 }}>
-          <label>试验次数<input value={nTrials} onChange={(event) => setNTrials(event.target.value)} inputMode="numeric" /></label>
-          <label>成本倍数<input value={multipliers} onChange={(event) => setMultipliers(event.target.value)} /></label>
-          <label>MC 路径数<input value={nPaths} onChange={(event) => setNPaths(event.target.value)} inputMode="numeric" /></label>
-          <label>MC 期限<input value={horizon} onChange={(event) => setHorizon(event.target.value)} inputMode="numeric" /></label>
-        </div>
-        <div className="button-row" style={{ marginTop: 10 }}>
-          <button className="btn primary" disabled={busy || !runId} onClick={runOverfitting}><Play size={14} /> Deflated Sharpe</button>
-          <button className="btn" disabled={busy || !runId} onClick={runCost}>成本敏感性</button>
-          <button className="btn" disabled={busy || !runId} onClick={runMonteCarlo}>Monte Carlo</button>
-          <button className="btn" disabled={busy || !runId} onClick={runCapacity}>容量</button>
-        </div>
-        <label className="field-label" style={{ marginTop: 10 }}>容量参与率<input value={participation} onChange={(event) => setParticipation(event.target.value)} inputMode="decimal" /></label>
-        {overResult ? (
-          <div className="grid kpis" style={{ marginTop: 12 }}>
-            <div><h3>Sharpe</h3><div className="kpi">{overResult.sharpe.toFixed(2)}</div></div>
-            <div><h3>Deflated Sharpe</h3><div className={`kpi ${overResult.deflated_sharpe >= 0.95 ? "up" : "down"}`}>{overResult.deflated_sharpe.toFixed(3)}</div></div>
-            <div><h3>判定</h3><div className="kpi">{overResult.verdict}</div></div>
-            <div><h3>期望最大 Sharpe</h3><div className="kpi">{overResult.expected_max_sharpe.toFixed(2)}</div></div>
+    <div className="grid grid-2">
+      <Panel
+        title={<><ShieldCheck size={16} aria-hidden="true" /> 实验与过拟合</>}
+        subtitle="选择实验，运行 Deflated Sharpe、成本敏感性、Monte Carlo 与容量估算"
+        actions={<span className="caption2 text-3">{busy ? "计算中…" : "仅研究口径 · 不构成投资建议"}</span>}
+      >
+        {error ? <Callout tone="danger" title="无法运行">{error}</Callout> : null}
+        <div className="stack stack-tight">
+          <Field label="实验" htmlFor="robust-run">
+            <Select
+              id="robust-run"
+              value={runId}
+              onChange={(event) => setRunId(event.target.value)}
+              options={experimentOptions}
+              placeholder={experiments.length ? undefined : "还没有实验"}
+            />
+          </Field>
+          <div className="form-grid">
+            <Field label="试验次数" hint="Deflated Sharpe 的试验数">
+              <Input value={nTrials} onChange={(event) => setNTrials(event.target.value)} inputMode="numeric" />
+            </Field>
+            <Field label="成本倍数" hint="逗号分隔，如 0, 0.5, 1, 2, 3">
+              <Input value={multipliers} onChange={(event) => setMultipliers(event.target.value)} />
+            </Field>
+            <Field label="MC 路径数">
+              <Input value={nPaths} onChange={(event) => setNPaths(event.target.value)} inputMode="numeric" />
+            </Field>
+            <Field label="MC 期限（交易日）">
+              <Input value={horizon} onChange={(event) => setHorizon(event.target.value)} inputMode="numeric" />
+            </Field>
           </div>
-        ) : null}
-        {overResult ? <p className="muted small">观测 {overResult.observations} 日 · 偏度 {overResult.skew.toFixed(2)} · 峰度 {overResult.kurtosis.toFixed(2)} · DSR≥0.95 视为稳健。</p> : null}
-        {monteCarlo.data ? (
-          <div className="grid kpis" style={{ marginTop: 12 }}>
-            <div><h3>终值 P05</h3><div className="kpi down">{pct(monteCarlo.data.terminal_return.p05)}</div></div>
-            <div><h3>终值 P50</h3><div className="kpi">{pct(monteCarlo.data.terminal_return.p50)}</div></div>
-            <div><h3>终值 P95</h3><div className="kpi up">{pct(monteCarlo.data.terminal_return.p95)}</div></div>
-            <div><h3>最大回撤 P50</h3><div className="kpi down">{pct(monteCarlo.data.max_drawdown.p50)}</div></div>
+          <Field label="容量参与率" hint="占日均成交额比例（0–1），用于容量估算" className="field-inline">
+            <Input value={participation} onChange={(event) => setParticipation(event.target.value)} inputMode="decimal" style={{ width: 120 }} />
+          </Field>
+          <div className="row">
+            <Button variant="primary" icon={Play} disabled={busy || !runId} loading={overfitting.isPending} onClick={runOverfitting}>Deflated Sharpe</Button>
+            <Button variant="secondary" disabled={busy || !runId} loading={cost.isPending} onClick={runCost}>成本敏感性</Button>
+            <Button variant="secondary" disabled={busy || !runId} loading={monteCarlo.isPending} onClick={runMonteCarlo}>Monte Carlo</Button>
+            <Button variant="secondary" icon={Gauge} disabled={busy || !runId} loading={capacity.isPending} onClick={runCapacity}>容量</Button>
           </div>
-        ) : null}
-        {capacity.data ? (
-          <div className="card" style={{ marginTop: 12 }}>
-            <h3><Gauge size={15} /> 容量估计</h3>
-            <p>约 <strong>{money(capacity.data.capacity_cny)}</strong>（参与率 {pct(capacity.data.participation)}，日均换手 {pct(capacity.data.avg_turnover)}）</p>
-            <p className="muted small">限制证券：{capacity.data.limiting_sec}；{capacity.data.notes}</p>
-          </div>
-        ) : null}
-      </div>
-      <div className="card">
-        <div className="card-head"><h3>PBO（CSCV）</h3><span className="muted small">至少选择 2 个实验</span></div>
-        <div className="pbo-list">
-          {experiments.slice(0, 20).map((item) => (
-            <label key={item.run_id} className="check-row">
-              <input type="checkbox" checked={pboIds.includes(item.run_id)} onChange={() => togglePbo(item.run_id)} />
-              <span>{item.strategy_name || item.template} · {item.run_id.slice(-8)}</span>
-            </label>
-          ))}
-        </div>
-        <div className="form-grid two">
-          <label>切分数<input value={nSplits} onChange={(event) => setNSplits(event.target.value)} inputMode="numeric" /></label>
-          <label>&nbsp;<button className="btn primary" disabled={busy || pboIds.length < 2} onClick={runPbo}><Play size={14} /> 运行 PBO</button></label>
-        </div>
-        {pbo.data ? (
-          <>
-            <div className="grid kpis" style={{ marginTop: 10 }}>
-              <div><h3>PBO</h3><div className={`kpi ${pbo.data.pbo <= 0.5 ? "up" : "down"}`}>{pct(pbo.data.pbo)}</div></div>
-              <div><h3>组合数</h3><div className="kpi">{pbo.data.combinations}</div></div>
-              <div><h3>OOS 中位排名</h3><div className="kpi">{pbo.data.median_oos_rank.toFixed(1)}</div></div>
+
+          {overResult ? (
+            <div className="stack stack-tight">
+              <div className="grid grid-4">
+                <StatTile label="Sharpe" value={overResult.sharpe.toFixed(2)} />
+                <StatTile
+                  label="Deflated Sharpe"
+                  value={overResult.deflated_sharpe.toFixed(3)}
+                  tone={overResult.deflated_sharpe >= 0.95 ? "ok" : "danger"}
+                  hint="DSR ≥ 0.95 视为稳健"
+                />
+                <StatTile
+                  size="sm"
+                  label="判定"
+                  value={verdictLabel(overResult.verdict)}
+                  tone={overResult.verdict === "robust" ? "ok" : overResult.verdict === "likely_overfit" ? "danger" : "warn"}
+                  hint={overResult.verdict}
+                />
+                <StatTile label="期望最大 Sharpe" value={overResult.expected_max_sharpe.toFixed(2)} />
+              </div>
+              <p className="caption text-3">观测 {overResult.observations} 日 · 偏度 {overResult.skew.toFixed(2)} · 峰度 {overResult.kurtosis.toFixed(2)}；Deflated Sharpe 对多试验做了惩罚，越高越可信。</p>
             </div>
-            <p className="muted small">PBO 越低越好；这是 CSCV 的近似，样本区间重叠时会高估稳定性。</p>
-          </>
-        ) : <p className="muted small">选择多个实验（最好来自参数扫描）估计回测过拟合概率。</p>}
-        {costOption ? <><div className="card-head" style={{ marginTop: 14 }}><h3>成本敏感性</h3>{cost.data?.breakeven_multiplier != null ? <span className="badge">盈亏平衡 {cost.data.breakeven_multiplier.toFixed(2)}×</span> : null}</div><Chart option={costOption} height={250} /></> : null}
-        {mcOption ? <><div className="card-head" style={{ marginTop: 14 }}><h3>Monte Carlo 路径</h3><span className="muted small">{monteCarlo.data?.n_paths} 条 · {monteCarlo.data?.horizon} 日</span></div><Chart option={mcOption} height={250} /></> : null}
-      </div>
+          ) : null}
+
+          {monteCarlo.data ? (
+            <div className="grid grid-4">
+              <StatTile label="终值 P05" value={pct(monteCarlo.data.terminal_return.p05)} tone="down" />
+              <StatTile label="终值 P50" value={pct(monteCarlo.data.terminal_return.p50)} />
+              <StatTile label="终值 P95" value={pct(monteCarlo.data.terminal_return.p95)} tone="up" />
+              <StatTile label="最大回撤 P50" value={pct(monteCarlo.data.max_drawdown.p50)} tone="down" />
+            </div>
+          ) : null}
+
+          {capacity.data ? (
+            <Callout tone="info" icon={Gauge} title={`容量估计：约 ${money(capacity.data.capacity_cny)}`}>
+              参与率 {pct(capacity.data.participation)} · 日均换手 {pct(capacity.data.avg_turnover)} · 限制证券 {capacity.data.limiting_sec}。{capacity.data.notes}
+            </Callout>
+          ) : null}
+        </div>
+      </Panel>
+
+      <Panel
+        title="PBO（CSCV）"
+        subtitle="至少选择 2 个实验（最好来自参数扫描），估计回测过拟合概率"
+        actions={<span className="caption2 text-3">已选 {pboIds.length}</span>}
+      >
+        <div className="stack stack-tight">
+          <div className="pbo-list" role="group" aria-label="选择实验">
+            {experiments.slice(0, 20).map((item) => (
+              <label key={item.run_id} className="check-row">
+                <input type="checkbox" checked={pboIds.includes(item.run_id)} onChange={() => togglePbo(item.run_id)} />
+                <span className="truncate">{item.strategy_name || item.template} · {item.run_id.slice(-8)}</span>
+              </label>
+            ))}
+            {experiments.length === 0 ? <span className="caption text-3">还没有实验，先跑一次回测。</span> : null}
+          </div>
+          <div className="row">
+            <Field label="切分数" className="field-inline">
+              <Input value={nSplits} onChange={(event) => setNSplits(event.target.value)} inputMode="numeric" style={{ width: 110 }} />
+            </Field>
+            <Button variant="primary" icon={Play} disabled={busy || pboIds.length < 2} loading={pbo.isPending} onClick={runPbo}>运行 PBO</Button>
+          </div>
+          {pbo.data ? (
+            <>
+              <div className="grid grid-3">
+                <StatTile label="PBO" value={pct(pbo.data.pbo)} tone={pbo.data.pbo <= 0.5 ? "ok" : "danger"} hint="越低越好" />
+                <StatTile label="组合数" value={String(pbo.data.combinations)} />
+                <StatTile label="OOS 中位排名" value={pbo.data.median_oos_rank.toFixed(1)} />
+              </div>
+              <p className="caption text-3">PBO 越低越好；CSCV 为近似，样本区间重叠时会高估稳定性。</p>
+            </>
+          ) : null}
+          {costSeries.length ? (
+            <div className="stack stack-tight">
+              <div className="split">
+                <strong className="headline">成本敏感性</strong>
+                {cost.data?.breakeven_multiplier != null ? <span className="badge badge-info">盈亏平衡 {cost.data.breakeven_multiplier.toFixed(2)}×</span> : null}
+              </div>
+              <Chart series={costSeries} height={240} />
+            </div>
+          ) : null}
+          {mcSeries.length ? (
+            <div className="stack stack-tight">
+              <div className="split">
+                <strong className="headline">Monte Carlo 路径</strong>
+                <span className="caption2 text-3">{monteCarlo.data?.n_paths} 条 · {monteCarlo.data?.horizon} 日</span>
+              </div>
+              <Chart series={mcSeries} height={240} />
+            </div>
+          ) : null}
+        </div>
+      </Panel>
     </div>
   );
 }

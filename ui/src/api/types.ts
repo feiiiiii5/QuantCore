@@ -411,8 +411,8 @@ export interface SnapshotStatus {
   source: string;
   n_sec: number;
   n_time: number;
-  start: number;
-  end: number;
+  start: number | string;
+  end: number | string;
   panel_available: boolean;
   quality: Record<string, unknown>;
   fields: string[];

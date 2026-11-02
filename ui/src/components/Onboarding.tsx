@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Sparkles } from "lucide-react";
 import { useBootstrap, useSubmitBacktest } from "../api/queries";
 import { useJobProgress } from "../hooks/useJobProgress";
+import Dialog from "./Dialog";
+import Button from "./Button";
+import Select from "./Select";
+import ProgressBar from "./ProgressBar";
 import StepList from "./StepList";
 import { zhCN as t } from "../i18n/zh-CN";
 
@@ -12,7 +16,7 @@ const TEMPLATES = [
   { id: "multi_factor", label: "多因子" },
 ];
 
-/** Optional two-step onboarding dialog: bootstrap synthetic data → run a sample backtest. */
+/** Two-step onboarding dialog: bootstrap synthetic data then run a sample backtest. */
 export default function Onboarding({ onDone, onClose }: { onDone: (runId: string) => void; onClose: () => void }) {
   const bootstrap = useBootstrap();
   const submit = useSubmitBacktest();
@@ -56,10 +60,7 @@ export default function Onboarding({ onDone, onClose }: { onDone: (runId: string
     setError("");
     submit.mutate(
       { template, params: {}, snapshot, config: { start: "2022-01-04", end: "2024-12-31", initial_cash: 1_000_000 } },
-      {
-        onSuccess: (response) => setJobId(response.job_id),
-        onError: (reason) => setError(reason.message),
-      },
+      { onSuccess: (response) => setJobId(response.job_id), onError: (reason) => setError(reason.message) },
     );
   };
 
@@ -70,58 +71,48 @@ export default function Onboarding({ onDone, onClose }: { onDone: (runId: string
   ];
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
-      <div className="modal">
-        <div className="modal-head">
-          <h2 id="onboarding-title">
-            {t.onboarding.title} <span className="muted small">第 {Math.min(step + 1, 2)} / 2 步</span>
-          </h2>
-          <button className="btn ghost sm" onClick={onClose} disabled={busy}>{t.onboarding.close}</button>
-        </div>
-        <p className="muted small" style={{ marginBottom: "var(--sp-3)" }}>{t.onboarding.subtitle}</p>
-        <StepList steps={steps} compact />
-        <div style={{ marginTop: "var(--sp-4)" }}>
-          {step === 0 ? (
-            <button className="btn primary" onClick={() => void generate()} disabled={busy}>
-              <Sparkles size={15} /> {bootstrap.isPending ? t.onboarding.generating : t.onboarding.generate}
-            </button>
-          ) : null}
-          {step === 1 ? (
-            <div className="stack tight">
-              <label className="field-label">
-                {t.onboarding.sample}
-                <select value={template} onChange={(event) => setTemplate(event.target.value)} disabled={busy || Boolean(bootstrapRunId)}>
-                  {TEMPLATES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-                </select>
-              </label>
-              <p className="muted small">{t.onboarding.snapshot}：<span className="mono">{snapshot || "—"}</span></p>
-              <div className="button-row">
-                <button className="btn" onClick={() => setStep(0)} disabled={busy}>{t.onboarding.back}</button>
-                {bootstrapRunId ? (
-                  <button className="btn primary" onClick={() => onDone(bootstrapRunId)}>
-                    <Check size={15} /> {t.onboarding.openExperiment}
-                  </button>
-                ) : (
-                  <button className="btn primary" onClick={run} disabled={busy || !snapshot}>
-                    {jobId && progress.job?.status !== "failed" ? <Loader2 className="spin" size={15} /> : <Sparkles size={15} />}
-                    {jobId ? `${progress.job?.status ?? "pending"} ${Math.round((progress.job?.progress ?? 0) * 100)}%` : t.onboarding.run}
-                  </button>
-                )}
-              </div>
-              {progress.job ? (
-                <div className="progress">
-                  <div className="progress-bar" style={{ width: `${Math.round(progress.job.progress * 100)}%` }} />
-                  <span>{progress.job.status}</span>
-                </div>
-              ) : null}
-              {progress.job?.status === "done" ? <p className="success-text"><Check size={14} /> {t.onboarding.done}</p> : null}
+    <Dialog
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      title={<>{t.onboarding.title} <span className="caption text-3">第 {Math.min(step + 1, 2)} / 2 步</span></>}
+      description={t.onboarding.subtitle}
+      footer={<span className="caption2 text-3">{t.onboarding.disclaimer} {t.disclaimer}</span>}
+    >
+      <StepList steps={steps} compact />
+      <div style={{ marginTop: "var(--sp-6)" }}>
+        {step === 0 ? (
+          <Button variant="primary" icon={Sparkles} loading={bootstrap.isPending} onClick={() => void generate()}>
+            {bootstrap.isPending ? t.onboarding.generating : t.onboarding.generate}
+          </Button>
+        ) : null}
+        {step === 1 ? (
+          <div className="stack stack-tight">
+            <Select
+              aria-label={t.onboarding.sample}
+              value={template}
+              onChange={(event) => setTemplate(event.target.value)}
+              disabled={busy || Boolean(bootstrapRunId)}
+              options={TEMPLATES.map((item) => ({ value: item.id, label: item.label }))}
+            />
+            <p className="caption text-3">{t.onboarding.snapshot}：<span className="mono">{snapshot || "—"}</span></p>
+            <div className="row">
+              <Button variant="secondary" size="sm" onClick={() => setStep(0)} disabled={busy}>{t.onboarding.back}</Button>
+              {bootstrapRunId ? (
+                <Button variant="primary" icon={Check} onClick={() => onDone(bootstrapRunId)}>{t.onboarding.openExperiment}</Button>
+              ) : (
+                <Button variant="primary" loading={Boolean(jobId && progress.job?.status !== "failed")} onClick={run} disabled={busy || !snapshot} icon={Sparkles}>
+                  {jobId ? `${progress.job?.status ?? "pending"} ${Math.round((progress.job?.progress ?? 0) * 100)}%` : t.onboarding.run}
+                </Button>
+              )}
             </div>
-          ) : null}
-        </div>
-        {message ? <p className="success-text" style={{ marginTop: "var(--sp-2)" }}>{message}</p> : null}
-        {error ? <p className="error" role="alert" style={{ marginTop: "var(--sp-2)" }}>{error}</p> : null}
-        <p className="muted small" style={{ marginTop: "var(--sp-3)" }}>{t.onboarding.disclaimer} {t.disclaimer}</p>
+            {jobId ? <ProgressBar value={Math.round((progress.job?.progress ?? 0) * 100)} label={progress.job?.status ?? "pending"} /> : null}
+            {progress.job?.status === "done" ? <p className="success-text"><Check size={14} /> {t.onboarding.done}</p> : null}
+            {jobId && progress.job?.status !== "done" ? <Loader2 className="spin" size={14} aria-hidden="true" /> : null}
+          </div>
+        ) : null}
       </div>
-    </div>
+      {message ? <p className="success-text" style={{ marginTop: "var(--sp-4)" }}>{message}</p> : null}
+      {error ? <p className="error-text" role="alert" style={{ marginTop: "var(--sp-4)" }}>{error}</p> : null}
+    </Dialog>
   );
 }

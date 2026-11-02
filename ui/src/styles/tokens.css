@@ -1,176 +1,242 @@
-/* Design tokens — docs/DESIGN-SPEC.md §4. Every visual value must come from here. */
+/* Design tokens — docs/DESIGN-SPEC.md v2 (Apple HIG). Light is the default. */
 
 :root {
-  /* surfaces */
-  --bg: #f4f6f8;
-  --bg-elev: #ffffff;
+  /* ---------------- surfaces & materials ---------------- */
+  --bg: #f5f5f7;
   --surface: #ffffff;
-  --surface-2: #f1f3f6;
-  --surface-3: #e8ecf1;
-  --border: #e1e5ea;
-  --border-strong: #c7d0da;
-  --text: #14181d;
-  --text-2: #3b4552;
-  --muted: #66707c;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-weak: rgba(37, 99, 235, 0.1);
-  --on-primary: #ffffff;
-  --up: #d92d20;
-  --up-weak: rgba(217, 45, 32, 0.1);
-  --down: #0f7a3d;
-  --down-weak: rgba(15, 122, 61, 0.1);
-  --flat: #66707c;
-  --ok: #0f7a3d;
-  --ok-weak: rgba(15, 122, 61, 0.1);
-  --warn: #a16207;
-  --warn-weak: rgba(161, 98, 7, 0.12);
-  --danger: #d92d20;
-  --danger-weak: rgba(217, 45, 32, 0.1);
-  --info: #2563eb;
-  --info-weak: rgba(37, 99, 235, 0.1);
-  --focus-ring: #2563eb;
-  --overlay: rgba(15, 23, 42, 0.44);
+  --surface-2: #ffffff;
+  --surface-3: #f0f0f4;
+  --material: rgba(255, 255, 255, 0.72);
+  --text: #1d1d1f;
+  --text-2: #6e6e73;
+  --text-3: #86868b;
+  --separator: rgba(60, 60, 67, 0.12);
+  --separator-strong: rgba(60, 60, 67, 0.2);
 
-  /* typography */
-  --font-sans: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --fs-11: 11px;
-  --fs-12: 12px;
-  --fs-13: 13px;
-  --fs-14: 14px;
-  --fs-16: 16px;
-  --fs-20: 20px;
-  --fs-28: 28px;
-  --fs-36: 36px;
-  --lh-tight: 1.2;
-  --lh-normal: 1.5;
+  /* ---------------- semantic colour ---------------- */
+  --accent: #0071e3;
+  --accent-press: #0062c4;
+  --accent-weak: rgba(0, 113, 227, 0.1);
+  --on-accent: #ffffff;
+  --up: #e5342b;
+  --up-weak: rgba(229, 52, 43, 0.1);
+  --down: #00a35c;
+  --down-weak: rgba(0, 163, 92, 0.1);
+  --flat: #86868b;
+  --warn: #b25000;
+  --warn-weak: rgba(178, 80, 0, 0.1);
+  --danger: #d70015;
+  --danger-weak: rgba(215, 0, 21, 0.1);
+  --ok: #248a3d;
+  --ok-weak: rgba(36, 138, 61, 0.1);
+  --info: #0071e3;
+  --info-weak: rgba(0, 113, 227, 0.1);
+  --focus-ring: rgba(0, 113, 227, 0.3);
+  --overlay: rgba(0, 0, 0, 0.28);
+
+  /* ---------------- typography ---------------- */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-caption2: 11px;
+  --fs-caption: 12px;
+  --fs-footnote: 13px;
+  --fs-subhead: 15px;
+  --fs-body: 15px;
+  --fs-headline: 17px;
+  --fs-title3: 20px;
+  --fs-title2: 24px;
+  --fs-title1: 28px;
+  --fs-large: 34px;
+  --lh-caption2: 13px;
+  --lh-caption: 16px;
+  --lh-footnote: 18px;
+  --lh-subhead: 20px;
+  --lh-body: 22px;
+  --lh-headline: 22px;
+  --lh-title3: 25px;
+  --lh-title2: 30px;
+  --lh-title1: 34px;
+  --lh-large: 41px;
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-semibold: 600;
   --fw-bold: 700;
+  --tracking-tight: -0.02em;
 
-  /* spacing */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 24px;
-  --sp-6: 32px;
-  --sp-7: 48px;
-  --sp-8: 64px;
+  /* ---------------- spacing (8pt grid) ---------------- */
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 20px;
+  --sp-8: 24px;
+  --sp-9: 32px;
+  --sp-10: 48px;
 
-  /* radius / elevation */
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
+  /* ---------------- radius / elevation ---------------- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
   --radius-pill: 999px;
-  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --shadow-2: 0 8px 24px rgba(16, 24, 40, 0.1);
-  --shadow-pop: 0 18px 48px rgba(16, 24, 40, 0.22);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.08);
+  --shadow-pop: 0 20px 60px rgba(0, 0, 0, 0.18);
+  --shadow-sheet: 0 -12px 48px rgba(0, 0, 0, 0.16);
+  --blur-material: saturate(180%) blur(20px);
 
-  /* motion */
+  /* ---------------- motion ---------------- */
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --dur-1: 120ms;
-  --dur-2: 200ms;
-  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-2: 180ms;
+  --dur-3: 260ms;
+  --dur-4: 360ms;
 
-  /* density (comfortable = 1) */
-  --density: 1;
-  --pad-card: calc(var(--sp-4) * var(--density));
-  --gap-card: calc(var(--sp-3) * var(--density));
-  --row-pad-y: calc(8px * var(--density));
+  /* ---------------- density-scaled metrics ---------------- */
+  --control-h: 36px;
+  --control-h-sm: 28px;
+  --control-h-lg: 44px;
+  --row-h: 40px;
+  --card-pad: 20px;
+  --card-gap: 16px;
+  --page-pad-x: 32px;
+  --page-pad-y: 28px;
 
-  /* layout */
-  --appbar-h: 56px;
-  --rail-w: 68px;
+  /* ---------------- layout ---------------- */
+  --appbar-h: 52px;
+  --rail-w: 64px;
   --statusbar-h: 28px;
-  --content-max: 1600px;
-  --content-pad: 24px;
+  --tabbar-h: 56px;
+  --content-max: 1560px;
   --z-appbar: 100;
   --z-rail: 90;
+  --z-statusbar: 95;
+  --z-tabbar: 100;
   --z-popover: 400;
   --z-modal: 500;
   --z-toast: 600;
+  --z-tooltip: 700;
 
-  /* legacy aliases — old components/charts still read these */
+  /* ---------------- compatibility aliases (v1 code still reads these) ---------------- */
   --panel: var(--surface);
   --panel-2: var(--surface-2);
-  --line: var(--border);
-  --accent: var(--primary);
-  --accent-weak: var(--primary-weak);
+  --line: var(--separator);
   --success: var(--ok);
+  --muted: var(--text-2);
   --font: var(--font-sans);
   --mono: var(--font-mono);
+  --density: 1;
+  --pad-card: var(--card-pad);
+  --row-pad-y: 8px;
+  --fs-11: var(--fs-caption2);
+  --fs-12: var(--fs-caption);
+  --fs-13: var(--fs-footnote);
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-20: var(--fs-title3);
+  --fs-28: var(--fs-title1);
+  --fs-36: var(--fs-large);
+  --lh-tight: 1.2;
+  --lh-normal: 1.5;
 }
 
-:root[data-theme="dark"] {
-  --bg: #0b0e13;
-  --bg-elev: #12161d;
-  --surface: #151a22;
-  --surface-2: #1b222c;
-  --surface-3: #222b37;
-  --border: #262f3b;
-  --border-strong: #3a4757;
-  --text: #e8edf3;
-  --text-2: #c3ccd6;
-  --muted: #93a0ae;
-  --primary: #78a9ff;
-  --primary-hover: #94baff;
-  --primary-weak: rgba(120, 169, 255, 0.16);
-  --on-primary: #0a1020;
-  --up: #ff7b72;
-  --up-weak: rgba(255, 123, 114, 0.14);
-  --down: #3fd07f;
-  --down-weak: rgba(63, 208, 127, 0.14);
-  --flat: #93a0ae;
-  --ok: #3fd07f;
-  --ok-weak: rgba(63, 208, 127, 0.14);
-  --warn: #f2b54a;
-  --warn-weak: rgba(242, 181, 74, 0.16);
-  --danger: #ff7b72;
-  --danger-weak: rgba(255, 123, 114, 0.14);
-  --info: #78a9ff;
-  --info-weak: rgba(120, 169, 255, 0.14);
-  --focus-ring: #9dc0ff;
-  --overlay: rgba(0, 0, 0, 0.6);
+html[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --surface-3: #3a3a3c;
+  --material: rgba(28, 28, 30, 0.72);
+  --text: #f5f5f7;
+  --text-2: #98989d;
+  --text-3: #7c7c80;
+  --separator: rgba(255, 255, 255, 0.12);
+  --separator-strong: rgba(255, 255, 255, 0.2);
+  --accent: #0a84ff;
+  --accent-press: #409cff;
+  --accent-weak: rgba(10, 132, 255, 0.16);
+  --on-accent: #ffffff;
+  --up: #ff6b63;
+  --up-weak: rgba(255, 107, 99, 0.14);
+  --down: #30d158;
+  --down-weak: rgba(48, 209, 88, 0.14);
+  --flat: #7c7c80;
+  --warn: #ffd60a;
+  --warn-weak: rgba(255, 214, 10, 0.14);
+  --danger: #ff453a;
+  --danger-weak: rgba(255, 69, 58, 0.14);
+  --ok: #30d158;
+  --ok-weak: rgba(48, 209, 88, 0.14);
+  --info: #0a84ff;
+  --info-weak: rgba(10, 132, 255, 0.16);
+  --focus-ring: rgba(10, 132, 255, 0.35);
+  --overlay: rgba(0, 0, 0, 0.48);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 10px 28px rgba(0, 0, 0, 0.5);
-  --shadow-pop: 0 20px 52px rgba(0, 0, 0, 0.62);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --shadow-sheet: 0 -12px 48px rgba(0, 0, 0, 0.55);
 }
 
-/* 涨跌语义：只走 --up/--down；色盲模式替换为蓝/橙（Okabe-Ito 系）。 */
-:root[data-color-mode="green-up"] {
-  --up: #0f7a3d;
-  --up-weak: rgba(15, 122, 61, 0.1);
-  --down: #d92d20;
-  --down-weak: rgba(217, 45, 32, 0.1);
+/* up/down colour modes: html[data-colors] (v2) and html[data-color-mode] (v1 helper). */
+html[data-colors="greenred"],
+html[data-color-mode="green-up"] {
+  --up: #00a35c;
+  --up-weak: rgba(0, 163, 92, 0.1);
+  --down: #e5342b;
+  --down-weak: rgba(229, 52, 43, 0.1);
 }
-:root[data-theme="dark"][data-color-mode="green-up"] {
-  --up: #3fd07f;
-  --up-weak: rgba(63, 208, 127, 0.14);
-  --down: #ff7b72;
-  --down-weak: rgba(255, 123, 114, 0.14);
+html[data-theme="dark"][data-colors="greenred"],
+html[data-theme="dark"][data-color-mode="green-up"] {
+  --up: #30d158;
+  --up-weak: rgba(48, 209, 88, 0.14);
+  --down: #ff6b63;
+  --down-weak: rgba(255, 107, 99, 0.14);
 }
-:root[data-color-mode="color-blind"] {
+html[data-colors="colorblind"],
+html[data-color-mode="color-blind"] {
   --up: #0072b2;
   --up-weak: rgba(0, 114, 178, 0.12);
-  --down: #b45309;
-  --down-weak: rgba(180, 83, 9, 0.12);
+  --down: #b25000;
+  --down-weak: rgba(178, 80, 0, 0.12);
 }
-:root[data-theme="dark"][data-color-mode="color-blind"] {
+html[data-theme="dark"][data-colors="colorblind"],
+html[data-theme="dark"][data-color-mode="color-blind"] {
   --up: #56b4e9;
   --up-weak: rgba(86, 180, 233, 0.16);
   --down: #f0a93b;
   --down-weak: rgba(240, 169, 59, 0.16);
 }
 
-:root[data-density="comfortable"] { --density: 1; }
-:root[data-density="compact"] { --density: 0.8; }
-:root[data-density="spacious"] { --density: 1.2; }
+/* Density: comfortable (default) / compact. */
+html[data-density="compact"] {
+  --control-h: 28px;
+  --control-h-sm: 24px;
+  --control-h-lg: 36px;
+  --row-h: 32px;
+  --card-pad: 16px;
+  --card-gap: 12px;
+  --page-pad-x: 24px;
+  --page-pad-y: 20px;
+  --density: 0.8;
+}
+html[data-density="spacious"] {
+  --control-h: 40px;
+  --row-h: 44px;
+  --card-pad: 24px;
+  --card-gap: 20px;
+  --density: 1.2;
+}
 
-@media (max-width: 1024px) {
-  :root { --content-pad: 16px; --rail-w: 60px; }
+@media (max-width: 1279px) {
+  :root { --page-pad-x: 24px; --page-pad-y: 24px; }
 }
-@media (max-width: 900px) {
-  :root { --content-pad: 12px; }
+@media (max-width: 1023px) {
+  :root { --page-pad-x: 20px; --page-pad-y: 20px; }
 }
+@media (max-width: 600px) {
+  :root { --page-pad-x: 16px; --page-pad-y: 16px; }
+}
+

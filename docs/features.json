@@ -277,6 +277,13 @@
       "evidence": "data/integrity.py audit_panel: coverage by listing date, gaps, OHLC, volume/amount, limit consistency, adjustment continuity, optional cross-source; GET /api/data/integrity; qc data integrity; tests/test_data_integrity.py; UI Data page health panel"
     },
     {
+      "id": "M2-020",
+      "milestone": "M2",
+      "title": "live/provider correctness fixes (paging, units, staleness, timezone)",
+      "passes": true,
+      "evidence": "realtime/quotes.py: 920xxx BSE mapping, pre-open suspended semantics; service.py: refresh requested codes, phase init, closed-market poll 15s; public_web.py: keep eastmoney turnover, dedupe merged dates; sina/eastmoney: Asia/Shanghai history window, concurrency clamped to quota (<=2); regression tests in test_live_quotes/test_sina_provider/test_eastmoney_provider; provider->quality integration test (0 errors, 0 quarantine)"
+    },
+    {
       "id": "M3-001",
       "milestone": "M3",
       "title": "engine semantics doc",
@@ -557,6 +564,13 @@
       "evidence": "onboarding.py + routes_onboarding.py: GET/POST /api/onboarding*, 6 plain-language presets (runnable templates), GET/PUT /api/watchlist persisted in SQLite meta; tests/test_onboarding_api.py (16 tests); live poller subscribes to the watchlist"
     },
     {
+      "id": "M5-010",
+      "milestone": "M5",
+      "title": "real XSHG trading calendar (exchange-calendars)",
+      "passes": true,
+      "evidence": "trading_calendar.py wraps exchange-calendars XSHG (holidays/weekends/sessions) and replaces the weekday heuristic in realtime/clock.py; tests/test_trading_calendar.py (Spring Festival 2024, National Day, next/prev session, 2024-02 list) + live clock tests; calendar_source()=XSHG; weekday fallback only if vendor data runs out"
+    },
+    {
       "id": "M6-001",
       "milestone": "M6",
       "title": "UI shell/nav",
@@ -653,6 +667,34 @@
       "title": "redesigned pages + live-first market page",
       "passes": true,
       "evidence": "All pages rebuilt against DESIGN-SPEC (3-step backtest wizard with conclusion-first results + data-health badge, data health page, beginner settings, experiment cards, research conclusion banner, paper partial-fill UI); Playwright e2e rewritten for /today and new DOM; screenshots refreshed"
+    },
+    {
+      "id": "M6-015",
+      "milestone": "M6",
+      "title": "Apple-style design system v2 on mature OSS primitives",
+      "passes": true,
+      "evidence": "docs/DESIGN-SPEC.md v2; tokens/base/layout/components/business/overlays/views rewritten (glass materials, hairlines, 34px titles, 8pt grid, density/themes/color-blind); Radix UI primitives + framer-motion transitions + sonner toasts + cmdk palette + vaul mobile sheet; 16 new primitives + redesigned shell/components; reduced-motion and focus-visible; 10 routes audited (0 overflow, 0 console errors, 0 unnamed controls)"
+    },
+    {
+      "id": "M6-016",
+      "milestone": "M6",
+      "title": "unified TradingView lightweight-charts; echarts removed",
+      "passes": true,
+      "evidence": "declarative Chart.tsx (line/area/histogram/candlestick/baseline, multi-pane, resize refit, theme reactive) used by backtest/research/experiment/paper panels; echarts dependency and imports removed; initial JS chunk 1.09 MB -> 0.60 MB, lazy monaco chunk unchanged; pnpm build/test green"
+    },
+    {
+      "id": "M6-017",
+      "milestone": "M6",
+      "title": "live quotes over shared WebSocket hub with polling fallback",
+      "passes": true,
+      "evidence": "ui/src/lib/liveStream.ts: one /ws/live connection per code set, backoff reconnects, react-query cache hydration; useLiveQuotes falls back to 15s polling; offline behavior unchanged (no network requests); manual live verification with QC_ALLOW_NETWORK=1"
+    },
+    {
+      "id": "M6-018",
+      "milestone": "M6",
+      "title": "frontend engineering: dev proxy, audit harness, typed build",
+      "passes": true,
+      "evidence": "vite dev proxy rewrites Origin to qc serve origin (dev mode previously got 403); ui/scripts/ui-audit.mjs captures screenshots + overflow/console/a11y metrics; vite manualChunks split (react/motion/overlays/charts/editor); full tsc/vitest/build gates"
     },
     {
       "id": "M7-001",
@@ -901,6 +943,6 @@
     }
   ],
   "verified_at": "2026-11-02",
-  "verified_by": "local gates: pytest (all green, see acceptance report); ctest 95/95; UI vitest 10; Playwright e2e (new UI, see acceptance report); ruff/mypy; make verify-cpp; make doctor/demo; real-data pipeline: Sina 3-name import + snapshot + qc data integrity + cpp backtest",
-  "note": "All listed features pass. Documented limitations remain: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display only, no L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); Eastmoney endpoints may be rate-limited; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers, real Tushare token verification and full-market performance benchmarks remain out of scope of this round."
+  "verified_by": "local gates: pytest (all green, see acceptance report); ctest 95/95; UI vitest 10; Playwright e2e 18/18 (redesigned UI); ruff/mypy; make verify-cpp; make doctor/demo; ui-audit 10 routes + mobile + dark (0 console errors, 0 overflow); real-data pipeline: Sina 3-name import + snapshot + qc data integrity (status ok) + cpp backtest; live quotes verified with QC_ALLOW_NETWORK=1 (REST + /ws/live frames)",
+  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display only, no L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope."
 }
