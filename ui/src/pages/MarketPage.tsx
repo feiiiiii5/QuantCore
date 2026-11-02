@@ -52,7 +52,11 @@ export default function MarketPage() {
   const financials = useFinancials(code || null);
   const minuteBars = useMinuteBars(code || null, minuteMode);
   const liveQuotes = useLiveQuotes(code ? [code] : [], liveEnabled && Boolean(code));
-  const integrity = useDataIntegrity(overview.data?.snapshot.id ?? undefined);
+  // The no-data market overview uses a synthetic fallback id; only ask for a real snapshot.
+  const overviewSnapshotId = overview.data?.snapshot?.id;
+  const integrity = useDataIntegrity(
+    overviewSnapshotId && overviewSnapshotId !== "synthetic" ? overviewSnapshotId : undefined,
+  );
 
   useEffect(() => {
     if (!code && rows[0]) { setPicked(rows[0].code); setMarketCode(rows[0].code); }

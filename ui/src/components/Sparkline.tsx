@@ -10,7 +10,8 @@ export interface SparklineProps {
 
 /** Inline mini trend line; colour comes from the --up/--down tokens only. */
 export default function Sparkline({ values, positive, tone = "auto", height = 32, area, className, ariaLabel }: SparklineProps) {
-  if (!values.length) return <span className="muted">—</span>;
+  // A single point cannot show a trend: render nothing instead of a misleading flat line.
+  if (values.length < 2) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
