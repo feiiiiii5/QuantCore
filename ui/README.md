@@ -52,7 +52,7 @@ pnpm -C ui build    # TypeScript strict + Vite
 pnpm -C ui e2e      # Playwright（需要后端 + 本机 Chrome；默认 127.0.0.1:8123，token=test-token）
 ```
 
-当前实测：`pnpm test` 7 passed；`pnpm build` 通过；本地后端 + Chrome 下 Playwright 14 passed（行情/选股/回测/实验/数据/策略/设置/研究/onboarding/暗色/移动端/全局搜索/性能预算）。
+当前实测：`pnpm test` 10 passed（5 files）；`pnpm build` 通过；本地后端 + Chrome 下 Playwright 18 passed（行情/选股/回测/实验/数据/策略/设置/研究/onboarding/暗色/移动端/全局搜索/性能预算/模拟交易/组合/插件/稳健性/设置自检）。
 
 ## 与后端契约的偏差（不伪造）
 

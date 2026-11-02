@@ -4,6 +4,7 @@ import { api } from "./client";
 export const qk = {
   health: ["health"] as const,
   meta: ["meta"] as const,
+  doctor: ["doctor"] as const,
   overview: (snapshot?: string) => ["market", "overview", snapshot ?? "latest"] as const,
   securities: (query: string) => ["market", "securities", query] as const,
   securityProfile: (code: string) => ["market", "profile", code] as const,
@@ -28,6 +29,10 @@ export function useHealth() {
 }
 export function useMeta() {
   return useQuery({ queryKey: qk.meta, queryFn: api.meta, staleTime: 30_000 });
+}
+/** Manual only: local self-check runs when the settings card asks for it. */
+export function useDoctor() {
+  return useQuery({ queryKey: qk.doctor, queryFn: () => api.doctor(), enabled: false, retry: false, staleTime: 60_000 });
 }
 export function useOverview(snapshot?: string) {
   return useQuery({ queryKey: qk.overview(snapshot), queryFn: () => api.overview(snapshot), staleTime: 15_000 });

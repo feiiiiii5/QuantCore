@@ -522,6 +522,13 @@
       "evidence": "Local toast + optional browser Notification on backtest completion/paper fills; Settings permission toggle; tested in Playwright flow"
     },
     {
+      "id": "M5-007",
+      "milestone": "M5",
+      "title": "local self-check API (GET /api/doctor)",
+      "passes": true,
+      "evidence": "Read-only offline environment report serialised by routes_doctor.py; no network, no state mutation; tests/test_api_doctor.py; docs/UI-API.md"
+    },
+    {
       "id": "M6-001",
       "milestone": "M6",
       "title": "UI shell/nav",
@@ -596,7 +603,14 @@
       "milestone": "M6",
       "title": "Playwright e2e",
       "passes": true,
-      "evidence": "Playwright 12 tests: market/screener/backtest/experiments/data/strategy/settings/research/onboarding/dark/mobile/perf"
+      "evidence": "Playwright 18 tests via make e2e (needs a local Chrome channel): market/screener/backtest/experiments/notes/data/strategy/settings/research/onboarding/dark/performance/search/mobile/paper/portfolio/plugin/robustness"
+    },
+    {
+      "id": "M6-012",
+      "milestone": "M6",
+      "title": "settings self-check panel",
+      "passes": true,
+      "evidence": "Settings page '本地自检' card runs GET /api/doctor and renders pass/warn/fail/skip with hints; ui/src/lib/doctor.test.ts; pnpm -C ui test/build; Playwright settings e2e"
     },
     {
       "id": "M7-001",
@@ -767,6 +781,13 @@
       "evidence": "PaperSession/PaperStore virtual cash/positions/orders/trades persisted under data/paper; tests/test_paper_engine.py"
     },
     {
+      "id": "M9-009",
+      "milestone": "M9",
+      "title": "partial fills (daily volume participation cap)",
+      "passes": true,
+      "evidence": "Paper engine caps each order per day at floor(volume*participation) (default 10%), order status 'partial', multi-day continuation, per-fill fees/positions; tests/test_paper_partial_fill.py; docs/paper-trading.md"
+    },
+    {
       "id": "M10-001",
       "milestone": "M10",
       "title": "Electron shell",
@@ -821,9 +842,16 @@
       "title": "licenses",
       "passes": true,
       "evidence": "Apache-2.0 + docs/DATA-LICENSES.md"
+    },
+    {
+      "id": "M10-009",
+      "milestone": "M10",
+      "title": "local test kit (qc doctor / qc demo / quick gates)",
+      "passes": true,
+      "evidence": "qc doctor + qc demo CLI; make doctor/demo/test-quick/verify-local/bench-scale; scripts/local_verify.sh + scripts/scale_bench.py; docs/LOCAL-TESTING.md; tests/test_doctor.py, tests/test_demo.py"
     }
   ],
   "verified_at": "2026-11-02",
-  "verified_by": "pytest 123 collected; Playwright 12; pnpm build/test; ruff/mypy; ctest 95/95",
-  "note": "M0-M4 core, M5 WebSocket/cancel, M6 full UI, M7 basic research, M9 basic paper replay/account/CSV; M8, M9 advanced, M10 packaging still false. Do not claim full completion."
+  "verified_by": "local gates: pytest 240 collected / 238 passed / 2 skipped; ctest 95/95; UI vitest 10 (5 files); Playwright 18/18; ruff/mypy; make verify-cpp; make doctor/demo/bench-scale",
+  "note": "All listed features pass. Documented limitations remain: no real vendor live feed; no signed/notarized installer (unsigned macOS/Windows zips only, Windows install/run unverified); real Tushare token/network unverified (fake-Pro contract tests only); minute bars are SYNTHETIC and the C++ engine is daily-only; C++ backtests still use board lots for ETF/convertibles; full-market 5500x20y benchmark not measured (default-scale bench in docs/PERFORMANCE.md); paper fills are aggregate volume-participation approximations (no order book) and corporate actions are not applied. Do not claim production trading."
 }

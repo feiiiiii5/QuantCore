@@ -10,6 +10,32 @@ WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>`; server valida
 - `GET /health` → `{status,version,engine_backend,engine_available,panel_available,synthetic_only,cors}`
 - `GET /api/meta` → `{version,engine_backend,synthetic_only,data_root,snapshots_root,experiments_root,token_required,ui_served}`
 
+## Local self-check (doctor)
+- `GET /api/doctor?include_optional=true` →
+  `{status:"ok"|"warn"|"fail",generated_at,version,engine_backend,engine_available,panel_available,root,counts:{pass,warn,fail,skip},checks:[{id,title,status:"pass"|"warn"|"fail"|"skip",detail,hint,required}]}`
+- Read-only local environment check (Python/deps, C++ engine/panel, data roots); it never touches the network and never mutates files. `include_optional=false` skips optional checks; `hint` is a short fix-it string (empty when there is nothing to do).
+- `root` is the server process `Path.cwd()`; `data_root`/`snapshots_root` come from the server workspace settings (not from query parameters). The loopback port probe is disabled here (the server already owns its port); `qc doctor` on the CLI still probes it.
+- Request: `curl -H "Authorization: Bearer <token>" "http://127.0.0.1:8000/api/doctor?include_optional=true"`.
+- Errors: 401 `{detail:"missing or invalid bearer token"}` without a valid token; 500 `{detail:"internal server error"}` only if the check itself crashes (not expected).
+- UI: 设置页「本地自检」卡片 — the check runs only when the user clicks 运行自检 (no polling, no auto-run).
+
+```json
+{
+  "status": "warn",
+  "generated_at": "2026-01-02T03:04:05+08:00",
+  "version": "0.1.0",
+  "engine_backend": "cpp",
+  "engine_available": true,
+  "panel_available": true,
+  "root": "/Users/me/QuantCore",
+  "counts": {"pass": 10, "warn": 2, "fail": 0, "skip": 2},
+  "checks": [
+    {"id": "python", "title": "Python runtime", "status": "pass", "detail": "Python 3.12.x (...); project .venv", "hint": "", "required": true},
+    {"id": "snapshots", "title": "Snapshots", "status": "warn", "detail": "no snapshots under data/snapshots", "hint": "uv run qc snapshot build", "required": false}
+  ]
+}
+```
+
 ## Market
 - `GET /api/market/overview?snapshot=<id|prefix>` →
   `{snapshot:{id,content_hash,n_sec,n_time,start,end,synthetic,source,fields[]}, indices:[{name,close,change_pct,spark[]}], breadth:{up,down,flat,limit_up,limit_down,suspended}, sectors:[{name,count,avg_change,up,down}], updated_at}`

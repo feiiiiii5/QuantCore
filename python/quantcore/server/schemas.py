@@ -49,6 +49,31 @@ class HealthView(BaseModel):
     cors: bool = False
 
 
+class DoctorCheckView(BaseModel):
+    """One read-only environment self-check (qc doctor)."""
+
+    id: str
+    title: str
+    status: str
+    detail: str = ""
+    hint: str = ""
+    required: bool = False
+
+
+class DoctorView(BaseModel):
+    """Local environment self-check report; read-only and never network-backed."""
+
+    status: str
+    generated_at: str
+    version: str
+    engine_backend: str
+    engine_available: bool
+    panel_available: bool
+    root: str
+    counts: dict[str, int]
+    checks: list[DoctorCheckView]
+
+
 class JobAcceptedView(BaseModel):
     job_id: str
     status: str = "pending"

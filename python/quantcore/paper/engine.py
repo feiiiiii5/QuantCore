@@ -10,8 +10,6 @@ model are reused from :mod:`quantcore.backtest.config`.
 from __future__ import annotations
 
 import bisect
-import csv
-import io
 import uuid
 from typing import Any
 
@@ -27,10 +25,14 @@ from .errors import (
 from .market import PaperMarketData
 from .models import PaperOrder, PaperPosition, PaperSession, PaperTrade
 from .rules import (
+    DEFAULT_PARTICIPATION,
     canonical_buy_qty,
     fee_breakdown,
     is_shanghai,
+    participation_cap,
+    participation_rate,
     price_limit_pct,
+    round_buy_qty,
     round_to_tick,
 )
 from .util import _clip_index, _date_text, _now
@@ -44,6 +46,8 @@ class PaperSessionEngine:
         self.session = session
         self.costs = CostModelConfig(**dict(session.config.get("costs") or {}))
         self.rules = RuleSetConfig(**dict(session.config.get("rules") or {}))
+        execution = dict(session.config.get("execution") or {})
+        self.participation = participation_rate(execution.get("participation"))
         try:
             self.start_idx = market.date_index[int(session.start_date)]
             self.end_idx = market.date_index[int(session.end_date)]
@@ -75,6 +79,11 @@ class PaperSessionEngine:
             raise PaperValidationError("start date must not be after end date")
         costs = CostModelConfig()
         rules = RuleSetConfig()
+        config: dict[str, Any] = {
+            "costs": costs.model_dump(mode="json"),
+            "rules": rules.model_dump(mode="json"),
+            "execution": {"participation": DEFAULT_PARTICIPATION},
+        }
         session = PaperSession(
             id=f"paper_{uuid.uuid4().hex[:12]}",
             name=(str(name).strip() if name else f"模拟交易 {_date_text(dates[start_idx])}"),
@@ -88,7 +97,7 @@ class PaperSessionEngine:
             initial_cash=float(initial_cash),
             cash=float(initial_cash),
             equity_curve=[{"date": int(dates[start_idx]), "equity": round(float(initial_cash), 4)}],
-            config={"costs": costs.model_dump(mode="json"), "rules": rules.model_dump(mode="json")},
+            config=config,
         )
         return session
 
@@ -191,7 +200,7 @@ class PaperSessionEngine:
     def cancel_order(self, order_id: str) -> PaperOrder:
         for order in self.session.orders:
             if order.id == str(order_id):
-                if order.status != "pending":
+                if not order.is_open:
                     raise PaperConflictError(f"order {order.id} is already {order.status}")
                 order.status = "cancelled"
                 order.reason = "cancelled by user"
@@ -224,7 +233,7 @@ class PaperSessionEngine:
             for position in self.session.positions.values():
                 position.available = position.qty  # T+1: yesterday's buys become sellable
             for order in self.session.orders:
-                if order.status != "pending" or order.date >= self.session.current_date:
+                if not order.is_open or order.date >= self.session.current_date:
                     continue
                 trade = self._try_fill(order, day)
                 if trade is not None:
@@ -261,42 +270,8 @@ class PaperSessionEngine:
         return self.detail()
 
     def signals_csv(self) -> str:
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow(
-            [
-                "date",
-                "code",
-                "name",
-                "side",
-                "order_type",
-                "qty",
-                "limit_price",
-                "status",
-                "filled_qty",
-                "fill_price",
-                "fees",
-                "reason",
-            ]
-        )
-        for order in sorted(self.session.orders, key=lambda item: (item.date, item.id)):
-            writer.writerow(
-                [
-                    order.date,
-                    order.code,
-                    order.name,
-                    order.side_name,
-                    order.order_type,
-                    order.qty,
-                    "" if order.limit_price is None else f"{order.limit_price:.2f}",
-                    order.status,
-                    order.filled_qty,
-                    "" if order.fill_price is None else f"{order.fill_price:.2f}",
-                    f"{(order.fees or {}).get('fee_total', 0.0):.2f}",
-                    order.reason or "",
-                ]
-            )
-        return buffer.getvalue()
+        """Signals CSV export (filled_qty is cumulative, fill_price the weighted average)."""
+        return self.session.signals_csv()
 
     # -- internals ---------------------------------------------------------
     def _require_active(self) -> None:
@@ -408,12 +383,28 @@ class PaperSessionEngine:
             self._reject(order, "no_quote")
             return None
 
-        qty = int(order.qty)
-        if order.side == 1:
-            position = self.session.positions.get(order.sec_id)
-            if position is None or position.qty < qty or position.available < qty:
-                self._reject(order, "insufficient_position")
-                return None
+        qty = self._fill_qty(order, sec, day)
+        if qty <= 0:
+            return None
+        return self._settle(order, sec, fill, qty)
+
+    def _fill_qty(self, order: PaperOrder, sec: int, day: int) -> int:
+        """Shares fillable today: participation cap, buy lot rounding and T+1 availability."""
+        remaining = order.remaining_qty
+        if remaining <= 0:
+            return 0
+        volume = self.market.value("volume", day, sec)
+        qty = min(remaining, participation_cap(volume, self.participation))
+        if order.side == 0:
+            return round_buy_qty(self.market.board(sec), qty, self.rules, self.market.sec_type(sec))
+        position = self.session.positions.get(order.sec_id)
+        if position is None or position.available <= 0:
+            self._reject(order, "insufficient_position")
+            return 0
+        return min(qty, position.available, position.qty)
+
+    def _settle(self, order: PaperOrder, sec: int, fill: float, qty: int) -> PaperTrade | None:
+        """Book one fill (cash, position, fees, order fills) and append the trade."""
         amount = fill * qty
         fees = fee_breakdown(
             self.costs,
@@ -446,19 +437,19 @@ class PaperSessionEngine:
                 position.avg_cost = round((old_cost + total) / position.qty, 6)
                 position.last = fill
         else:
+            position = self.session.positions.get(order.sec_id)
+            if position is None or position.qty < qty or position.available < qty:
+                self._reject(order, "insufficient_position")
+                return None
             self.session.cash = round(self.session.cash + amount - fee_total, 4)
-            position = self.session.positions[order.sec_id]
             position.qty -= qty
             position.available = max(0, position.available - qty)
             position.last = fill
             if position.qty <= 0:
                 self.session.positions.pop(order.sec_id, None)
-
-        order.status = "filled"
-        order.filled_qty = qty
-        order.fill_price = fill
-        order.fill_date = int(self.session.current_date)
-        order.fees = fees
+        order.record_fill(
+            date=int(self.session.current_date), qty=qty, price=fill, amount=amount, fees=fees
+        )
         trade = PaperTrade(
             id=f"trd_{self.session.next_trade_seq:06d}",
             order_id=order.id,

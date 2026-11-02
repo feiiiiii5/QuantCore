@@ -19,6 +19,13 @@ const dateText = (value: number) => {
   const text = String(value);
   return text.length === 8 ? `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6)}` : text;
 };
+const orderStatusText: Record<string, string> = {
+  pending: "待成交",
+  partial: "部分成交",
+  filled: "已成交",
+  cancelled: "已撤销",
+  rejected: "已拒绝",
+};
 
 export default function PaperPage() {
   const [sessions, setSessions] = useState<PaperSessionSummary[]>([]);
@@ -301,7 +308,7 @@ export default function PaperPage() {
               </div>
               <div className="card-head" style={{ marginTop: 12 }}><h3>委托</h3></div>
               <div className="table-wrap"><table><thead><tr><th>时间</th><th>代码</th><th>方向</th><th className="num">数量</th><th>类型</th><th>状态</th><th>成交价</th><th></th></tr></thead>
-                <tbody>{detail.orders.slice().reverse().slice(0, 30).map((order) => <tr key={order.id}><td>{dateText(order.date)}</td><td>{order.code}</td><td className={order.side === "buy" ? "up" : "down"}>{order.side === "buy" ? "买入" : "卖出"}</td><td className="num">{order.qty}</td><td>{order.order_type === "market" ? "市价" : `限价 ${order.limit_price?.toFixed(2) ?? ""}`}</td><td>{order.status}{order.reason ? ` · ${order.reason}` : ""}</td><td>{order.fill_price?.toFixed(2) ?? "—"}</td><td>{order.status === "pending" ? <button className="btn ghost" onClick={() => void cancelOrder(order)}><Square size={13} /> 撤单</button> : null}</td></tr>)}</tbody></table>
+                <tbody>{detail.orders.slice().reverse().slice(0, 30).map((order) => <tr key={order.id}><td>{dateText(order.date)}</td><td>{order.code}</td><td className={order.side === "buy" ? "up" : "down"}>{order.side === "buy" ? "买入" : "卖出"}</td><td className="num">{order.filled_qty > 0 && order.filled_qty < order.qty ? `${order.filled_qty}/${order.qty}` : order.qty}</td><td>{order.order_type === "market" ? "市价" : `限价 ${order.limit_price?.toFixed(2) ?? ""}`}</td><td>{orderStatusText[order.status] ?? order.status}{order.reason ? ` · ${order.reason}` : ""}</td><td>{order.fill_price?.toFixed(2) ?? "—"}</td><td>{(order.status === "pending" || order.status === "partial") ? <button className="btn ghost" onClick={() => void cancelOrder(order)}><Square size={13} /> 撤单</button> : null}</td></tr>)}</tbody></table>
               </div>
               <div className="card-head" style={{ marginTop: 12 }}><h3>成交</h3></div>
               <div className="table-wrap"><table><thead><tr><th>日期</th><th>代码</th><th>方向</th><th className="num">数量</th><th className="num">价格</th><th className="num">金额</th><th className="num">费用</th></tr></thead>

@@ -48,6 +48,8 @@ app.add_typer(check_app, name="check")
 
 
 from .cli_serve import serve_command  # noqa: E402
+from .demo import demo_command  # noqa: E402
+from .doctor import doctor_command  # noqa: E402
 
 
 def _emit(payload: dict[str, Any], json_output: bool = True) -> None:
@@ -439,6 +441,8 @@ def replay_command(
 
 
 app.command("serve")(serve_command)
+app.command("demo")(demo_command)
+app.command("doctor")(doctor_command)
 
 
 @app.command("bench")

@@ -19,6 +19,13 @@ uv run qc backtest run --template dual_ma --start 2021-01-01 --end 2024-12-31
 ```
 输出会写明 `engine_backend == "cpp"`；结果含净值、回撤、指标与逐笔交易。
 
+### 本地自检 / 一键演示
+```bash
+make doctor   # 环境自检（Python / C++ 扩展 / 前端构建 / 数据目录）
+make demo     # 合成数据 + 快照 + 示例回测，一条命令跑通
+```
+完整的本地测试路线（verify-local / bench-scale / 故障排查）见 [`LOCAL-TESTING.md`](LOCAL-TESTING.md)。
+
 ## 3. 启动本地工作台
 ```bash
 pnpm -C ui build

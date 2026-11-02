@@ -62,7 +62,12 @@ uv run qc serve --port 8000 --open
 make build        # 构建 C++ / Python 扩展
 make test         # pytest + ctest
 make lint         # ruff check/format + mypy
+make doctor       # 只读环境自检（Python/引擎/数据/UI/端口）
+make demo         # 一条命令跑通 合成数据→快照→回测→HTML 报告
+make test-quick   # 快速回归（排除 e2e/bench/network）
+make verify-local # doctor + test-quick，分段耗时与 PASS/FAIL
 make bench        # C++/Python 基准
+make bench-scale  # 规模基准（面板/Parquet/.qpanel/engine/峰值 RSS）
 make verify-cpp   # C++ 后端、差分与性能门禁
 make ci-local     # 本地完整门禁
 make audit        # CycloneDX SBOM + pip-audit 依赖审计
@@ -70,13 +75,16 @@ make desktop-smoke # Electron dev shell 启动本地 qc serve + UI（非安装�
 make e2e          # 隔离 qc serve + Playwright（需要本机 Chrome）
 ```
 
-本轮实测：pytest **196 collected / 194 passed / 2 skipped**；UI vitest **7 passed**；Playwright **18 passed**；
-ctest **95/95**；ruff/mypy 全绿。`make e2e` 会构建 UI，使用临时 data/experiments 启动 `qc serve`，不污染工作区。
+每天开发推荐入口见 [本地测试总览](docs/LOCAL-TESTING.md)：`make doctor` → `make demo` → `make test-quick`。
+
+本轮实测：pytest **240 collected / 238 passed / 2 skipped**；UI vitest **10 passed**；Playwright **18 passed**；
+ctest **95/95**；ruff/mypy 全绿；`make doctor` ok（engine=cpp）；`make demo` 2–3s 跑通并有指标/HTML 报告；
+`make e2e` 会构建 UI，使用临时 data/experiments 启动 `qc serve`，不污染工作区。
 
 ## API 与文档
 
 - [UI/API 契约 v2](docs/UI-API.md) · [快速上手](docs/QUICKSTART.md) · [UI 说明](docs/UI.md)
-- [迁移会话交接](docs/HANDOFF.md) · [计划与里程碑](docs/PLAN.md) · [进度](docs/PROGRESS.md) · [验收报告](docs/acceptance-report.md) · [决策](docs/DECISIONS.md)
+- [计划与里程碑](docs/PLAN.md) · [进度](docs/PROGRESS.md) · [本地测试](docs/LOCAL-TESTING.md) · [验收报告](docs/acceptance-report.md) · [决策](docs/DECISIONS.md)
 - [回测语义](docs/engine-semantics.md) · [规则来源](docs/rules-sources.md) · [数据字典](docs/data-dictionary.md)
 - [架构](docs/ARCHITECTURE.md) · [开发环境/镜像](docs/DEV-SETUP.md) · [策略手册](docs/strategy-guide.md)
 - [API](docs/API.md) · [贡献](CONTRIBUTING.md)
@@ -84,11 +92,12 @@ ctest **95/95**；ruff/mypy 全绿。`make e2e` 会构建 UI，使用临时 data
 ## 当前状态（2026-11-02）
 
 - C++ core：panel/kernels/expression/engine，ctest **95/95**；`make verify-cpp` 差分/基准通过。
-- Python：194 passed / 2 skipped；ruff/mypy 全绿；数据→快照→C++ 回测→实验/HTML 报告 CLI 端到端。
+- Python：238 passed / 2 skipped（240 collected）；ruff/mypy 全绿；数据→快照→C++ 回测→实验/HTML 报告 CLI 端到端。
+- 本地工具：`qc doctor` 环境自检（含 `GET /api/doctor` 与设置页自检卡片）、`qc demo` 一键合成演示、`make test-quick/verify-local/bench-scale`；见 [docs/LOCAL-TESTING.md](docs/LOCAL-TESTING.md)。
 - 服务端：FastAPI 契约、任务队列/取消/崩溃恢复、WebSocket、安全头、GZip；`qc serve` 同源托管构建后的 UI。
 - 前端：八页工作台真实接线；行情 K 线/涨跌分布、选股 DSL/导出、策略 Monaco/校验、回测任务/指标/交易解释、
-  实验复现/报告/导出/对比、数据中心/onboarding、研究因子/扫描/滚动/归因/稳健性、本地模拟账户/逐日回放、本地通知；Playwright 18 条。
-- 诚实状态：`docs/features.json` **117/117**。M0–M3 核心完成，M5（含本地通知）/M6 完成，M7 基础+稳健性（DSR/PBO/成本/MC/容量）、M8 数据（含合成分钟线/V2 catalog）与 M9 模拟（账户/回放/插件/组合/模拟时钟）完成；M10 提供 SBOM/audit/perf、Electron dev shell 与 unsigned macOS/Windows zip；真实 vendor 实时 feed 与签名安装包仍未实现。
+  实验复现/报告/导出/对比、数据中心/onboarding、研究因子/扫描/滚动/归因/稳健性、本地模拟账户/逐日回放（含部分成交）、本地通知；Playwright 18 条。
+- 诚实状态：`docs/features.json` **121/121**。M0–M3 核心完成，M5（含本地通知与自检接口）/M6 完成，M7 基础+稳健性（DSR/PBO/成本/MC/容量）、M8 数据（含合成分钟线/V2 catalog）与 M9 模拟（账户/回放/插件/组合/模拟时钟/部分成交）完成；M10 提供 SBOM/audit/perf、Electron dev shell 与 unsigned macOS/Windows zip；真实 vendor 实时 feed 与签名安装包仍未实现。
   完整缺口与证据见 [验收报告](docs/acceptance-report.md)；不要据本 README 声称可实盘或已 100% 完成。
 - 仅研究与模拟；合成数据标 `SYNTHETIC`；真实 Tushare 需 Token，未在本次验证。
 

@@ -248,7 +248,7 @@ test("paper trading session creates, steps and renders the virtual account", asy
   await page.getByLabel("代码").fill(firstCode);
   await page.getByLabel("数量").fill("100");
   await page.getByRole("button", { name: /提交委托/ }).click();
-  await expect(page.getByText(/pending|已提交/).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/待成交|部分成交|已成交/).first()).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: /下一交易日/ }).click();
   await expect(page.getByText("持仓市值")).toBeVisible();
   await page.getByRole("button", { name: "持续模拟" }).click();

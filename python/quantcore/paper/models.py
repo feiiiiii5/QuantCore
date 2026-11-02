@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -92,10 +94,60 @@ class PaperOrder:
     fill_date: int | None = None
     fees: dict[str, float] | None = None
     reason: str | None = None
+    fills: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def side_name(self) -> str:
         return "buy" if self.side == 0 else "sell"
+
+    @property
+    def remaining_qty(self) -> int:
+        return max(0, int(self.qty) - int(self.filled_qty))
+
+    @property
+    def is_open(self) -> bool:
+        return self.status in {"pending", "partial"}
+
+    def record_fill(
+        self,
+        *,
+        date: int,
+        qty: int,
+        price: float,
+        amount: float,
+        fees: dict[str, float],
+    ) -> None:
+        """Append one fill (partial or full) and refresh cumulative aggregates."""
+        if int(qty) <= 0:
+            return
+        self.fills.append(
+            {
+                "date": int(date),
+                "qty": int(qty),
+                "price": _round_money(price),
+                "amount": _round_money(amount),
+                "fees": {key: _round_money(value) for key, value in fees.items()},
+            }
+        )
+        prior_qty = int(self.filled_qty)
+        self.filled_qty = prior_qty + int(qty)
+        legacy = prior_qty > 0 and len(self.fills) == 1 and self.fill_price is not None
+        if legacy:
+            total_amount = float(self.fill_price or 0.0) * prior_qty + float(
+                self.fills[0]["amount"]
+            )
+        else:
+            total_amount = sum(float(item["amount"]) for item in self.fills)
+        self.fill_price = round(total_amount / self.filled_qty, 6) if self.filled_qty else None
+        totals: dict[str, float] = {}
+        if legacy and self.fees:
+            totals = {key: float(value) for key, value in self.fees.items()}
+        for item in self.fills:
+            for key, value in item["fees"].items():
+                totals[key] = _round_money(totals.get(key, 0.0) + float(value))
+        self.fees = totals
+        self.fill_date = int(date)
+        self.status = "filled" if self.filled_qty >= int(self.qty) else "partial"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -114,6 +166,7 @@ class PaperOrder:
             "fill_date": None if self.fill_date is None else int(self.fill_date),
             "fees": dict(self.fees) if self.fees else None,
             "reason": self.reason,
+            "fills": [dict(item) for item in self.fills],
             "created_at": self.created_at,
         }
 
@@ -136,6 +189,7 @@ class PaperOrder:
             fill_date=payload.get("fill_date"),
             fees=dict(payload["fees"]) if payload.get("fees") else None,
             reason=payload.get("reason"),
+            fills=[dict(item) for item in (payload.get("fills") or [])],
         )
 
 
@@ -260,11 +314,50 @@ class PaperSession:
             "equity": self.equity(),
             "starting_cash": _round_money(self.initial_cash),
             "position_count": len(self.positions),
-            "pending_orders": sum(1 for order in self.orders if order.status == "pending"),
+            "pending_orders": sum(1 for order in self.orders if order.is_open),
             "synthetic": bool(self.snapshot.get("synthetic", False)),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
+
+    def signals_csv(self) -> str:
+        """Signals CSV export; filled_qty is cumulative and fill_price a weighted average."""
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            [
+                "date",
+                "code",
+                "name",
+                "side",
+                "order_type",
+                "qty",
+                "limit_price",
+                "status",
+                "filled_qty",
+                "fill_price",
+                "fees",
+                "reason",
+            ]
+        )
+        for order in sorted(self.orders, key=lambda item: (item.date, item.id)):
+            writer.writerow(
+                [
+                    order.date,
+                    order.code,
+                    order.name,
+                    order.side_name,
+                    order.order_type,
+                    order.qty,
+                    "" if order.limit_price is None else f"{order.limit_price:.2f}",
+                    order.status,
+                    order.filled_qty,
+                    "" if order.fill_price is None else f"{order.fill_price:.2f}",
+                    f"{(order.fees or {}).get('fee_total', 0.0):.2f}",
+                    order.reason or "",
+                ]
+            )
+        return buffer.getvalue()
 
     # -- persistence -------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:

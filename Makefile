@@ -8,7 +8,7 @@ export UV_DEFAULT_INDEX ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export PIP_INDEX_URL ?= https://pypi.tuna.tsinghua.edu.cn/simple
 export UV_HTTP_TIMEOUT ?= 120
 
-.PHONY: setup setup-ui build test bench lint verify-cpp perf-gate ui-check e2e desktop-smoke ci-local package sbom audit release fmt clean cmake configure
+.PHONY: setup setup-ui build test test-quick doctor demo bench bench-scale lint verify-cpp verify-local perf-gate ui-check e2e desktop-smoke ci-local package sbom audit release fmt clean cmake configure
 
 setup:
 	$(UV) python install $(PYTHON_VERSION)
@@ -30,9 +30,21 @@ test: build
 	$(UV) run pytest -q
 	ctest --test-dir $(BUILD_DIR) --output-on-failure
 
+test-quick:
+	$(UV) run pytest -q -m "not e2e and not bench and not network"
+
+doctor:
+	$(UV) run qc doctor --no-json-output
+
+demo:
+	$(UV) run qc demo
+
 bench: build
 	$(UV) run python scripts/bench.py
 	./$(BUILD_DIR)/qcore_bench --benchmark_min_time=0.2s
+
+bench-scale:
+	$(UV) run python scripts/scale_bench.py
 
 lint:
 	$(UV) run ruff check python tests
@@ -50,6 +62,9 @@ e2e:
 	@$(UV) run pytest -q -m e2e; code=$$?; if [ $$code -ne 0 ] && [ $$code -ne 5 ]; then exit $$code; fi
 	pnpm -C ui test
 	bash scripts/e2e.sh
+
+verify-local:
+	bash scripts/local_verify.sh
 
 ui-check:
 	pnpm -C ui test

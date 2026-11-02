@@ -44,7 +44,7 @@ print(result.metrics)
 完整契约见 [UI-API.md](UI-API.md)。摘要：
 
 ```
-GET  /health, /api/meta
+GET  /health, /api/meta, /api/doctor?include_optional=true
 GET  /api/market/{overview,bars,securities}
 GET  /api/screener/presets; POST /api/screener/run
 GET  /api/strategies/templates[/id]; POST /api/strategies/validate

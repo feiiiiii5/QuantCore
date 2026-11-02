@@ -29,6 +29,7 @@ from ..errors import (
 )
 from ..jobs.queue import JobQueue
 from .routes_data import register_data_routes
+from .routes_doctor import register_doctor_routes
 from .routes_experiments import register_experiment_routes
 from .routes_jobs import register_job_routes
 from .routes_market import register_market_routes
@@ -184,6 +185,7 @@ def create_app(
     register_strategy_routes(app, workspace)
     register_experiment_routes(app, workspace)
     register_data_routes(app, workspace)
+    register_doctor_routes(app, workspace)
     register_research_routes(app, workspace)
     register_paper_routes(app, workspace)
 

@@ -8,3 +8,4 @@
 6. 单文件 ≤500 行；`make lint test` 全绿；提交信息使用 Conventional Commits。
 7. 不引入 GPL/AGPL 运行时依赖；新增依赖需在 `docs/DECISIONS.md` 记录理由与许可证。
 8. 不实现真实下单；`BrokerGateway` 默认禁用。
+9. 本地快速回归：`make test-quick`（不构建）/ `make verify-local`（doctor + 快速回归）；完整门禁 `make ci-local` 由维护者在提交前统一执行。

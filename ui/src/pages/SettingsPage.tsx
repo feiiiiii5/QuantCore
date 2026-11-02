@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { CheckCircle2, Database, PlugZap, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Database, MinusCircle, PlugZap, ShieldCheck, Stethoscope, XCircle } from "lucide-react";
 import { configure, getApiBase, getToken } from "../api/client";
-import { useDataStatus, useHealth, useMeta } from "../api/queries";
+import { useDataStatus, useDoctor, useHealth, useMeta } from "../api/queries";
+import { doctorCheckLabel, doctorCountsSummary, doctorOverallBadge, doctorOverallLabel, doctorStatusColor } from "../lib/doctor";
 import { dateInt } from "../lib/format";
 import { ensureNotificationPermission } from "../lib/notify";
 import { zhCN as t } from "../i18n/zh-CN";
+
+function DoctorStatusIcon({ status }: { status: string }) {
+  const style = { color: doctorStatusColor(status), flex: "0 0 auto" };
+  if (status === "pass") return <CheckCircle2 size={14} style={style} />;
+  if (status === "warn") return <AlertTriangle size={14} style={style} />;
+  if (status === "fail") return <XCircle size={14} style={style} />;
+  return <MinusCircle size={14} style={style} />;
+}
 
 export default function SettingsPage() {
   const [base, setBase] = useState(getApiBase());
@@ -18,6 +27,8 @@ export default function SettingsPage() {
   const health = useHealth();
   const meta = useMeta();
   const data = useDataStatus();
+  const doctor = useDoctor();
+  const [doctorError, setDoctorError] = useState("");
 
   const save = () => {
     configure(base, token);
@@ -39,6 +50,13 @@ export default function SettingsPage() {
       if (result.error) throw result.error;
       setTest(`已连接：${result.data?.engine_backend ?? "?"} · v${result.data?.version ?? "?"}`);
     } catch (error) { setTest(`连接失败：${error instanceof Error ? error.message : "unknown"}`); }
+  };
+  const runSelfCheck = async () => {
+    setDoctorError("");
+    try {
+      const result = await doctor.refetch();
+      if (result.error) throw result.error;
+    } catch (error) { setDoctorError(`自检失败：${error instanceof Error ? error.message : "unknown"}`); }
   };
 
   return (
@@ -80,6 +98,34 @@ export default function SettingsPage() {
           <h3 style={{ marginTop: 16 }}>数据源</h3>
           {(data.data?.providers ?? []).map((provider) => <div className="provider-row" key={provider.id}><div><strong>{provider.name}</strong><small className="muted">{provider.requires_token ? "需 Token" : provider.requires_network ? "需网络" : "本地"}</small></div><span className={provider.available ? "badge success" : "badge"}>{provider.available ? "可用" : "不可用"}</span></div>)}
           <p className="muted small"><ShieldCheck size={13} /> 仅研究与模拟，不包含真实下单；规则/费率 TODO(verify)。{t.disclaimer}</p>
+        </div>
+        <div className="card" style={{ gridColumn: "1 / -1" }}>
+          <h3><Stethoscope size={14} /> 本地自检</h3>
+          <div className="button-row">
+            <button className="btn" onClick={() => void runSelfCheck()} disabled={doctor.isFetching}>
+              <Stethoscope size={15} /> {doctor.isFetching ? "自检中…" : "运行自检"}
+            </button>
+            {doctor.data ? <span className={doctorOverallBadge(doctor.data.status)}>{doctorOverallLabel(doctor.data.status)}</span> : null}
+            {doctor.data ? <span className="muted small">{doctorCountsSummary(doctor.data.counts)}</span> : null}
+          </div>
+          {doctorError ? <p className="error" role="alert">{doctorError}</p> : null}
+          {doctor.data ? (
+            <div className="provider-list" style={{ marginTop: 10 }}>
+              {doctor.data.checks.map((item) => (
+                <div className="provider-row" key={item.id} style={{ alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                    <strong style={{ display: "flex", alignItems: "center", gap: 6 }}><DoctorStatusIcon status={item.status} /> {item.title}</strong>
+                    <small className="muted">{item.detail}</small>
+                    {item.hint ? <small className="mono muted">{item.hint}</small> : null}
+                  </div>
+                  <span className="badge" style={{ color: doctorStatusColor(item.status), flex: "0 0 auto" }}>{doctorCheckLabel(item.status)}</span>
+                </div>
+              ))}
+            </div>
+          ) : doctorError ? null : (
+            <p className="muted small">只读本地环境检查：Python/依赖/C++ 引擎/数据目录/端口；不联网、不修改任何文件。点击「运行自检」开始。</p>
+          )}
+          {doctor.data ? <p className="muted small mono" style={{ overflowWrap: "anywhere" }}>{doctor.data.version} · {doctor.data.engine_backend} · {doctor.data.generated_at} · {doctor.data.root}</p> : null}
         </div>
       </div>
     </>

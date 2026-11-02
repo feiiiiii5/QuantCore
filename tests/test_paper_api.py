@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -22,8 +23,10 @@ BASE = "http://127.0.0.1:8000"
 pytestmark = pytest.mark.skipif(not quantcore.engine_available(), reason="C++ engine unavailable")
 
 
-def _tradable_sec(market: PaperMarketData, day: int) -> int | None:
+def _tradable_sec(market: PaperMarketData, day: int, board: str | None = None) -> int | None:
     for sec in range(market.n_sec):
+        if board is not None and market.board(sec) != board:
+            continue
         open_px = market.value("open", day, sec)
         high = market.value("high", day, sec)
         low = market.value("low", day, sec)
@@ -380,6 +383,46 @@ def test_reopen_across_server_instances(
         stepped = client2.post(f"/api/paper/sessions/{sid}/step", json={"days": 1}, headers=AUTH)
         assert stepped.status_code == 200
         assert client2.delete(f"/api/paper/sessions/{sid}", headers=AUTH).status_code == 200
+
+
+def test_partial_fill_status_and_fills_round_trip(
+    client: TestClient, plan: dict[str, Any], tmp_path: Path, synthetic_snapshot: Any
+) -> None:
+    panel = synthetic_snapshot.to_panel_data()
+    market = PaperMarketData(panel)
+    start_idx = market.date_index[int(plan["start"])]
+    fill_idx = start_idx + 1
+    sec = _tradable_sec(market, fill_idx, "MAIN")
+    assert sec is not None
+    volume = market.value("volume", fill_idx, sec)
+    assert np.isfinite(volume) and volume > 0
+
+    view = _create(client, plan)
+    sid = view["id"]
+    # shrink participation so 200 shares only fill one board lot (100 shares) that day
+    session_path = tmp_path / "data" / "paper" / f"{sid}.json"
+    payload = json.loads(session_path.read_text(encoding="utf-8"))
+    payload["config"]["execution"]["participation"] = 100.5 / volume
+    session_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    order = client.post(
+        f"/api/paper/sessions/{sid}/orders",
+        json={"code": market.code(sec), "side": "buy", "qty": 200},
+        headers=AUTH,
+    ).json()["order"]
+    assert order["status"] == "pending" and order["fills"] == []
+
+    stepped = client.post(f"/api/paper/sessions/{sid}/step", json={}, headers=AUTH)
+    assert stepped.status_code == 200, stepped.text
+    serialized = stepped.json()["orders"][0]
+    assert serialized["status"] == "partial"
+    assert serialized["filled_qty"] == 100
+    assert len(serialized["fills"]) == 1 and serialized["fills"][0]["qty"] == 100
+    assert serialized["fill_price"] is not None
+
+    detail = client.get(f"/api/paper/sessions/{sid}", headers=AUTH).json()
+    assert detail["orders"][0]["status"] == "partial"
+    assert detail["session"]["pending_orders"] == 1
 
 
 def test_create_without_snapshot_returns_404(tmp_path: Path) -> None:

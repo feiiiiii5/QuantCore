@@ -1,6 +1,6 @@
 import type {
   DatasetCatalog, MinuteBars,
-  AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, Experiment, ExperimentDetail,
+  AttributionResult, BacktestResultPayload, Bars, CompareResult, DataStatus, DoctorReport, Experiment, ExperimentDetail,
   FactorCorrelationResult, FactorResult, FinancialsResult, Health, Job, JobResult, MarketOverview, Meta, ProviderInfo, QualityReport, ReplayResult,
   CapacityResult, CostSensitivityResult, MonteCarloResult, OverfittingResult, PaperAutoStatus, PaperOrder, PaperPortfolioResult,
   PaperSessionDetail, PaperSessionSummary, PBOResult, PluginBacktestAccepted, PluginInfo, PluginValidation,
@@ -105,6 +105,7 @@ export async function downloadWithAuth(path: string, filename: string): Promise<
 export const api = {
   health: () => request<Health>("/health"),
   meta: () => request<Meta>("/api/meta"),
+  doctor: (includeOptional = true) => request<DoctorReport>("/api/doctor?include_optional=" + includeOptional),
 
   overview: (snapshot?: string) => request<MarketOverview>(`/api/market/overview${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),
   bars: (code: string, snapshot?: string) => request<Bars>(`/api/market/bars?code=${encodeURIComponent(code)}${snapshot ? `&snapshot=${encodeURIComponent(snapshot)}` : ""}`),

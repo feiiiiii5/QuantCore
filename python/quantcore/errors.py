@@ -49,3 +49,7 @@ class BacktestError(QuantCoreError):
 
 class ExperimentError(QuantCoreError):
     """Raised when an experiment record is missing or inconsistent."""
+
+
+class DemoError(QuantCoreError):
+    """Raised when the one-command ``qc demo`` pipeline cannot run (e.g. engine missing)."""
