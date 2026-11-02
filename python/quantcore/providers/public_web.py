@@ -140,7 +140,7 @@ def normalize_sina_universe(payload: Any) -> pd.DataFrame:
                 "source": "SINA",
             }
         )
-    return pd.DataFrame(
+    frame = pd.DataFrame(
         rows,
         columns=[
             "sec_id",
@@ -155,6 +155,9 @@ def normalize_sina_universe(payload: Any) -> pd.DataFrame:
             "source",
         ],
     )
+    if not frame.empty:
+        frame = frame.drop_duplicates(subset=["code"], keep="first").reset_index(drop=True)
+    return frame
 
 
 def _number(value: Any) -> float:
@@ -196,6 +199,7 @@ def parse_sina_daily(payload: Any, code: str) -> pd.DataFrame:
     frame["code"] = code_norm
     frame["volume"] = frame["volume"].fillna(0).round().astype("int64")  # shares as-is
     frame = frame.dropna(subset=["open", "high", "low", "close"])
+    frame = frame.drop_duplicates(subset=["date"], keep="last")
     return frame.sort_values("date", kind="stable").reset_index(drop=True)
 
 
@@ -217,7 +221,10 @@ def parse_tencent_qfq(payload: Any, symbol: str) -> pd.DataFrame:
         except (TypeError, ValueError):
             continue
         parsed.append({"date": day, "close": close})
-    return pd.DataFrame(parsed, columns=["date", "close"])
+    frame = pd.DataFrame(parsed, columns=["date", "close"])
+    if frame.empty:
+        return frame
+    return frame.drop_duplicates(subset=["date"], keep="last").reset_index(drop=True)
 
 
 def empty_public_bars() -> pd.DataFrame:
@@ -266,7 +273,10 @@ def build_canonical_bars(
         bars[column] = 0
     for column in ("mktcap", "float_mktcap"):
         bars[column] = 0.0
-    bars["turnover"] = 0.0
+    if "turnover" in bars.columns:
+        bars["turnover"] = pd.to_numeric(bars["turnover"], errors="coerce").fillna(0.0)
+    else:
+        bars["turnover"] = 0.0
     bars["source"] = source
     return normalize_bars(bars)
 
@@ -283,9 +293,9 @@ def derive_adjustment(
     factors = pd.Series(1.0, index=raw.index, dtype="float64")
     if raw.empty or adjusted.empty or "sec_id" not in raw.columns:
         return factors, empty_corporate_actions()
-    merged = raw[["date", "close"]].merge(
-        adjusted[["date", "close"]], on="date", how="inner", suffixes=("_raw", "_adj")
-    )
+    raw_rows = raw[["date", "close"]].drop_duplicates(subset=["date"], keep="last")
+    adjusted_rows = adjusted[["date", "close"]].drop_duplicates(subset=["date"], keep="last")
+    merged = raw_rows.merge(adjusted_rows, on="date", how="inner", suffixes=("_raw", "_adj"))
     merged = merged[(merged["close_raw"] > 0) & (merged["close_adj"] > 0)].reset_index(drop=True)
     if merged.empty:
         return factors, empty_corporate_actions()

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
 import time
 from collections.abc import Callable
@@ -28,6 +29,8 @@ from .quotes import (
     fetch_sina_quotes,
     normalize_code,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_SECONDS = 3.0
 MIN_INTERVAL_SECONDS = 2.0
@@ -104,6 +107,7 @@ class LiveQuoteService:
 
     async def _run(self) -> None:
         while not self._stop.is_set():
+            phase = "closed"
             try:
                 phase = market_phase(self.clock())
                 if phase in {"pre_open", "open", "lunch"} or self._as_of is None:
@@ -112,8 +116,11 @@ class LiveQuoteService:
                 raise
             except Exception as exc:  # surfaced through status instead of crashing
                 self._error = f"{type(exc).__name__}: {exc}"[:300]
+                LOGGER.warning("live refresh failed: %s", exc)
             delay = self.config.interval_seconds
-            if self._as_of is None and phase in {"closed", "holiday"}:
+            if phase in {"closed", "holiday"}:
+                # Polling without network during the closed/holiday phase: slow down from
+                # the 2-3s intraday cadence (the status still updates last_trade_date).
                 delay = max(delay, 15.0)
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=delay)
@@ -159,10 +166,14 @@ class LiveQuoteService:
             if not quotes:
                 raise QuoteSourceError("eastmoney returned no quotes")
         except Exception as primary:  # fallback source
+            LOGGER.info("live primary source eastmoney failed, trying sina: %s", primary)
             try:
                 quotes = await self._fetch_group(stocks, indexes, now=now, source="sina")
                 source = "sina"
             except Exception as secondary:  # report both sources in the error
+                LOGGER.warning(
+                    "live quote sources failed: eastmoney=%s sina=%s", primary, secondary
+                )
                 raise QuoteSourceError(
                     f"eastmoney failed ({primary}); sina failed ({secondary})"
                 ) from secondary
@@ -220,8 +231,6 @@ class LiveQuoteService:
     def _notice(self, state: str) -> str:
         if state == "off":
             return OFFLINE_NOTICE
-        if state == "holiday":
-            return "今日休市: 展示最近交易日数据"
         if state == "closed":
             return "已收盘: 展示最近收盘数据(如有)"
         if state == "error":
@@ -277,7 +286,9 @@ class LiveQuoteService:
         if not missing and not (stale and phase in {"pre_open", "open", "lunch"}):
             return
         try:
-            await self.refresh(codes if missing else None)
+            # Always refresh the requested codes: refresh() merges them with the watchlist,
+            # so a stale non-watchlist quote must not fall back to a watchlist-only refresh.
+            await self.refresh(codes)
         except QuoteSourceError:
             return  # status carries the error; keep serving whatever is cached
 

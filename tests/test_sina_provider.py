@@ -158,7 +158,15 @@ def test_recorded_universe_parsing() -> None:
 
 def test_security_master_pagination_and_limit() -> None:
     page1 = (FIXTURES / "universe_page1.json").read_text(encoding="utf-8")
-    page2_rows = json.loads(page1)[:5]
+    page1_rows = json.loads(page1)
+    page2_rows = [
+        {
+            **row,
+            "code": f"9209{position:02d}",
+            "symbol": f"bj9209{position:02d}",
+        }
+        for position, row in enumerate(page1_rows[:5])
+    ]
     calls = {"n": 0}
 
     def transport(kind: str, params: Mapping[str, Any]) -> str:
@@ -178,6 +186,24 @@ def test_security_master_pagination_and_limit() -> None:
     limited = make_provider(limit=3)
     assert len(limited.fetch_security_master()) == 3
     assert len(limited._transport.requests) == 1
+
+
+def test_concurrency_is_clamped_to_the_declared_quota() -> None:
+    assert SinaProvider(allow_network=False, max_workers=8).max_workers == 2
+    assert SinaProvider(allow_network=False, max_workers=0).max_workers == 1
+
+
+def test_universe_deduplicates_overlapping_pages() -> None:
+    page1 = (FIXTURES / "universe_page1.json").read_text(encoding="utf-8")
+
+    def transport(kind: str, params: Mapping[str, Any]) -> str:
+        if kind == "universe":
+            return page1 if int(params.get("page", 1)) <= 2 else "[]"
+        raise AssertionError(kind)
+
+    frame = make_provider(transport=transport).fetch_security_master()
+    assert len(frame) == 80  # overlapping page 2 rows are deduplicated by code
+    assert not frame["code"].duplicated().any()
 
 
 def test_daily_bars_volume_is_shares_and_amount_is_estimated() -> None:
@@ -368,3 +394,98 @@ def test_derive_adjustment_accepts_sustained_dividend_step() -> None:
     assert int(action["ex_date"]) == 20240104
     assert float(action["cash_per_share"]) > 0
     assert float(factor.iloc[-1]) == pytest.approx(1.0, abs=1e-6)
+
+
+def test_duplicate_kline_dates_are_deduplicated() -> None:
+    payload = [
+        {
+            "day": "2026-10-20",
+            "open": "9.79",
+            "high": "9.86",
+            "low": "9.68",
+            "close": "9.76",
+            "volume": "100",
+        },
+        {
+            "day": "2026-10-20",
+            "open": "9.79",
+            "high": "9.86",
+            "low": "9.68",
+            "close": "9.77",
+            "volume": "200",
+        },
+        {
+            "day": "2026-10-21",
+            "open": "9.72",
+            "high": "9.76",
+            "low": "9.61",
+            "close": "9.66",
+            "volume": "300",
+        },
+    ]
+
+    def transport(kind: str, params: Mapping[str, Any]) -> str:
+        if kind == "kline":
+            return json.dumps(payload, ensure_ascii=False)
+        raise AssertionError(f"unexpected request {kind}")
+
+    provider = make_provider(transport=transport)
+    frame = provider._raw_daily("600000", 20261020, 20261021)
+    assert frame["date"].tolist() == [20261020, 20261021]
+    assert frame["volume"].tolist() == [200, 300]  # last duplicate wins
+
+
+def test_qfq_rounding_noise_is_not_a_corporate_action() -> None:
+    dates = [20260622, 20260623, 20260624, 20260625, 20260626, 20260629]
+    raw = pd.DataFrame(
+        {"date": dates, "sec_id": "SH.600000", "close": [10.0, 10.0, 10.0, 10.0, 10.0, 10.0]}
+    )
+    noisy = pd.DataFrame(
+        {"date": dates, "close": [9.9995, 10.0005, 10.0000, 10.0004, 9.9998, 10.0001]}
+    )
+    _, actions = derive_adjustment(raw, noisy)
+    assert actions.empty  # rounding noise stays below the jump threshold
+
+    raw_ex = raw.copy()
+    raw_ex["close"] = [10.0, 10.0, 10.0, 9.7, 9.8, 9.9]
+    adjusted = pd.DataFrame({"date": dates, "close": [9.50, 9.50, 9.50, 9.70, 9.80, 9.90]})
+    _, actions = derive_adjustment(raw_ex, adjusted)
+    assert len(actions) == 1
+    assert int(actions.iloc[0]["ex_date"]) == 20260625
+
+
+def test_provider_panel_passes_quality_gate() -> None:
+    from quantcore.calendar import TradingCalendar
+    from quantcore.data.panel import PanelData
+    from quantcore.quality import quarantine_bad_rows, run_quality_checks
+
+    provider = make_provider()
+    window = ("2026-07-14", "2026-07-17")
+    bars = provider.fetch_daily_bars(["600000"], *window)
+    actions = provider.fetch_corporate_actions(["600000"], *window)
+    assert len(bars) >= 4 and len(actions) == 1
+    securities = pd.DataFrame(
+        {
+            "sec_id": ["SH.600000"],
+            "code": ["600000"],
+            "exchange": ["SH"],
+            "name": ["浦发银行"],
+            "board": ["MAIN"],
+            "list_date": [19991110],
+            "delist_date": [0],
+            "sec_type": ["STOCK"],
+            "industry": [""],
+            "source": ["SINA"],
+        }
+    )
+    panel = PanelData(
+        calendar=TradingCalendar.from_dates(bars["date"].tolist()),
+        securities=securities,
+        bars=bars,
+        corporate_actions=actions,
+        meta={"provider": "sina", "source": "SINA", "synthetic": False},
+    )
+    report = run_quality_checks(panel)
+    assert report.errors == []
+    quarantined = quarantine_bad_rows(panel)
+    assert quarantined.dropped == 0

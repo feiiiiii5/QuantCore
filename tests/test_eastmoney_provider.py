@@ -92,6 +92,10 @@ def test_board_inference_and_secid(code: str, board: str, secid: str) -> None:
     assert secid_for_code("sh.600000") == "1.600000"
 
 
+def test_concurrency_is_clamped_to_the_declared_quota() -> None:
+    assert EastmoneyProvider(allow_network=False, max_workers=8).max_workers == 2
+
+
 def test_universe_parsing_from_recorded_payload() -> None:
     payload = json.loads((FIXTURES / "universe.json").read_text(encoding="utf-8"))
     frame = normalize_eastmoney_universe(payload)
@@ -198,3 +202,25 @@ def test_network_requires_explicit_opt_in(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv("QC_ALLOW_NETWORK", "1")
     provider.ensure_available()
     assert provider.allow_network is True
+
+
+def test_turnover_from_kline_is_preserved() -> None:
+    bars = make_provider().fetch_daily_bars(["600000"], "2026-10-20", "2026-10-30")
+    assert float(bars.iloc[0]["turnover"]) == pytest.approx(0.0018)  # 0.18% as a fraction
+
+
+def test_duplicate_kline_rows_are_deduplicated() -> None:
+    payload = {
+        "rc": 0,
+        "data": {
+            "code": "600000",
+            "klines": [
+                "2026-10-20,9.79,9.76,9.86,9.68,100,1000000.00,1.84,-0.20,-0.02,0.18",
+                "2026-10-20,9.79,9.77,9.86,9.68,200,2000000.00,1.84,-0.19,-0.02,0.19",
+                "2026-10-21,9.72,9.66,9.76,9.61,300,3000000.00,1.54,-1.02,-0.10,0.14",
+            ],
+        },
+    }
+    frame = normalize_eastmoney_kline(payload, "600000")
+    assert frame["date"].tolist() == [20261020, 20261021]
+    assert int(frame["volume"].iloc[0]) == 20000  # last duplicate wins, x100 shares

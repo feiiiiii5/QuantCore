@@ -130,7 +130,7 @@ def normalize_eastmoney_universe(payload: Mapping[str, Any]) -> pd.DataFrame:
                 "source": "EASTMONEY",
             }
         )
-    return pd.DataFrame(
+    frame = pd.DataFrame(
         rows,
         columns=[
             "sec_id",
@@ -145,6 +145,9 @@ def normalize_eastmoney_universe(payload: Mapping[str, Any]) -> pd.DataFrame:
             "source",
         ],
     )
+    if not frame.empty:
+        frame = frame.drop_duplicates(subset=["code"], keep="last").reset_index(drop=True)
+    return frame
 
 
 def parse_kline_payload(payload: Mapping[str, Any], code: str) -> pd.DataFrame:
@@ -162,6 +165,7 @@ def parse_kline_payload(payload: Mapping[str, Any], code: str) -> pd.DataFrame:
         return frame
     frame["date"] = [to_date_int(value) for value in frame["date"]]
     frame["code"] = normalize_code(code)
+    frame = frame.drop_duplicates(subset=["date"], keep="last")
     return frame.sort_values("date", kind="stable").reset_index(drop=True)
 
 
@@ -228,7 +232,8 @@ class EastmoneyProvider(DataProvider):
         self._transport = transport
         self.codes = [normalize_code(value) for value in codes] if codes else None
         self.limit = int(limit) if limit is not None else None
-        self.max_workers = max(1, min(4, int(max_workers)))
+        # The declared quota promises <=2 concurrent requests; never exceed it.
+        self.max_workers = max(1, min(2, int(max_workers)))
         self.page_size = max(1, int(page_size))
         self.index_secid = index_secid
         self._limiter_lock = threading.Lock()

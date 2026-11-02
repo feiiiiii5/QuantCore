@@ -15,7 +15,7 @@ from typing import Any, Protocol
 import httpx
 
 from ..errors import QuantCoreError
-from .clock import now_shanghai
+from .clock import market_phase, now_shanghai
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -129,7 +129,13 @@ def is_index_code(code: str) -> bool:
 
 
 def _market_id(code: str) -> int:
-    """Eastmoney market id: 1 = Shanghai, 0 = Shenzhen/Beijing."""
+    """Eastmoney market id: 1 = Shanghai, 0 = Shenzhen/Beijing.
+
+    Beijing stock codes are 4xxxxx / 8xxxxx and the newer 920xxx range; 92xxxx must be
+    checked before the generic Shanghai "9" prefix (B-shares) rule.
+    """
+    if code.startswith(("4", "8", "92")):
+        return 0
     return 1 if code[0] in {"6", "9"} else 0
 
 
@@ -157,10 +163,10 @@ def sina_symbol(target: str) -> str:
     if target.startswith(INDEX_PREFIX):
         return _INDEX_BY_CODE[target[len(INDEX_PREFIX) :]]["sina"]
     code = normalize_code(target)
+    if code.startswith(("4", "8", "92")):
+        return f"bj{code}"
     if code[0] in {"6", "9"}:
         return f"sh{code}"
-    if code[0] in {"4", "8"}:
-        return f"bj{code}"
     return f"sz{code}"
 
 
@@ -194,11 +200,13 @@ def _quote_from_numbers(
 ) -> Quote | None:
     prev = prev_close or 0.0
     if price is None or price <= 0:
-        # Closed/suspended sessions: fall back to the previous close as the display price.
+        # Pre-open / closed sessions report no trade price: show the previous close and do
+        # not label the security as suspended.  During the continuous session (open/lunch)
+        # a missing price really means no trading today (halt/suspension).
         if prev <= 0:
             return None
         price = prev
-        suspended = True
+        suspended = market_phase(now) in {"open", "lunch"}
     else:
         suspended = False
     # Pre-open / halted rows report 0 for OHLC: keep them nullable instead of showing 0.00.

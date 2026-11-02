@@ -30,6 +30,7 @@ SINA_APPROX and must be re-verified before a research conclusion relies on them.
 
 from __future__ import annotations
 
+import datetime as dt
 import os
 import threading
 from collections.abc import Callable, Iterable, Mapping
@@ -76,6 +77,14 @@ SINA_KLINE_URL = (
 )
 TENCENT_QFQ_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
 INDEX_SYMBOL = "sh000001"
+_SHANGHAI_TZ = dt.timezone(dt.timedelta(hours=8), "Asia/Shanghai")
+
+
+def _today_shanghai() -> date:
+    """Today in Asia/Shanghai (the data vendor's trading-day timezone)."""
+    return dt.datetime.now(tz=_SHANGHAI_TZ).date()
+
+
 MAX_HISTORY_BARS = 2000
 REQUEST_HEADERS = {
     "User-Agent": (
@@ -139,7 +148,8 @@ class SinaProvider(DataProvider):
         self._transport = transport
         self.codes = [normalize_code(value) for value in codes] if codes else None
         self.limit = int(limit) if limit is not None else None
-        self.max_workers = max(1, min(4, int(max_workers)))
+        # The declared quota promises <=2 concurrent requests; never exceed it.
+        self.max_workers = max(1, min(2, int(max_workers)))
         self.page_size = max(1, int(page_size))
         self.derive_actions = bool(derive_actions)
         self.index_symbol = index_symbol
@@ -209,7 +219,7 @@ class SinaProvider(DataProvider):
     @staticmethod
     def _history_bars(start: int) -> int:
         """datalen covering [start, today] for the latest-N kline endpoint."""
-        span_days = max(0, (date.today() - from_date_int(start)).days)
+        span_days = max(0, (_today_shanghai() - from_date_int(start)).days)
         estimate = int(span_days * 5 / 7) + 40
         return max(40, min(MAX_HISTORY_BARS, estimate))
 
@@ -322,7 +332,7 @@ class SinaProvider(DataProvider):
 
     def _qfq_closes(self, code: str, start: int, end: int) -> pd.DataFrame:
         symbol = sina_symbol(code)
-        today = to_date_int(date.today())
+        today = to_date_int(_today_shanghai())
         last = min(int(end), today)
         count = min(MAX_HISTORY_BARS, self._history_bars(start) + 5)
         text = self._get_text(
