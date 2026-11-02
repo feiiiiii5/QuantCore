@@ -747,3 +747,138 @@ export interface FinancialsResult {
   rows: FinancialReport[];
   note: string;
 }
+
+// ---------------------------------------------------------------- live market / 新手流程（重构轮）
+
+/** Where an endpoint or helper lives for the live quote service. */
+export type LiveState = "off" | "idle" | "connecting" | "live" | "error" | "closed";
+
+export type MarketPhase = "pre_open" | "open" | "lunch" | "closed" | "holiday";
+
+export interface MarketClock {
+  phase: MarketPhase;
+  is_trading_day: boolean;
+  server_time: string;
+  next_open: string | null;
+  last_trade_date: number | null;
+}
+
+export interface LiveStatus {
+  enabled: boolean;
+  source: "eastmoney" | "sina" | "none";
+  state: LiveState;
+  market: MarketClock;
+  as_of: string | null;
+  latency_ms: number | null;
+  subscribed: number;
+  error: string | null;
+  notice: string;
+}
+
+export interface LiveQuote {
+  code: string;
+  name: string;
+  price: number;
+  prev_close: number;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  change: number;
+  change_pct: number;
+  volume: number;
+  amount: number;
+  turnover_pct: number | null;
+  limit_up: number | null;
+  limit_down: number | null;
+  suspended: boolean;
+  timestamp: string | null;
+  source: string;
+}
+
+export interface LiveQuotesPayload {
+  as_of: string | null;
+  source: string;
+  stale: boolean;
+  quotes: LiveQuote[];
+}
+
+export interface WatchlistPayload {
+  codes: string[];
+}
+
+export interface IntegrityCheckView {
+  id: string;
+  title: string;
+  status: "pass" | "warn" | "fail";
+  detail: string;
+}
+
+export interface DataIntegrity {
+  status: "ok" | "warn" | "fail";
+  generated_at: string;
+  snapshot: {
+    id: string;
+    synthetic: boolean;
+    source: string;
+    n_sec: number;
+    n_time: number;
+    start: number;
+    end: number;
+  } | null;
+  coverage: {
+    expected_cells: number;
+    present_cells: number;
+    coverage_pct: number;
+    symbols: number;
+    trading_days: number;
+  };
+  checks: IntegrityCheckView[];
+  gaps: {
+    missing_days: number;
+    symbols_with_gaps: number;
+    examples: Array<{ code: string; date: number }>;
+  };
+  accuracy: {
+    ohlc_violations: number;
+    volume_amount_mismatch: number;
+    limit_violations: number;
+    adjustment_breaks: number;
+  };
+  cross_source: {
+    checked: number;
+    matched: number;
+    max_rel_diff: number | null;
+    source: string | null;
+    note: string;
+  };
+  note: string;
+}
+
+export interface OnboardingStep {
+  id: string;
+  title: string;
+  description: string;
+  action: "bootstrap" | "backtest" | "browse" | "data";
+  label: string;
+  done: boolean;
+}
+
+export interface OnboardingState {
+  first_run: boolean;
+  beginner: boolean;
+  steps: OnboardingStep[];
+  progress: { done: number; total: number };
+}
+
+export interface StrategyPreset {
+  id: string;
+  name: string;
+  tagline: string;
+  description: string;
+  plain_terms: string;
+  risk_note: string;
+  template: string;
+  params: Record<string, unknown>;
+  horizon: string;
+  suitable_for: string;
+}

@@ -24,13 +24,15 @@ from ..strategy.spec import StrategySpec
 from .schemas import DataUpdateRequest, OnboardingRequest, SnapshotBuildRequest
 from .workspace import Workspace, json_safe
 
-NETWORK_PROVIDERS = {"tushare", "akshare", "mootdx"}
+NETWORK_PROVIDERS = {"tushare", "akshare", "mootdx", "sina", "eastmoney"}
 PROVIDER_LABELS = {
     "synthetic": "Synthetic (合成)",
     "local": "LocalFile (本地文件)",
     "tushare": "Tushare Pro",
     "akshare": "AKShare",
     "mootdx": "mootdx",
+    "sina": "新浪财经公开行情 (免 Token)",
+    "eastmoney": "东方财富 (备用, 可能限流)",
 }
 
 
@@ -47,6 +49,9 @@ def _provider_available(name: str) -> bool:
         return True
     if name == "tushare":
         return bool(os.environ.get("TUSHARE_TOKEN"))
+    if name in {"sina", "eastmoney"}:
+        # Public web quotes need no credentials, only an explicit network opt-in.
+        return os.environ.get("QC_ALLOW_NETWORK") == "1"
     if name in {"akshare", "mootdx"}:
         return os.environ.get("QC_ALLOW_NETWORK") == "1" and (
             importlib.util.find_spec(name) is not None
@@ -187,6 +192,12 @@ def register_data_routes(app: FastAPI, ctx: Workspace) -> None:
             kwargs["data_dir"] = payload.local_dir
         elif name == "tushare" and payload.fixture_dir:
             kwargs["fixture_dir"] = payload.fixture_dir
+        elif name in {"sina", "eastmoney"}:
+            kwargs["allow_network"] = os.environ.get("QC_ALLOW_NETWORK") == "1"
+            if payload.codes:
+                kwargs["codes"] = list(payload.codes)
+            if payload.limit is not None:
+                kwargs["limit"] = int(payload.limit)
         try:
             create_provider(name, **kwargs)
         except Exception as exc:  # provider construction errors are 422

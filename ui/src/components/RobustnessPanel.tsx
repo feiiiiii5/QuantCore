@@ -10,6 +10,7 @@ import {
   usePBO,
 } from "../api/queries";
 import Chart from "./Chart";
+import { chartToken } from "../lib/tokens";
 
 const pct = (value: number | undefined) => `${((value ?? 0) * 100).toFixed(2)}%`;
 const money = (value: number | undefined) => `¥${Number(value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -82,8 +83,8 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
         { type: "value", splitLine: { show: false } },
       ],
       series: [
-        { name: "总收益", type: "bar", data: cost.data.points.map((point) => point.total_return * 100), itemStyle: { color: "#2563eb" } },
-        { name: "Sharpe", type: "line", yAxisIndex: 1, data: cost.data.points.map((point) => point.sharpe), lineStyle: { color: "#eab308" }, symbolSize: 5 },
+        { name: "总收益", type: "bar", data: cost.data.points.map((point) => point.total_return * 100), itemStyle: { color: chartToken("--primary", "#2563eb") } },
+        { name: "Sharpe", type: "line", yAxisIndex: 1, data: cost.data.points.map((point) => point.sharpe), lineStyle: { color: chartToken("--warn", "#eab308") }, symbolSize: 5 },
       ],
     };
   }, [cost.data]);
@@ -105,7 +106,7 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
             const values = rows.map((row) => row[index]).sort((a, b) => a - b);
             return values[Math.floor(values.length / 2)] * 100;
           });
-        })(), showSymbol: false, lineStyle: { width: 2, color: "#2563eb" } },
+        })(), showSymbol: false, lineStyle: { width: 2, color: chartToken("--primary", "#2563eb") } },
       ],
     };
   }, [monteCarlo.data]);

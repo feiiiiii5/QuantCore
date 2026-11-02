@@ -30,6 +30,18 @@ def _local(**kwargs: Any) -> DataProvider:
     return LocalFileProvider(**kwargs)
 
 
+def _sina(**kwargs: Any) -> DataProvider:
+    from .sina import SinaProvider
+
+    return SinaProvider(**kwargs)
+
+
+def _eastmoney(**kwargs: Any) -> DataProvider:
+    from .eastmoney import EastmoneyProvider
+
+    return EastmoneyProvider(**kwargs)
+
+
 def _tushare(**kwargs: Any) -> DataProvider:
     from .tushare import TushareProvider
 
@@ -51,6 +63,8 @@ def _mootdx(**kwargs: Any) -> DataProvider:
 for _name, _factory in (
     ("synthetic", _synthetic),
     ("local", _local),
+    ("sina", _sina),
+    ("eastmoney", _eastmoney),
     ("tushare", _tushare),
     ("akshare", _akshare),
     ("mootdx", _mootdx),

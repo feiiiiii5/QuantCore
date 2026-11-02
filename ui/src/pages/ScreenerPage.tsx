@@ -1,18 +1,22 @@
 import { useMemo, useState } from "react";
-import { Download, Play, Save } from "lucide-react";
+import { Download, ListFilter, Play, Save } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useRunScreener, useScreenerPresets } from "../api/queries";
 import type { ScreenerRow } from "../api/types";
-import StatePanel from "../components/StatePanel";
-import VirtualTable from "../components/VirtualTable";
+import { Badge, EmptyState, Panel, Skeleton, Tag, VirtualTable } from "../components";
 import { compact, downloadText, num, signedPct, toCsv } from "../lib/format";
+import { useBeginner } from "../store/ui";
 import { useWorkspace } from "../store/workspace";
 import { zhCN as t } from "../i18n/zh-CN";
+import "./pages.css";
 
 const DEFAULT_EXPRESSION = "rank(ret(close,20)) > 0.8 and ma(close,5) > ma(close,20)";
 interface SavedScreener { name: string; expression: string; board: string; excludeSt: boolean; minAmount: string; at: string }
 
 export default function ScreenerPage() {
+  const navigate = useNavigate();
+  const beginner = useBeginner();
   const presets = useScreenerPresets();
   const runScreener = useRunScreener();
   const [preset, setPreset] = useState(() => useWorkspace.getState().screenerPreset);
@@ -44,7 +48,7 @@ export default function ScreenerPage() {
     const next = [{ name, expression, board, excludeSt, minAmount, at: new Date().toISOString() }, ...saved].slice(0, 20);
     setSaved(next);
     localStorage.setItem("qc_screener_saved", JSON.stringify(next));
-    setNotice(`已保存“${name}”（localStorage）`);
+    setNotice(`已保存「${name}」（本机 localStorage）`);
     setSavedName("");
   };
   const exportCsv = () => {
@@ -52,6 +56,7 @@ export default function ScreenerPage() {
     const rows = result.rows.map((row) => ({ ...row }));
     downloadText("screener.csv", toCsv(rows, ["code", "name", "board", "industry", "close", "change_pct", "turnover", "mktcap", "score"]));
   };
+  const backtestWithResult = () => navigate(`/backtest?screener=${encodeURIComponent(expression)}`);
   const columns = useMemo<ColumnDef<ScreenerRow, unknown>[]>(() => [
     { accessorKey: "code", header: "代码", size: 96, cell: ({ row }) => <span className="mono">{row.original.code}</span> },
     { accessorKey: "name", header: "名称", size: 150, cell: ({ row }) => <span className="truncate" title={row.original.name}>{row.original.name}</span> },
@@ -65,44 +70,42 @@ export default function ScreenerPage() {
   ], []);
 
   return (
-    <>
-      <div className="page-head">
-        <div><h1>选股</h1><p>DSL 条件组合 · 股票池 · 结果排序 · 保存与 CSV 导出</p></div>
-        <div className="button-row">
-          <button className="btn" onClick={save} disabled={!expression.trim()}><Save size={15} /> 保存</button>
-          <button className="btn" onClick={exportCsv} disabled={!result}><Download size={15} /> 导出</button>
+    <div className="page">
+      <header className="page-head">
+        <div><h1>选股</h1><p className="page-lead">一句话描述条件，选出一篮子股票；可直接用结果发起回测。</p></div>
+        <div className="page-head-actions">
+          <button className="btn" onClick={save} disabled={!expression.trim()}><Save size={15} /> 保存预设</button>
+          <button className="btn" onClick={exportCsv} disabled={!result}><Download size={15} /> 导出 CSV</button>
           <button className="btn primary" onClick={run} disabled={runScreener.isPending}><Play size={15} /> {runScreener.isPending ? "运行中…" : "运行选股"}</button>
         </div>
-      </div>
-      <div className="card">
-        {presets.isError ? <StatePanel error={presets.error.message} onRetry={() => void presets.refetch()} /> : (
-          <>
-            <div className="form-grid">
-              <label>预设<select value={preset} onChange={(event) => applyPreset(event.target.value)}><option value="">自定义</option>{(presets.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-              <label>板块<select value={board} onChange={(event) => setBoard(event.target.value)}><option value="">全部 A 股</option><option value="MAIN">主板</option><option value="GEM">创业板</option><option value="STAR">科创板</option><option value="BSE">北交所</option></select></label>
-              <label>最小成交额<input value={minAmount} onChange={(event) => setMinAmount(event.target.value)} inputMode="decimal" /></label>
-            </div>
-            <label className="check-line"><input type="checkbox" checked={excludeSt} onChange={(event) => setExcludeSt(event.target.checked)} /> 剔除 ST</label>
-          </>
+      </header>
+
+      <Panel title="选股条件" subtitle="模板是常用条件；也可以直接改 DSL 表达式" actions={presets.isError ? <Badge tone="warn">预设加载失败，可自定义</Badge> : <span className="muted small">{presets.data?.length ?? 0} 个模板</span>}>
+        {presets.isLoading ? <Skeleton rows={2} /> : (
+          <div className="chip-row">
+            {(presets.data ?? []).map((item) => <Tag key={item.id} tone={preset === item.id ? "info" : "neutral"} active={preset === item.id} onClick={() => applyPreset(item.id)} title={item.description}>{item.name}</Tag>)}
+            <Tag tone="neutral" active={!preset} onClick={() => { setPreset(""); setExpression(DEFAULT_EXPRESSION); }}>自定义</Tag>
+          </div>
         )}
-        <label className="field-label" htmlFor="screener-expression">表达式（DSL）</label>
-        <textarea id="screener-expression" className="code-input" value={expression} onChange={(event) => setExpression(event.target.value)} rows={3} spellCheck={false} />
-        <div className="inline-actions">
-          <input className="input compact" placeholder="方案名称（可选）" value={savedName} onChange={(event) => setSavedName(event.target.value)} />
-          {saved.length ? <span className="muted small">已保存 {saved.length} 个方案</span> : null}
+        <label className="field-label" htmlFor="screener-expression">选股条件（DSL 一句话）</label>
+        <textarea id="screener-expression" className="code-input" value={expression} onChange={(event) => setExpression(event.target.value)} rows={3} spellCheck={false} placeholder={DEFAULT_EXPRESSION} />
+        <div className="form-grid" style={{ marginTop: 10 }}>
+          <label>板块<select value={board} onChange={(event) => setBoard(event.target.value)}><option value="">全部 A 股</option><option value="MAIN">主板</option><option value="GEM">创业板</option><option value="STAR">科创板</option><option value="BSE">北交所</option></select></label>
+          {!beginner ? <label>最小成交额<input value={minAmount} onChange={(event) => setMinAmount(event.target.value)} inputMode="decimal" /></label> : null}
+          {!beginner ? <label className="check-line" style={{ alignSelf: "end" }}><input type="checkbox" checked={excludeSt} onChange={(event) => setExcludeSt(event.target.checked)} /> 剔除 ST</label> : null}
+          <label>保存名称<input value={savedName} onChange={(event) => setSavedName(event.target.value)} placeholder="方案名称（可选）" /></label>
         </div>
-        <p className="muted small">字段 open/high/low/close/volume/amount/turnover/mktcap；函数 ma/std/ret/rank/zscore/ts_mean/ts_std/ts_sum/delay。仅研究，不构成投资建议。</p>
-      </div>
-      <div className="card" style={{ marginTop: 14 }}>
-        {runScreener.isPending ? <StatePanel loading /> : runScreener.error ? <StatePanel error={runScreener.error.message} onRetry={run} /> : !result ? <StatePanel empty emptyHint="运行一个选股表达式，结果会显示在这里。" /> : (
-          <>
-            <div className="card-head"><h3>结果 <span className="muted small">{result.matched_count} / {result.universe_count} 只 · 截至 {result.as_of}</span></h3><span className="muted small">点击表头排序</span></div>
-            <VirtualTable data={result.rows} columns={columns} rowKey={(row) => row.sec_id} height={460} ariaLabel="选股结果" empty={<span className="muted">没有股票匹配当前条件。</span>} />
-          </>
+        <p className="muted small">字段 open/high/low/close/volume/amount/turnover/mktcap；函数 ma/std/ret/rank/zscore/ts_mean/ts_std/ts_sum/delay。仅研究，不构成投资建议。{saved.length ? ` 本机已保存 ${saved.length} 个方案。` : ""}</p>
+      </Panel>
+
+      <Panel title="选股结果" subtitle={result ? `${result.matched_count} / ${result.universe_count} 只 · 截至 ${result.as_of}` : "运行后显示匹配股票"} actions={result ? <div className="row"><button className="btn primary" onClick={backtestWithResult}><ListFilter size={15} /> 用这个结果回测</button><button className="btn" onClick={exportCsv}><Download size={15} /> 导出</button></div> : null}>
+        {runScreener.isPending ? <Skeleton rows={6} /> : runScreener.error ? <EmptyState title="选股运行失败" hint={runScreener.error.message} action={<button className="btn" onClick={run}>重试</button>} /> : !result ? <EmptyState title="还没有选股结果" hint="点右上角「运行选股」；结果会显示匹配数量、排序表格，并可一键带回回测。" action={<button className="btn primary" onClick={run}><Play size={15} /> 运行选股</button>} /> : (
+          <VirtualTable data={result.rows} columns={columns} rowKey={(row) => row.sec_id} height={460} ariaLabel="选股结果" empty={<span className="muted">没有股票匹配当前条件。</span>} />
         )}
-      </div>
+      </Panel>
       {notice ? <p className="success-text">{notice}</p> : null}
+      {beginner ? <p className="muted small">新手提示：先选一个模板再运行；把结果带到回测页只是研究记录，回测仍按策略模板选股。</p> : null}
       <p className="muted small">{t.disclaimer}</p>
-    </>
+    </div>
   );
 }

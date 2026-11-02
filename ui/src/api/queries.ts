@@ -22,6 +22,13 @@ export const qk = {
   providers: ["data", "providers"] as const,
   quality: (snapshot: string) => ["data", "quality", snapshot] as const,
   jobs: (status?: string) => ["jobs", status ?? "all"] as const,
+  liveStatus: ["live", "status"] as const,
+  liveIndices: ["live", "indices"] as const,
+  liveQuotes: (codes: string[]) => ["live", "quotes", codes.join(",")] as const,
+  watchlist: ["live", "watchlist"] as const,
+  dataIntegrity: (snapshot?: string) => ["data", "integrity", snapshot ?? "latest"] as const,
+  onboarding: ["onboarding"] as const,
+  onboardingPresets: ["onboarding", "presets"] as const,
 };
 
 export function useHealth() {
@@ -163,4 +170,50 @@ export function useMonteCarlo() {
 }
 export function useCapacity() {
   return useMutation({ mutationFn: api.capacity });
+}
+
+// ---------------------------------------------------------------- live market / beginner flow
+
+/** Server-side live status (polled); keeps the UI honest about offline/synthetic modes. */
+export function useLiveStatus() {
+  return useQuery({ queryKey: qk.liveStatus, queryFn: api.liveStatus, refetchInterval: 5_000, staleTime: 2_000, retry: false });
+}
+export function useLiveIndices(enabled = true) {
+  return useQuery({ queryKey: qk.liveIndices, queryFn: api.liveIndices, refetchInterval: 5_000, staleTime: 2_000, retry: false, enabled });
+}
+export function useLiveQuotes(codes: string[], enabled = true) {
+  return useQuery({
+    queryKey: qk.liveQuotes(codes),
+    queryFn: () => api.liveQuotes(codes),
+    refetchInterval: 5_000,
+    staleTime: 2_000,
+    retry: false,
+    enabled: enabled && codes.length > 0,
+  });
+}
+export function useWatchlist() {
+  return useQuery({ queryKey: qk.watchlist, queryFn: api.watchlist, staleTime: 30_000 });
+}
+export function useSaveWatchlist() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: api.saveWatchlist,
+    onSuccess: () => { void client.invalidateQueries({ queryKey: qk.watchlist }); },
+  });
+}
+export function useDataIntegrity(snapshot?: string) {
+  return useQuery({ queryKey: qk.dataIntegrity(snapshot), queryFn: () => api.dataIntegrity(snapshot), staleTime: 60_000 });
+}
+export function useOnboarding() {
+  return useQuery({ queryKey: qk.onboarding, queryFn: api.onboarding, staleTime: 10_000 });
+}
+export function useCompleteOnboardingStep() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: api.completeOnboardingStep,
+    onSuccess: () => { void client.invalidateQueries({ queryKey: qk.onboarding }); },
+  });
+}
+export function useOnboardingPresets() {
+  return useQuery({ queryKey: qk.onboardingPresets, queryFn: api.onboardingPresets, staleTime: 60_000 });
 }

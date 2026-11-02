@@ -46,12 +46,16 @@ print(result.metrics)
 ```
 GET  /health, /api/meta, /api/doctor?include_optional=true
 GET  /api/market/{overview,bars,securities}
+GET  /api/live/{status,indices,quotes}   # 实时行情，需 QC_ALLOW_NETWORK=1；默认离线
+WS   /ws/live?token=...                  # 行情快照推送
 GET  /api/screener/presets; POST /api/screener/run
 GET  /api/strategies/templates[/id]; POST /api/strategies/validate
 POST /api/backtest -> 202 job_id; GET /api/jobs[/id|/result]; POST /api/jobs/{id}/cancel
 WS   /ws/jobs/{id}?token=...
 GET  /api/experiments[/id|/result|/report|/export|/compare]; POST /{id}/replay; DELETE /{id}
-GET  /api/data/{status,providers,snapshots,quality}; POST /api/data/{update,snapshot}
+GET  /api/data/{status,providers,snapshots,quality,integrity}; POST /api/data/{update,snapshot}
+GET  /api/onboarding; POST /api/onboarding/{complete,reset}; GET /api/onboarding/presets
+GET  /api/watchlist; PUT /api/watchlist
 POST /api/onboarding/bootstrap
 POST /api/research/{factor,sweep,walk_forward,attribution}
 ```

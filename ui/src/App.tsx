@@ -1,15 +1,14 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
-import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import {
-  BarChart3, Database, FlaskConical, LineChart, ListFilter, Microscope, Moon, Settings,
-  SlidersHorizontal, Sparkles, Sun, Wallet,
-} from "lucide-react";
-import { zhCN as t } from "./i18n/zh-CN";
-import GlobalSearch from "./components/GlobalSearch";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Moon, Sparkles, Sun } from "lucide-react";
+import AppBar from "./components/AppBar";
+import Rail, { MobileTabBar } from "./components/Rail";
+import CommandPalette, { type CommandPaletteItem } from "./components/CommandPalette";
+import Onboarding from "./components/Onboarding";
 import Toasts from "./components/Toasts";
 import StatusBar from "./components/StatusBar";
-import Onboarding from "./components/Onboarding";
 import ErrorBoundary from "./components/ErrorBoundary";
+import HomePage from "./pages/HomePage";
 import MarketPage from "./pages/MarketPage";
 import ScreenerPage from "./pages/ScreenerPage";
 import BacktestPage from "./pages/BacktestPage";
@@ -18,144 +17,171 @@ import ResearchPage from "./pages/ResearchPage";
 import PaperPage from "./pages/PaperPage";
 import DataPage from "./pages/DataPage";
 import SettingsPage from "./pages/SettingsPage";
+import { NAV_ITEMS, navItemByShortcut, titleForPath } from "./lib/nav";
+import {
+  applyAppearance, readAppearance, subscribeAppearance, toggleTheme, type Appearance,
+} from "./lib/appearance";
+import { useBeginner, useUIStore } from "./store/ui";
 import { useWorkspace } from "./store/workspace";
+import { zhCN as t } from "./i18n/zh-CN";
 
 const StrategyPage = lazy(() => import("./pages/StrategyPage"));
 
-const nav = [
-  { to: "/", label: t.nav.market, icon: LineChart, end: true },
-  { to: "/screener", label: t.nav.screener, icon: ListFilter },
-  { to: "/strategy", label: t.nav.strategy, icon: SlidersHorizontal },
-  { to: "/backtest", label: t.nav.backtest, icon: BarChart3 },
-  { to: "/experiments", label: t.nav.experiments, icon: FlaskConical },
-  { to: "/research", label: t.nav.research, icon: Microscope },
-  { to: "/paper", label: t.nav.paper, icon: Wallet },
-  { to: "/data", label: t.nav.data, icon: Database },
-  { to: "/settings", label: t.nav.settings, icon: Settings },
-];
-
-function applyTheme(): void {
-  const root = document.documentElement;
-  root.dataset.theme = localStorage.getItem("qc_theme") || "light";
-  root.dataset.density = localStorage.getItem("qc_density") || "comfortable";
-  root.dataset.colorMode = localStorage.getItem("qc_color_mode") || "red-up";
+function isTyping(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  if (!element) return false;
+  return element.tagName === "INPUT" || element.tagName === "TEXTAREA" || element.isContentEditable;
 }
 
 export default function App() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("qc_theme") || "light");
-  const [onboarding, setOnboarding] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const restored = useRef(false);
-  const initialLastPath = useRef(useWorkspace.getState().lastPath).current;
+  const [appearance, setAppearanceState] = useState<Appearance>(() => readAppearance());
+  const commandOpen = useUIStore((state) => state.commandOpen);
+  const setCommandOpen = useUIStore((state) => state.setCommandOpen);
+  const onboardingOpen = useUIStore((state) => state.onboardingOpen);
+  const openOnboarding = useUIStore((state) => state.openOnboarding);
+  const closeOnboarding = useUIStore((state) => state.closeOnboarding);
+  const beginner = useBeginner();
+  const toggleBeginner = useUIStore((state) => state.toggleBeginner);
   const navigate = useNavigate();
   const location = useLocation();
   const setLastPath = useWorkspace((state) => state.setLastPath);
+  const pendingG = useRef(0);
 
   useEffect(() => {
-    applyTheme();
-    const onSettings = () => { applyTheme(); setTheme(localStorage.getItem("qc_theme") || "light"); };
-    window.addEventListener("qc-settings", onSettings);
-    return () => window.removeEventListener("qc-settings", onSettings);
+    setAppearanceState(applyAppearance());
+    return subscribeAppearance(setAppearanceState);
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
-
-  useEffect(() => {
     setLastPath(location.pathname);
-    const item = nav.find((entry) => entry.to === location.pathname);
-    document.title = item ? `${item.label} · QuantCore` : "QuantCore";
+    const label = titleForPath(location.pathname);
+    document.title = label ? `${label} · ${t.appName}` : t.appName;
   }, [location.pathname, setLastPath]);
 
   useEffect(() => {
-    if (restored.current) return;
-    restored.current = true;
-    const last = initialLastPath;
-    if (window.location.pathname === "/" && !window.location.search && last !== "/" && nav.some((entry) => entry.to === last)) {
-      navigate(last, { replace: true });
-    }
-  }, [navigate, initialLastPath]);
-
-  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const typing = Boolean(target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable));
+      const typing = isTyping(event.target);
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        searchRef.current?.focus();
+        setCommandOpen(!useUIStore.getState().commandOpen);
         return;
       }
-      if (!typing && event.key === "/") {
+      if (event.key === "Escape" && useUIStore.getState().commandOpen) {
+        setCommandOpen(false);
+        return;
+      }
+      if (typing) return;
+      if (event.key === "/") {
         event.preventDefault();
-        searchRef.current?.focus();
+        setCommandOpen(true);
         return;
       }
-      if (!typing && event.altKey && /^[1-8]$/.test(event.key)) {
+      if (event.altKey && /^[0-9]$/.test(event.key)) {
         event.preventDefault();
-        const entry = nav[Number(event.key) - 1];
-        if (entry) navigate(entry.to);
+        const item = navItemByShortcut(Number(event.key));
+        if (item) navigate(item.to);
         return;
       }
-      if (event.key === "Escape" && document.activeElement === searchRef.current) {
-        searchRef.current?.blur();
+      if (event.key === "g") { pendingG.current = Date.now(); return; }
+      if (pendingG.current && Date.now() - pendingG.current < 1200 && /^[0-9]$/.test(event.key)) {
+        const item = navItemByShortcut(Number(event.key));
+        pendingG.current = 0;
+        if (item) { event.preventDefault(); navigate(item.to); }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [navigate]);
+  }, [navigate, setCommandOpen]);
 
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    localStorage.setItem("qc_theme", next);
-    setTheme(next);
-    document.documentElement.dataset.theme = next;
-  };
+  const paletteItems = useMemo<CommandPaletteItem[]>(() => {
+    const navItems: CommandPaletteItem[] = NAV_ITEMS.map((item) => ({
+      id: `nav-${item.to}`,
+      label: item.label,
+      hint: `Alt+${item.shortcut}`,
+      group: "页面",
+      icon: item.icon,
+      run: () => { setCommandOpen(false); navigate(item.to); },
+    }));
+    const commands: CommandPaletteItem[] = [
+      {
+        id: "cmd-theme",
+        label: appearance.theme === "dark" ? "切换到浅色主题" : "切换到深色主题",
+        group: "命令",
+        icon: appearance.theme === "dark" ? Sun : Moon,
+        keywords: "theme dark light 主题 深色 浅色",
+        run: () => { setCommandOpen(false); setAppearanceState(toggleTheme()); },
+      },
+      {
+        id: "cmd-beginner",
+        label: beginner ? "关闭新手模式" : "开启新手模式",
+        group: "命令",
+        keywords: "beginner 新手",
+        run: () => { setCommandOpen(false); toggleBeginner(); },
+      },
+      {
+        id: "cmd-onboarding",
+        label: "打开新手引导（一键示例）",
+        group: "命令",
+        icon: Sparkles,
+        keywords: "onboarding 引导 示例 bootstrap",
+        run: () => { setCommandOpen(false); openOnboarding(); },
+      },
+      {
+        id: "cmd-live",
+        label: "开启实时行情（去设置）",
+        group: "命令",
+        keywords: "live 实时 网络",
+        run: () => { setCommandOpen(false); navigate("/settings"); },
+      },
+      {
+        id: "cmd-integrity",
+        label: "查看数据体检",
+        group: "命令",
+        keywords: "data integrity 数据 体检",
+        run: () => { setCommandOpen(false); navigate("/data"); },
+      },
+    ];
+    return [...navItems, ...commands];
+  }, [appearance.theme, beginner, navigate, openOnboarding, setCommandOpen, toggleBeginner]);
 
   return (
     <div className="app-shell">
-      <aside className="sidebar" aria-label="主导航">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">QC</span>
-          <div><strong>{t.appName}</strong><small>{t.tagline}</small></div>
+      <AppBar theme={appearance.theme} onToggleTheme={() => setAppearanceState(toggleTheme())} />
+      <Rail />
+      <main className="app-main">
+        <div className="app-content">
+          <div className="content-inner">
+            <ErrorBoundary>
+              <Suspense fallback={<div className="state-panel" role="status">加载页面…</div>}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/today" replace />} />
+                  <Route path="/today" element={<HomePage />} />
+                  <Route path="/market" element={<MarketPage />} />
+                  <Route path="/screener" element={<ScreenerPage />} />
+                  <Route path="/strategy" element={<StrategyPage />} />
+                  <Route path="/backtest" element={<BacktestPage />} />
+                  <Route path="/experiments" element={<ExperimentPage />} />
+                  <Route path="/research" element={<ResearchPage />} />
+                  <Route path="/paper" element={<PaperPage />} />
+                  <Route path="/data" element={<DataPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="*" element={<Navigate to="/today" replace />} />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
+          </div>
         </div>
-        <nav>
-          {nav.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className={({ isActive }) => (isActive ? "active" : "")} title={`${label} (Alt+${nav.findIndex((item) => item.to === to) + 1})`}>
-              <Icon size={18} aria-hidden="true" /><span>{label}</span>
-            </NavLink>
-          ))}
-        </nav>
-        <button className="btn sidebar-cta" onClick={() => setOnboarding(true)}><Sparkles size={15} /> 一键示例</button>
-        <div className="sidebar-foot">{t.disclaimer}</div>
-      </aside>
-      <main className="main">
-        <header className="topbar">
-          <GlobalSearch ref={searchRef} />
-          <div className="topbar-meta">A股 · 日线 · 本地数据</div>
-          <button className="icon-btn" onClick={toggleTheme} aria-label="切换主题">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
-        </header>
-        <section className="content">
-          <ErrorBoundary>
-            <Suspense fallback={<div className="state-panel">加载页面…</div>}>
-              <Routes>
-                <Route path="/" element={<MarketPage />} />
-                <Route path="/screener" element={<ScreenerPage />} />
-                <Route path="/strategy" element={<StrategyPage />} />
-                <Route path="/backtest" element={<BacktestPage />} />
-                <Route path="/experiments" element={<ExperimentPage />} />
-                <Route path="/research" element={<ResearchPage />} />
-            <Route path="/paper" element={<PaperPage />} />
-                <Route path="/data" element={<DataPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
-        </section>
         <StatusBar />
       </main>
+      <MobileTabBar />
+      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} items={paletteItems} />
+      {onboardingOpen ? (
+        <Onboarding
+          onDone={(runId) => { closeOnboarding(); navigate(`/experiments?run=${encodeURIComponent(runId)}`); }}
+          onClose={closeOnboarding}
+        />
+      ) : null}
       <Toasts />
-      {onboarding ? <Onboarding onDone={(runId) => { setOnboarding(false); navigate(`/experiments?run=${encodeURIComponent(runId)}`); }} onClose={() => setOnboarding(false)} /> : null}
     </div>
   );
 }

@@ -1,71 +1,70 @@
-# UI — 交互与页面
+# UI — 交互与页面（重构轮）
 
-前端 `ui/`：React 19 + Vite + TypeScript；设计令牌在 `ui/src/styles.css`；zh-CN 默认。
-构建：`pnpm -C ui build`；开发：`pnpm -C ui dev`（Vite 将 `/api` `/ws` `/health` 代理到 `127.0.0.1:8000`）。
-生产：`qc serve` 同源托管 `ui/dist`，无 CORS、无 CDN；Monaco/ECharts 均本地 bundle。
+前端 `ui/`：React 19 + Vite + TypeScript；设计规范见 `docs/DESIGN-SPEC.md`，产品理念见 `docs/PRODUCT.md`。
+构建：`pnpm -C ui build`；开发：`pnpm -C ui dev`（Vite 代理 `/api` `/ws` `/health` 到 `127.0.0.1:8000`）。
+生产：`qc serve` 同源托管 `ui/dist`，无 CORS、无 CDN；Monaco/ECharts/Lightweight Charts 全部本地 bundle。
+仅研究与模拟，不连接券商、不下真实单；所有结果页与报告保留"历史表现不代表未来，不构成投资建议"。
 
-## 导航
-行情 / 选股 / 策略 / 回测 / 实验 / 研究 / 模拟 / 数据（+ 设置）；顶部全局搜索（代码/名称/行业，⌘K 聚焦，选中跳转 K 线）；
-底部状态栏显示数据截止日、数据源、任务状态、引擎/版本与本地地址。
+## 信息架构（IA）
+一级导航 6 组（左侧 68px 图标 rail；≤900px 变底部 tab）：
+
+| 组 | 路由 |
+|---|---|
+| 今日 | `/today`（默认；`/` 重定向到 `/today`） |
+| 行情 | `/market` |
+| 研究 | `/screener` `/strategy` `/backtest` `/experiments` `/research` |
+| 模拟 | `/paper` |
+| 数据 | `/data` |
+| 设置 | `/settings` |
+
+## 应用外壳
+- **AppBar（56px）**：品牌 · 实时指数条（上证/深成/创业板/科创50，涨跌色 + 实时/休市/离线状态点）· ⌘K 命令面板 · 新手模式开关 · 主题切换。
+- **Rail（68px）**：图标 + 文字分组导航；当前页高亮；Alt+1…9 / Alt+0 与 `g`+`数字` 跳页。
+- **StatusBar（28px）**：实时状态 · 数据源 · 快照日期 · 引擎 · 任务 · API 地址 · 免责声明。
+- **CommandPalette（⌘K / Ctrl-K / `/`）**：跳页、搜索证券（快照列表）、运行命令（主题/新手模式/新手引导/实时设置/数据体检）。
+- 新手引导弹窗改为 2 步（生成示例数据 → 跑示例回测），由首页 CTA 或命令面板打开。
+
+## 设计系统
+- tokens 全部在 `ui/src/styles/tokens.css`（浅/深色、紧凑密度、红涨/绿涨/色盲蓝橙）；组件与页面只消费 `var(--*)`，禁止硬编码颜色。
+- 样式拆分：`styles/{tokens,base,layout,components,overlays,views,legacy}.css`，`styles.css` 只做 @import；单文件 <500 行。
+- 通用组件（`ui/src/components/index.ts` barrel）：Panel、StatTile、SectionHeader、Toolbar、Segmented、Badge/Tag、DataTable、Sparkline、ChartCard、EmptyState、Skeleton、StepList、Tabs、MetricPill、QuoteRow、CommandPalette；既有组件（Chart、KLineChart、VirtualTable、ParamForm、StatePanel、MetricCard、RobustnessPanel、PaperPortfolioPanel、Toasts、ErrorBoundary、GlobalSearch、StatusBar）保持导出名与 props 兼容。
+- 三态约定：每个数据区块必须实现 loading（骨架）/ empty（带下一步）/ error（重试 + 提示）；实时关闭或数据过期显示 stale 标注。
+- 无障碍：`:focus-visible` 焦点环、aria-label、tabular-nums、`prefers-reduced-motion` 关闭动画。
 
 ## 页面
 
-### 行情 `/`
-- 全市场/主板/创业板/科创板指数卡 + 迷你走势；涨跌/涨跌停/停牌分布；行业板块涨跌。
-- 证券列表（代码/名称/行业/最新/涨跌/换手/交易所/类型/上市日）；证券资料与 PIT 财务公告视图，点击切换 K 线；K 线含 MA5/MA20/成交量/十字线/缩放。
-- 数据来源标注 `SYNTHETIC`；无快照时使用 40 只合成回退，页面会提示。
+### 今日 `/today`
+- 市场状态带：四大指数（实时优先，关闭实时时用最近快照 + 明确状态点）、涨跌色、迷你走势、休市/离线提示。
+- 我的自选：6 位代码添加/移除；实时开启时显示实时报价，否则显示快照报价；空态引导去行情页。
+- 新手进度：后端 `/api/onboarding` 四步（生成示例数据 → 跑第一个回测 → 看懂结果 → 数据体检），完成打勾；不可用时回退到静态步骤。
+- 最近研究：最近 6 个实验卡片（策略、总收益/Sharpe/最大回撤、SYNTHETIC 与数据体检徽章、时间），空态给"一键示例"。
+- 数据体检摘要：状态徽章 + 覆盖率/标的数/交易日/缺口 + warn/fail 检查项；失败醒目提示。
+- 主 CTA「开始一次研究」→ `/backtest`；新手模式显示"怎么看这一页"三句话说明。
 
-### 选股 `/screener`
-- 预设因子（动量/低波动/趋势/流动性/质量动量）、板块、剔除 ST、最小成交额。
-- DSL 表达式（`rank/ret/ma/std/ts_mean/...`），运行后在表格展示匹配数/行业/市值/分数；支持浏览器本地保存与 CSV 导出。
+### 行情 `/market`
+- 指数卡（实时优先）→ 证券搜索/自选/全部列表 → K 线主图（MA5/MA20/成交量/分钟切换）→ 右侧实时读数（现价、涨跌、今开/高/低/昨收、成交额、振幅、涨跌停、换手、更新时间）。
+- 实时开启：绿点 + 最后更新时间；未开启：黄色"离线快照" + 去设置开启提示；实时失败回退快照并提示。
+- 底部/右栏：数据源、快照 ID 与日期、数据体检徽章与覆盖率；保留证券资料、PIT 财务、涨跌分布与 SYNTHETIC 标注。
+- 「加入自选」写入本地 watchlist；「开始一次研究」带代码去回测页。
 
-### 策略 `/strategy`
-- 本地插件：data/strategies/*.py 的发现/静态审计/运行回测（后台任务）；页面明确静态审计不是安全沙箱。
-- 七个模板与 JSON Schema 默认参数；Monaco 本地编辑器编辑参数 JSON；调用 `/api/strategies/validate` 显示校验结果。
-- “运行回测”把模板/参数带到回测页；编辑器按路由懒加载，首屏不下载 3.3MB Monaco chunk。
+### 研究工作台（选股/策略/回测/实验/研究）
+- 结论先行、三态齐全；新手模式隐藏高级参数并给"下一步建议"；结果带数据体检/可信度徽章。细节见各页面实现与 DESIGN-SPEC §6.3。
 
-### 回测 `/backtest`
-- 模板/参数/日期/初始资金/成交模型；高级费用/成交/风险限制（最大持仓数、单票最大权重）；可选基准代码；提交 `/api/backtest` 后台任务，WS 进度，可取消。
-- 完成后加载实验：总收益/年化/Sharpe/最大回撤/换手/费用，可选基准收益/超额/信息比率，净值+基准+回撤图，逐笔交易表。
-- 点击任一笔交易打开“交易解释”：价格、数量、成交额、佣金/印花税/过户费/其他/合计、触发原因与 trace 摘要。
-- HTML 报告与可选 PDF 导出（本地 Chrome/Chromium；无浏览器时 API 返回 503，不伪造文件）。
+### 模拟 `/paper` / 数据 `/data` / 设置 `/settings`
+- 模拟：会话 → 持仓/委托/成交/权益曲线 → 下单面板；partial 状态显示"部分成交 成交/委托"；明确不连接券商。
+- 数据：数据体检优先 → 导入真实数据（网络默认关，开启需显式确认）→ 快照列表 → 合成示例入口（SYNTHETIC）。
+- 设置：服务/Token、实时行情开关、自检、主题/密度/涨跌色、新手模式、免责声明。
 
-### 实验 `/experiments`
-- 运行记录（策略/时间/收益）；选择后加载净值与指标；支持复现校验、HTML 报告、ZIP 导出。
-- 勾选多条实验对比净值曲线（最多 6 条）；`DELETE` 仅在 API 层提供，UI 未暴露删除以避免误操作。
+## 新手模式
+- 默认开启，状态存 localStorage `qc_beginner`（`ui/src/store/ui.ts`：`useBeginner()` / `setBeginner()`）；AppBar 与设置页可切换。
+- 开启时：隐藏高级参数、术语白话解释、突出"下一步"、空态优先"一键示例"、结果页"怎么看这个结果"。
 
-### 模拟 `/paper`
-- 本地虚拟账户：创建/选择快照会话、逐日推进/自动推进、重置/删除；市价或限价委托、撤单、持仓/委托/成交/权益曲线、信号 CSV、本地权益阈值提醒；多会话只读组合视图（权重合计=1，归一化聚合）；服务端模拟时钟“持续模拟”（历史快照推进，非实时行情）；明确不连接券商、不产生真实委托。
+## 实时行情规则
+- 网络能力只在运行时显式开启（服务端 `QC_ALLOW_NETWORK=1`）；测试用录制 fixture，不联网。
+- 状态：`实时`（绿点 + 更新时间）/ `休市`（灰点 + 最近收盘）/ `离线`（黄点 + 快照日期）；未开启时全站不发起行情网络请求。
+- 数据源、延迟、最后更新时间在行情页与 StatusBar 可见；价格变化用 ≤200ms 轻闪动画，尊重 reduced-motion。
 
-### 研究 `/research`
-- 稳健性：选择实验做 Deflated Sharpe、PBO/CSCV、成本敏感性、Monte Carlo 路径/分位、容量估算；近似口径在页面注明。
-- 因子诊断：表达式、预测期、分层数；IC/RankIC 时间序列、分层平均收益、衰减曲线、覆盖率/ICIR、分层明细；多因子相关性矩阵（日截面 Pearson/Spearman 均值）。
-- 参数扫描：模板 + JSON 网格或确定性随机抽样（mode/sample_size/seed，服务端上限 200 组合），输出 Sharpe 热力图/表格与最佳点。
-- 滚动验证：模板/参数/折数，输出各折收益/Sharpe/回撤/交易数与柱状图。
-- 归因：选择实验，按行业展示 FIFO 已实现+未实现盈亏（含费用，近似研究口径）。
-
-### 数据 `/data`
-- 数据仓库行数/大小、快照数、实验产物、可用空间；快照列表（证券/交易日/质量/类型）。
-- 数据源能力（AKShare/mootdx/Tushare/Local/Synthetic）；“增量更新+构建快照”后台任务与进度。
-- “一键示例”调用 onboarding：生成 SYNTHETIC 面板、快照并跑示例回测，跳转实验页。
-
-### 设置 `/settings`
-- API 地址（留空同源）/Bearer Token；测试连接；浅/深色、舒适/紧凑、红涨绿跌/绿涨红跌/色盲友好；保存后全局即时生效。
-
-## 状态与错误
-- 所有数据页有 loading/empty/error + 重试；API 错误显示 `detail`。
-- 空快照/空实验有明确引导；不把异常吞成空白。
-- `qc serve --open` 的 `?token=` 会被入口保存到 localStorage 并从 URL 移除，避免出现在 Referer/历史记录。
-
-## 预算与验证
-- 初始 JS 约 1.4MB raw（ECharts 1.0MB + app 0.31MB + React 0.05MB）；Monaco 3.3MB 仅 `/strategy` 按需加载。
-- Playwright 预算测试：首屏 <5s、初始 JS <2MB raw、无 console/page error；移动端 390px 无横向溢出。
-- `make e2e`：构建 UI + 隔离 `qc serve` + 18 条 Playwright，覆盖行情/选股/回测/实验/数据/策略/设置/研究/稳健性/模拟/onboarding/暗色/性能/移动端。
-
-## 兼容性
-- 桌面优先（macOS/Windows），移动端为响应式兜底：≤900px 侧栏折叠为图标，表格横向滚动。
-- 浏览器：Chrome/Edge/Safari 当前版本；Playwright 使用本机 Chrome channel。
-
-## Desktop shell
-
-`desktop/` is an Electron dev shell (M10-001) that launches the local `qc serve` and loads the same UI with a random token; it is not a signed installer and does not change the local-only security model. `make desktop-smoke` verifies headless loading.
+## 验证
+- `pnpm -C ui exec tsc -p tsconfig.json`、`pnpm -C ui test`、`pnpm -C ui build`。
+- Playwright（Lead 统一更新选择器）：新首页 `/today`、行情 `/market`、⌘K 命令面板、新手模式开关、实时/离线徽章为新增锚点。
+- 关键 DOM：`.app-shell/.appbar/.rail/.statusbar/.panel/.stat-tile/.badge/.segmented/.step-list/.tabs/.quote-row/.research-card/.readings-grid`；首页标题「今日」、行情标题「行情」。

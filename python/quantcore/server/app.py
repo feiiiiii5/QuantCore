@@ -28,11 +28,15 @@ from ..errors import (
     StrategyValidationError,
 )
 from ..jobs.queue import JobQueue
+from ..realtime.service import LiveQuoteService
 from .routes_data import register_data_routes
 from .routes_doctor import register_doctor_routes
 from .routes_experiments import register_experiment_routes
+from .routes_integrity import register_integrity_routes
 from .routes_jobs import register_job_routes
+from .routes_live import register_live_routes
 from .routes_market import register_market_routes
+from .routes_onboarding import register_onboarding_routes
 from .routes_paper import register_paper_routes
 from .routes_research import register_research_routes
 from .routes_screener import register_screener_routes
@@ -97,14 +101,17 @@ def create_app(
     state = SQLiteState(settings.state_path)
     queue = JobQueue(state, runner or run_job)
     workspace = Workspace(settings=settings, state=state, queue=queue)
+    live = LiveQuoteService(state=state)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if start_worker:
             queue.start()
+        await live.start()
         try:
             yield
         finally:
+            await live.stop()
             queue.stop()
 
     app = FastAPI(
@@ -119,6 +126,7 @@ def create_app(
     app.state.state = state
     app.state.workspace = workspace
     app.state.settings = settings
+    app.state.live = live
     app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.add_middleware(SecurityMiddleware, security=security)
 
@@ -188,6 +196,9 @@ def create_app(
     register_doctor_routes(app, workspace)
     register_research_routes(app, workspace)
     register_paper_routes(app, workspace)
+    register_onboarding_routes(app, workspace)
+    register_integrity_routes(app, workspace)
+    register_live_routes(app, live, security)
 
     # -- built UI (same origin): assets mount + SPA fallback; API routes always win -----
     ui_root = settings.ui_dir.resolve()

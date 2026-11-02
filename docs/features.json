@@ -263,6 +263,20 @@
       "evidence": "incremental watermark/idempotent upsert; test_data_store"
     },
     {
+      "id": "M2-018",
+      "milestone": "M2",
+      "title": "Sina public-web real data provider (full universe daily bars)",
+      "passes": true,
+      "evidence": "providers/sina.py: 5576-name A-share universe (Sina hs_a pages) + ~2000 raw daily bars (volume in shares, verified) + Tencent qfq-derived adjustment/approximate actions; real import verified 2026-11-02 (3 names / 2049 bars / quality passed); tests/test_sina_provider.py with recorded fixtures; docs/data-dictionary.md, docs/DATA-LICENSES.md"
+    },
+    {
+      "id": "M2-019",
+      "milestone": "M2",
+      "title": "data integrity audit (data health) + API/CLI",
+      "passes": true,
+      "evidence": "data/integrity.py audit_panel: coverage by listing date, gaps, OHLC, volume/amount, limit consistency, adjustment continuity, optional cross-source; GET /api/data/integrity; qc data integrity; tests/test_data_integrity.py; UI Data page health panel"
+    },
+    {
       "id": "M3-001",
       "milestone": "M3",
       "title": "engine semantics doc",
@@ -529,6 +543,20 @@
       "evidence": "Read-only offline environment report serialised by routes_doctor.py; no network, no state mutation; tests/test_api_doctor.py; docs/UI-API.md"
     },
     {
+      "id": "M5-008",
+      "milestone": "M5",
+      "title": "live market quotes (opt-in network) REST + WebSocket",
+      "passes": true,
+      "evidence": "realtime/: Shanghai session clock, Sina/Eastmoney quote sources with fallback, bounded polling cache, /api/live/{status,indices,quotes}, WS /ws/live; disabled by default and fully offline-safe; tests/test_live_quotes.py (fixtures, no network); docs/UI-API.md"
+    },
+    {
+      "id": "M5-009",
+      "milestone": "M5",
+      "title": "beginner onboarding, presets and watchlist API",
+      "passes": true,
+      "evidence": "onboarding.py + routes_onboarding.py: GET/POST /api/onboarding*, 6 plain-language presets (runnable templates), GET/PUT /api/watchlist persisted in SQLite meta; tests/test_onboarding_api.py (16 tests); live poller subscribes to the watchlist"
+    },
+    {
       "id": "M6-001",
       "milestone": "M6",
       "title": "UI shell/nav",
@@ -611,6 +639,20 @@
       "title": "settings self-check panel",
       "passes": true,
       "evidence": "Settings page '本地自检' card runs GET /api/doctor and renders pass/warn/fail/skip with hints; ui/src/lib/doctor.test.ts; pnpm -C ui test/build; Playwright settings e2e"
+    },
+    {
+      "id": "M6-013",
+      "milestone": "M6",
+      "title": "product concept, design system and Today dashboard",
+      "passes": true,
+      "evidence": "docs/PRODUCT.md + docs/DESIGN-SPEC.md; tokenised light/dark/density/colour-blind styles, component library (Panel/StatTile/DataTable/Tabs/CommandPalette/...), /today dashboard with live market band, watchlist, beginner checklist, recent research and data health; pnpm build/test"
+    },
+    {
+      "id": "M6-014",
+      "milestone": "M6",
+      "title": "redesigned pages + live-first market page",
+      "passes": true,
+      "evidence": "All pages rebuilt against DESIGN-SPEC (3-step backtest wizard with conclusion-first results + data-health badge, data health page, beginner settings, experiment cards, research conclusion banner, paper partial-fill UI); Playwright e2e rewritten for /today and new DOM; screenshots refreshed"
     },
     {
       "id": "M7-001",
@@ -849,9 +891,16 @@
       "title": "local test kit (qc doctor / qc demo / quick gates)",
       "passes": true,
       "evidence": "qc doctor + qc demo CLI; make doctor/demo/test-quick/verify-local/bench-scale; scripts/local_verify.sh + scripts/scale_bench.py; docs/LOCAL-TESTING.md; tests/test_doctor.py, tests/test_demo.py"
+    },
+    {
+      "id": "M10-010",
+      "milestone": "M10",
+      "title": "zero-basis tutorial (docs/TUTORIAL.md)",
+      "passes": true,
+      "evidence": "docs/TUTORIAL.md: install -> start -> 今日 -> 4-step checklist -> market live/offline -> first backtest + how to read results -> data health/import -> paper trading -> FAQ; every section ends with 'you should see'; 163 lines"
     }
   ],
   "verified_at": "2026-11-02",
-  "verified_by": "local gates: pytest 240 collected / 238 passed / 2 skipped; ctest 95/95; UI vitest 10 (5 files); Playwright 18/18; ruff/mypy; make verify-cpp; make doctor/demo/bench-scale",
-  "note": "All listed features pass. Documented limitations remain: no real vendor live feed; no signed/notarized installer (unsigned macOS/Windows zips only, Windows install/run unverified); real Tushare token/network unverified (fake-Pro contract tests only); minute bars are SYNTHETIC and the C++ engine is daily-only; C++ backtests still use board lots for ETF/convertibles; full-market 5500x20y benchmark not measured (default-scale bench in docs/PERFORMANCE.md); paper fills are aggregate volume-participation approximations (no order book) and corporate actions are not applied. Do not claim production trading."
+  "verified_by": "local gates: pytest (all green, see acceptance report); ctest 95/95; UI vitest 10; Playwright e2e (new UI, see acceptance report); ruff/mypy; make verify-cpp; make doctor/demo; real-data pipeline: Sina 3-name import + snapshot + qc data integrity + cpp backtest",
+  "note": "All listed features pass. Documented limitations remain: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display only, no L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); Eastmoney endpoints may be rate-limited; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers, real Tushare token verification and full-market performance benchmarks remain out of scope of this round."
 }

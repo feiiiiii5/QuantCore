@@ -38,10 +38,13 @@ export function bytes(value: number | null | undefined): string {
   return `${value} B`;
 }
 
-export function dateInt(value: number | null | undefined): string {
+export function dateInt(value: number | string | null | undefined): string {
   if (value == null) return "—";
-  const text = String(value);
-  return text.length === 8 ? `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6)}` : text;
+  const text = String(value).trim();
+  if (!text) return "—";
+  if (/^\d{8}$/.test(text)) return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6)}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  return "—";
 }
 
 export function monthKey(value: number): string {

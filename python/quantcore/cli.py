@@ -47,9 +47,14 @@ app.add_typer(sweep_app, name="sweep")
 app.add_typer(check_app, name="check")
 
 
+from .cli_data import data_integrity, data_status, data_update  # noqa: E402
 from .cli_serve import serve_command  # noqa: E402
 from .demo import demo_command  # noqa: E402
 from .doctor import doctor_command  # noqa: E402
+
+data_app.command("update")(data_update)
+data_app.command("status")(data_status)
+data_app.command("integrity")(data_integrity)
 
 
 def _emit(payload: dict[str, Any], json_output: bool = True) -> None:
@@ -113,64 +118,6 @@ def _load_spec(
     if template is None:
         raise typer.BadParameter("provide --spec strategy.yaml or --template <name>")
     return StrategySpec(name=name or template, template=template, params=_parse_json_object(params))
-
-
-# ---------------------------------------------------------------------------
-# data
-# ---------------------------------------------------------------------------
-@data_app.command("update")
-def data_update(
-    provider: str = typer.Option("synthetic", help="synthetic | local | tushare | ..."),
-    data_root: Path = typer.Option(DATA_ROOT, help="data directory"),
-    start: str = typer.Option("2020-01-02"),
-    end: str = typer.Option("2024-12-31"),
-    n_sec: int = typer.Option(200, min=1),
-    seed: int = typer.Option(42),
-    local_dir: Path | None = typer.Option(None, help="local provider data directory"),
-    fixture_dir: Path | None = typer.Option(None, help="tushare fixture directory"),
-    incremental: bool = typer.Option(True),
-    reset: bool = typer.Option(False),
-    json_output: bool = typer.Option(True),
-) -> None:
-    """Fetch/normalise data into the Parquet warehouse (quality-gated)."""
-    from quantcore.data.store import ParquetStore
-    from quantcore.ingest import ProviderIngestor
-    from quantcore.providers import create_provider
-
-    store = ParquetStore(data_root / "warehouse")
-    if reset:
-        store.reset()
-    kwargs: dict[str, Any] = {}
-    if provider == "synthetic":
-        from quantcore.data.synthetic import SyntheticConfig
-
-        kwargs["config"] = SyntheticConfig(n_sec=n_sec, start=start, end=end, seed=seed)
-    elif provider == "local":
-        if local_dir is None:
-            raise typer.BadParameter("--local-dir is required for the local provider")
-        kwargs["data_dir"] = local_dir
-    elif provider == "tushare" and fixture_dir is not None:
-        kwargs["fixture_dir"] = fixture_dir
-    prov = create_provider(provider, **kwargs)
-    ingestor = ProviderIngestor(prov, store)
-    result = ingestor.update(start, end, incremental=incremental)
-    payload = result.to_dict()
-    payload["manifest_hash"] = store.manifest_hash()
-    _emit(payload, json_output)
-
-
-@data_app.command("status")
-def data_status(
-    data_root: Path = typer.Option(DATA_ROOT),
-    json_output: bool = typer.Option(True),
-) -> None:
-    """Show warehouse datasets, manifest hash and ingest metadata."""
-    from quantcore.data.store import ParquetStore
-
-    store = ParquetStore(data_root / "warehouse")
-    payload = store.describe()
-    payload["last_ingest"] = store.state.get_meta("last_ingest")
-    _emit(payload, json_output)
 
 
 # ---------------------------------------------------------------------------

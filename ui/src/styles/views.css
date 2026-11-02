@@ -1,0 +1,44 @@
+/* Page-view specific classes for the Today dashboard and Market page. */
+
+.home-index-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.market-index-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+
+/* research cards on Today */
+.research-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--sp-3);
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--dur-1) var(--ease);
+}
+.research-card:hover { border-color: var(--border-strong); text-decoration: none; }
+.research-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap; min-width: 0; }
+.research-card-head strong { font-size: var(--fs-13); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+.hint-list { margin: 0; padding-left: 18px; color: var(--text-2); font-size: var(--fs-13); line-height: 1.7; }
+
+/* live readings on Market */
+.readings-price { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--sp-3); }
+.readings-price-value {
+  font-size: var(--fs-36);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.readings-price-delta { font-size: var(--fs-13); font-variant-numeric: tabular-nums; }
+.readings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px var(--sp-3); }
+.reading-item { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); min-width: 0; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+.reading-item span { color: var(--muted); font-size: var(--fs-12); }
+.reading-item strong { font-variant-numeric: tabular-nums; font-size: var(--fs-13); text-align: right; }
+.minute-panel { margin-top: var(--sp-2); }
+
+@media (max-width: 600px) {
+  .readings-price-value { font-size: var(--fs-28); }
+}

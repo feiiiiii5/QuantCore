@@ -3,6 +3,7 @@ import type { EChartsOption } from "echarts";
 import { usePaperPortfolio } from "../api/queries";
 import type { PaperSessionSummary } from "../api/types";
 import Chart from "./Chart";
+import { chartToken } from "../lib/tokens";
 import StatePanel from "./StatePanel";
 
 const pct = (value: number | undefined) => `${((value ?? 0) * 100).toFixed(2)}%`;
@@ -39,7 +40,7 @@ export default function PaperPortfolioPanel({ sessions }: { sessions: PaperSessi
       animation: false, tooltip: { trigger: "axis" }, grid: { left: 70, right: 20, top: 24, bottom: 32 },
       xAxis: { type: "category", data: result.dates.map((date) => String(date)), axisLabel: { fontSize: 10 } },
       yAxis: { type: "value", scale: true, splitLine: { lineStyle: { color: "rgba(148,163,184,.18)" } } },
-      series: [{ type: "line", data: result.equity, showSymbol: false, lineStyle: { width: 1.8, color: "#2563eb" }, areaStyle: { opacity: 0.07 } }],
+      series: [{ type: "line", data: result.equity, showSymbol: false, lineStyle: { width: 1.8, color: chartToken("--primary", "#2563eb") }, areaStyle: { opacity: 0.07 } }],
     };
   }, [result]);
 

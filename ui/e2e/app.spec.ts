@@ -1,55 +1,126 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 const token = process.env.QC_E2E_TOKEN || "test-token";
+const AUTH = { Authorization: `Bearer ${token}` };
 
-async function prepare(page: Page) {
-  await page.addInitScript((value: string) => {
-    localStorage.setItem("qc_token", value);
-    localStorage.removeItem("qc_api");
-    localStorage.setItem("qc_theme", "light");
-    localStorage.setItem("qc_density", "comfortable");
-  }, token);
+interface PrepareOptions {
+  beginner?: boolean;
+  theme?: "light" | "dark";
+}
+
+async function prepare(page: Page, options: PrepareOptions = {}) {
+  const beginner = options.beginner ?? false;
+  await page.addInitScript(
+    ({ value, beginnerMode, theme }) => {
+      localStorage.setItem("qc_token", value);
+      localStorage.removeItem("qc_api");
+      localStorage.setItem("qc_theme", theme);
+      localStorage.setItem("qc_density", "comfortable");
+      localStorage.setItem("qc_beginner", beginnerMode ? "1" : "0");
+    },
+    { value: token, beginnerMode: beginner, theme: options.theme ?? "light" },
+  );
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
-  page.on("console", (message) => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(`console: ${message.text()}`);
+  });
   return errors;
 }
 
-test("market page renders indices, breadth and K-line", async ({ page }) => {
+async function bootstrap(request: APIRequestContext, nSec = 30, seed = 41) {
+  const response = await request.post("/api/onboarding/bootstrap", {
+    headers: AUTH,
+    data: { n_sec: nSec, start: "2023-01-03", end: "2024-12-31", seed },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json();
+}
+
+/** Create one real experiment through the job queue (used by experiments/research tests). */
+async function createExperiment(request: APIRequestContext): Promise<string> {
+  const response = await request.post("/api/backtest", {
+    headers: AUTH,
+    data: { template: "momentum", params: { top_n: 5, lookback: 60 } },
+  });
+  expect(response.status()).toBe(202);
+  const jobId = String((await response.json()).job_id);
+  for (let i = 0; i < 240; i += 1) {
+    const status = await request.get(`/api/jobs/${jobId}`, { headers: AUTH });
+    const payload = await status.json();
+    if (payload.status === "done") {
+      const full = await request.get(`/api/jobs/${jobId}/result`, { headers: AUTH });
+      const result = await full.json();
+      return String(result.result?.run_id ?? result.result?.summary?.run_id ?? payload.result?.run_id ?? "");
+    }
+    if (payload.status === "failed") throw new Error(`backtest job failed: ${payload.error}`);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  throw new Error("backtest job did not finish");
+}
+
+test("today dashboard shows market, watchlist, beginner progress and data health", async ({ page, request }) => {
+  const errors = await prepare(page, { beginner: true });
+  await bootstrap(request);
+  await page.goto("/today");
+  await expect(page.getByRole("heading", { name: "今日" })).toBeVisible();
+  await expect(page.locator(".index-card")).toHaveCount(4);
+  await expect(page.getByText("市场状态").first()).toBeVisible();
+  await expect(page.getByText("我的自选").first()).toBeVisible();
+  await expect(page.getByText("新手进度").first()).toBeVisible();
+  await expect(page.getByText("最近研究").first()).toBeVisible();
+  await expect(page.getByText("数据体检").first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /开始一次研究/ })).toBeVisible();
+  await page.screenshot({ path: "/tmp/qc-today.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("market page renders indices, breadth, readings and K-line (offline snapshot)", async ({ page, request }) => {
   const errors = await prepare(page);
-  await page.goto("/");
+  await bootstrap(request);
+  await page.goto("/market");
   await expect(page.getByRole("heading", { name: "行情" })).toBeVisible();
   await expect(page.locator(".index-card")).toHaveCount(4);
-  await expect(page.locator(".kline-canvas canvas").first()).toBeVisible();
   await expect(page.locator(".breadth")).toContainText("上涨");
-  await expect(page.locator(".profile-strip")).toContainText("交易所");
-  await expect(page.locator(".profile-strip")).toContainText("最近成交额");
-  await expect(page.locator(".financial-panel")).toContainText("PIT 财务");
+  await expect(page.locator(".readings-grid")).toBeVisible();
+  await expect(page.locator(".kline-canvas canvas").first()).toBeVisible();
+  await expect(page.getByText("实时行情未开启").first()).toBeVisible();
   await page.getByRole("button", { name: "分钟", exact: true }).click();
   await expect(page.getByTestId("minute-panel")).toContainText("SYNTHETIC_MINUTE");
   await expect(page.getByTestId("minute-panel").locator("tbody tr")).toHaveCount(5);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: "/tmp/qc-market.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 
-test("screener runs and shows matched rows", async ({ page }) => {
+test("screener runs and can hand the expression to a backtest", async ({ page, request }) => {
   const errors = await prepare(page);
+  await bootstrap(request);
   await page.goto("/screener");
-  await expect(page.getByRole("heading", { name: "选股" })).toBeVisible();
-  await page.getByRole("button", { name: /运行选股/ }).click();
+  await expect(page.getByRole("heading", { name: "选股", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: /运行选股/ }).first().click();
   await expect(page.locator(".vtable-row").first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".card-head").last()).toContainText("只");
+  await expect(page.getByText(/只 · 截至/)).toBeVisible();
+  await page.getByRole("button", { name: /用这个结果回测/ }).click();
+  await expect(page).toHaveURL(/\/backtest\?screener=/);
   await page.screenshot({ path: "/tmp/qc-screener.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 
-test("backtest submits a job and renders equity/trades", async ({ page }) => {
+test("backtest wizard runs a job and renders conclusion-first results", async ({ page, request }) => {
   const errors = await prepare(page);
-  await page.goto("/backtest?template=momentum&params=%7B%22top_n%22%3A5%2C%22lookback%22%3A60%7D");
+  await bootstrap(request);
+  await page.goto("/backtest");
   await expect(page.getByRole("heading", { name: "回测" })).toBeVisible();
-  await page.getByRole("button", { name: /运行回测/ }).click();
-  await expect(page.getByText("总收益")).toBeVisible({ timeout: 90_000 });
-  await expect(page.locator(".chart-block canvas")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "选策略" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "选数据与区间" })).toBeVisible();
+  await page.getByRole("button", { name: /运行回测/ }).first().click();
+  await expect(page.getByText("总收益").first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator(".stat-tile")).not.toHaveCount(0);
+  await expect(page.getByText("数据体检").first()).toBeVisible();
+  const tradesTab = page.getByRole("tab", { name: "交易明细" });
+  await tradesTab.click();
   await expect(page.locator(".vtable-row").first()).toBeVisible();
   await page.locator(".vtable-row").first().click();
   await expect(page.getByRole("heading", { name: "交易解释" })).toBeVisible();
@@ -57,100 +128,103 @@ test("backtest submits a job and renders equity/trades", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("experiments and data pages connect to the local service", async ({ page }) => {
+test("data page shows integrity first and keeps import/snapshot entry points", async ({ page, request }) => {
   const errors = await prepare(page);
-  await page.goto("/experiments");
-  await expect(page.getByRole("heading", { name: "实验" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("运行记录");
-  await page.screenshot({ path: "/tmp/qc-experiments.png", fullPage: true });
+  await bootstrap(request);
   await page.goto("/data");
   await expect(page.getByRole("heading", { name: "数据", exact: true })).toBeVisible();
-  await expect(page.getByText("数据仓库")).toBeVisible();
-  await expect(page.getByText("V2 数据集")).toBeVisible();
-  await expect(page.getByRole("cell", { name: "minute_bars" })).toBeVisible();
+  await expect(page.getByText("数据体检").first()).toBeVisible();
+  await expect(page.getByText("导入真实数据").first()).toBeVisible();
+  await expect(page.getByText("新浪财经（免 Token）")).toBeVisible();
   await expect(page.locator(".provider-row").first()).toBeVisible();
-  const snapshotRow = page.getByTestId("snapshot-table").locator("tbody tr").first();
-  if (await snapshotRow.count()) {
-    await snapshotRow.click();
-    await expect(page.getByRole("heading", { name: /质量报告/ })).toBeVisible({ timeout: 15000 });
-  }
+  await expect(page.getByTestId("snapshot-table").locator("tbody tr").first()).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("snapshot-table").locator("tbody tr").first().click();
+  await expect(page.getByRole("heading", { name: /质量报告/ })).toBeVisible({ timeout: 15_000 });
   await page.screenshot({ path: "/tmp/qc-data.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 
-test("experiment tags and notes persist locally", async ({ page }) => {
+test("experiments list renders cards and keeps local tags/notes", async ({ page, request }) => {
   const errors = await prepare(page);
+  await bootstrap(request);
+  await createExperiment(request);
   await page.goto("/experiments");
-  await expect(page.locator(".experiment-item").first()).toBeVisible({ timeout: 30000 });
-  await page.locator(".experiment-item").first().click();
+  await expect(page.getByRole("heading", { name: "实验" })).toBeVisible();
+  await expect(page.locator(".exp-card").first()).toBeVisible({ timeout: 20_000 });
+  await page.locator(".exp-card").first().click();
   const tags = page.getByLabel(/标签（逗号分隔，本地）/);
   const notes = page.getByLabel(/笔记（本地）/);
   await tags.fill("e2e, 动量");
   await notes.fill("本地笔记 e2e");
   await page.reload();
-  await expect(page.locator(".experiment-item").first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator(".exp-card").first()).toBeVisible({ timeout: 20_000 });
+  await page.locator(".exp-card").first().click();
   await expect(page.getByLabel(/标签（逗号分隔，本地）/)).toHaveValue("e2e, 动量");
   await expect(page.getByLabel(/笔记（本地）/)).toHaveValue("本地笔记 e2e");
+  await page.screenshot({ path: "/tmp/qc-experiments.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 
-test("strategy and settings pages render without overflow", async ({ page }) => {
+test("strategy and settings pages render, connect and pass self-check", async ({ page }) => {
   const errors = await prepare(page);
   await page.goto("/strategy");
   await expect(page.getByRole("heading", { name: "策略", level: 1 })).toBeVisible();
+  await expect(page.getByText("策略模板（白话版）")).toBeVisible();
   await expect(page.getByText("内置模板")).toBeVisible();
   await page.screenshot({ path: "/tmp/qc-strategy.png", fullPage: true });
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "设置" })).toBeVisible();
   await page.getByRole("button", { name: /测试连接/ }).click();
-  await expect(page.getByText(/已连接/)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/已连接/)).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: /运行自检/ }).click();
+  await expect(page.getByText(/自检|通过|警告/).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("switch", { name: "新手模式" })).toBeVisible();
   await page.screenshot({ path: "/tmp/qc-settings.png", fullPage: true });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
 
-test("research factor analysis renders IC, quantiles and decay", async ({ page }) => {
+test("research factor analysis gives a conclusion before charts", async ({ page, request }) => {
   const errors = await prepare(page);
+  await bootstrap(request);
   await page.goto("/research");
   await expect(page.getByRole("heading", { name: "研究", exact: true })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "研究视图" })).toBeVisible();
   await page.getByRole("button", { name: /运行诊断/ }).click();
-  await expect(page.getByRole("heading", { name: "IC 均值", exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("heading", { name: "分层平均收益" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "因子衰减（RankIC）" })).toBeVisible();
-  await expect(page.locator(".grid.kpis .card")).toHaveCount(4);
+  await expect(page.locator(".conclusion")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".stat-tile").first()).toBeVisible();
+  await expect(page.getByText("分层平均收益").first()).toBeVisible();
+  await expect(page.getByText("因子衰减（RankIC）").first()).toBeVisible();
   await page.getByRole("button", { name: "计算相关性" }).click();
-  await expect(page.getByRole("heading", { name: "因子相关性矩阵" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/平均 \|ρ\|/)).toBeVisible();
+  await expect(page.getByText("因子相关性矩阵").first()).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: "/tmp/qc-research.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 
-test("research sweep, walk-forward and attribution tabs run", async ({ page }) => {
+test("research sweep and walk-forward run inside tabs", async ({ page, request }) => {
   const errors = await prepare(page);
+  await bootstrap(request);
   await page.goto("/research");
   await page.getByRole("tab", { name: /参数扫描/ }).click();
   await page.getByRole("button", { name: /运行扫描/ }).click();
-  await expect(page.getByRole("heading", { name: /扫描结果/ })).toBeVisible({ timeout: 60_000 });
-  await page.getByLabel("模式").selectOption("random");
+  await expect(page.getByText("扫描结果").first()).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("combobox", { name: /模式/ }).selectOption("random");
   await page.getByLabel("抽样数").fill("4");
   await page.getByRole("button", { name: /运行扫描/ }).click();
   await expect(page.getByText(/随机 4\/4/)).toBeVisible({ timeout: 60_000 });
-  await page.screenshot({ path: "/tmp/qc-sweep.png", fullPage: true });
   await page.getByRole("tab", { name: /滚动验证/ }).click();
   await page.getByRole("button", { name: /运行滚动验证/ }).click();
-  await expect(page.getByRole("heading", { name: /4 折/ })).toBeVisible({ timeout: 60_000 });
-  await page.getByRole("tab", { name: /归因/ }).click();
-  await page.getByRole("button", { name: /运行行业归因/ }).click();
-  await expect(page.getByRole("heading", { name: /行业贡献/ })).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: "/tmp/qc-attribution.png", fullPage: true });
+  await expect(page.getByText(/4 折/).first()).toBeVisible({ timeout: 60_000 });
+  await page.screenshot({ path: "/tmp/qc-sweep.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 
-test("dark theme renders without overflow", async ({ page }) => {
+test("dark theme renders without overflow", async ({ page, request }) => {
   const errors = await prepare(page);
-  await page.goto("/");
-  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30000 });
+  await bootstrap(request);
+  await page.goto("/today");
+  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "切换主题" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -159,69 +233,70 @@ test("dark theme renders without overflow", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("onboarding creates a demo snapshot and experiment", async ({ page }) => {
-  const errors = await prepare(page);
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "行情", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /一键示例/ }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "三步开始" })).toBeVisible();
-  await page.getByRole("button", { name: /生成示例数据与快照/ }).click();
-  await expect(page.getByRole("button", { name: /下一步/ })).toBeVisible({ timeout: 90_000 });
-  await page.getByRole("button", { name: /下一步/ }).click();
-  await page.getByRole("button", { name: /运行示例回测/ }).click();
-  await expect(page).toHaveURL(/\/experiments/, { timeout: 120_000 });
-  await expect(page.getByRole("heading", { name: "实验", exact: true })).toBeVisible();
+test("onboarding demo button creates a snapshot and an experiment", async ({ page }) => {
+  const errors = await prepare(page, { beginner: true });
+  await page.goto("/today");
+  await expect(page.getByRole("heading", { name: "今日" })).toBeVisible();
+  await page.getByRole("button", { name: /一键示例/ }).first().click();
+  await expect(page.getByText(/快照|示例/).first()).toBeVisible({ timeout: 90_000 });
+  await page.goto("/experiments");
+  await expect(page.getByRole("heading", { name: "实验" })).toBeVisible();
+  await expect(page.locator(".exp-card").first()).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: "/tmp/qc-onboarding.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 
-test("qc serve --open token URL bootstraps auth and is cleaned", async ({ page }) => {
+test("qc serve --open token URL bootstraps auth and is cleaned", async ({ page, request }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  await bootstrap(request);
   await page.goto(`/?token=${encodeURIComponent(token)}`);
-  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30_000 });
   expect(new URL(page.url()).searchParams.get("token")).toBeNull();
   const stored = await page.evaluate(() => localStorage.getItem("qc_token"));
   expect(stored).toBe(token);
   expect(errors).toEqual([]);
 });
 
-test("initial UI load meets the local performance budget", async ({ page }) => {
+test("initial UI load meets the local performance budget", async ({ page, request }) => {
   const errors = await prepare(page);
+  await bootstrap(request);
   const started = Date.now();
-  await page.goto("/");
-  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 15000 });
+  await page.goto("/today");
+  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 15_000 });
   const elapsed = Date.now() - started;
-  const encoded = await page.evaluate(() => performance.getEntriesByType("resource")
-    .filter((entry) => (entry as PerformanceResourceTiming).name.endsWith(".js"))
-    .reduce((sum, entry) => sum + ((entry as PerformanceResourceTiming).encodedBodySize || 0), 0));
+  const encoded = await page.evaluate(() =>
+    performance
+      .getEntriesByType("resource")
+      .filter((entry) => (entry as PerformanceResourceTiming).name.endsWith(".js"))
+      .reduce((sum, entry) => sum + ((entry as PerformanceResourceTiming).encodedBodySize || 0), 0),
+  );
   expect(elapsed).toBeLessThan(5000);
   expect(encoded).toBeLessThan(2_000_000);
   expect(errors).toEqual([]);
 });
 
-test("global search focuses with Ctrl+K and filters securities locally", async ({ page }) => {
+test("command palette opens with Ctrl+K and navigates", async ({ page }) => {
   const errors = await prepare(page);
-  await page.goto("/");
-  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30000 });
+  await page.goto("/today");
+  await expect(page.getByRole("heading", { name: "今日" })).toBeVisible();
   await page.keyboard.press("Control+k");
-  const search = page.getByRole("combobox", { name: "全局搜索" });
-  await expect(search).toBeFocused();
-  await search.fill("000001");
-  await expect(page.locator(".search-hit").first()).toBeVisible({ timeout: 10000 });
-  await page.locator(".search-hit").first().click();
-  await expect(page).toHaveURL(/code=000001/);
-  await expect(page.locator(".kline-legend")).toContainText("000001");
+  const palette = page.getByRole("combobox", { name: "命令面板" });
+  await expect(palette).toBeFocused();
+  await palette.fill("回测");
+  await expect(page.locator(".palette-item").first()).toBeVisible({ timeout: 10_000 });
+  await page.locator(".palette-item").first().click();
+  await expect(page).toHaveURL(/\/backtest/);
   expect(errors).toEqual([]);
 });
 
-test("mobile layout has no horizontal overflow", async ({ page }) => {
+test("mobile layout has no horizontal overflow and shows the tab bar", async ({ page, request }) => {
   const errors = await prepare(page);
+  await bootstrap(request);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "行情" })).toBeVisible();
-  await expect(page.locator(".index-card").first()).toBeVisible({ timeout: 30000 });
+  await page.goto("/today");
+  await expect(page.getByRole("heading", { name: "今日" })).toBeVisible();
+  await expect(page.locator(".mobile-tabbar")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: "/tmp/qc-mobile.png", fullPage: true });
@@ -230,21 +305,15 @@ test("mobile layout has no horizontal overflow", async ({ page }) => {
 
 test("paper trading session creates, steps and renders the virtual account", async ({ page, request }) => {
   const errors = await prepare(page);
-  const auth = { Authorization: `Bearer ${token}` };
-  const bootstrap = await request.post("/api/onboarding/bootstrap", {
-    headers: auth,
-    data: { n_sec: 30, start: "2023-01-03", end: "2024-12-31", seed: 41 },
-  });
-  expect(bootstrap.ok()).toBeTruthy();
+  await bootstrap(request, 30, 41);
   await page.goto("/paper");
   await expect(page.getByRole("heading", { name: "模拟交易" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /创建会话/ })).toBeEnabled();
   await page.getByRole("button", { name: /创建会话/ }).click();
   await expect(page.getByText("总权益")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("持仓市值")).toBeVisible();
-  const securitiesResponse = await request.get("/api/market/securities?limit=1", { headers: auth });
-  const securities = await securitiesResponse.json();
-  const firstCode = String(securities[0]?.code || "600000");
+  const securities = await request.get("/api/market/securities?limit=1", { headers: AUTH });
+  const rows = await securities.json();
+  const firstCode = String(rows[0]?.code || "600000");
   await page.getByLabel("代码").fill(firstCode);
   await page.getByLabel("数量").fill("100");
   await page.getByRole("button", { name: /提交委托/ }).click();
@@ -257,32 +326,27 @@ test("paper trading session creates, steps and renders the virtual account", asy
   await expect(page.getByText("虚拟账户仅用于研究")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
-  expect(errors).toEqual([]);
   await page.screenshot({ path: "/tmp/qc-paper.png", fullPage: true });
+  expect(errors).toEqual([]);
 });
 
-test("research robustness computes deflated Sharpe without overflow", async ({ page }) => {
+test("research robustness computes deflated Sharpe without overflow", async ({ page, request }) => {
   const errors = await prepare(page);
+  await bootstrap(request);
+  await createExperiment(request);
   await page.goto("/research");
-  await expect(page.getByRole("heading", { name: "研究" })).toBeVisible();
   await page.getByRole("tab", { name: /稳健性/ }).click();
-  await expect(page.getByRole("button", { name: /Deflated Sharpe/ })).toBeVisible();
   await page.getByRole("button", { name: /Deflated Sharpe/ }).click();
-  await expect(page.getByText(/观测 \d+ 日/)).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText(/观测 \d+ 日/)).toBeVisible({ timeout: 60_000 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
-  expect(errors).toEqual([]);
   await page.screenshot({ path: "/tmp/qc-robustness.png", fullPage: true });
+  expect(errors).toEqual([]);
 });
 
-test("local strategy plugin lists, audits and runs through the job queue", async ({ page, request }) => {
+test("local strategy plugin lists, audits and runs in professional mode", async ({ page, request }) => {
   const errors = await prepare(page);
-  const auth = { Authorization: `Bearer ${token}` };
-  const bootstrap = await request.post("/api/onboarding/bootstrap", {
-    headers: auth,
-    data: { n_sec: 24, start: "2023-01-03", end: "2024-12-31", seed: 61 },
-  });
-  expect(bootstrap.ok()).toBeTruthy();
+  await bootstrap(request, 24, 61);
   const source = [
     'PLUGIN_INFO = {"description": "demo equal weight", "version": "1"}',
     "import numpy as np",
@@ -296,32 +360,27 @@ test("local strategy plugin lists, audits and runs through the job queue", async
     "            weights[index] = 1.0 / panel.n_sec",
     "        return weights",
   ].join("\n");
-  const put = await request.put("/api/strategies/files/demo_plugin.py", { headers: auth, data: { content: source } });
+  const put = await request.put("/api/strategies/files/demo_plugin.py", { headers: AUTH, data: { content: source } });
   expect(put.ok()).toBeTruthy();
   await page.goto("/strategy");
-  await expect(page.getByRole("heading", { name: "策略", level: 1 })).toBeVisible();
   await expect(page.getByText("demo_plugin", { exact: false }).first()).toBeVisible({ timeout: 20_000 });
   await page.getByText("demo_plugin", { exact: false }).first().click();
   await page.getByRole("button", { name: "审计", exact: true }).click();
   await expect(page.getByText(/静态审计通过|审计失败/)).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: /运行插件回测/ }).click();
   await page.waitForURL(/\/experiments/, { timeout: 60_000 });
-  expect(errors).toEqual([]);
   await page.screenshot({ path: "/tmp/qc-plugin.png", fullPage: true });
+  expect(errors).toEqual([]);
 });
 
 test("paper portfolio aggregates two simulated sessions", async ({ page, request }) => {
   const errors = await prepare(page);
-  const auth = { Authorization: `Bearer ${token}` };
-  const bootstrap = await request.post("/api/onboarding/bootstrap", { headers: auth, data: { n_sec: 24, start: "2023-01-03", end: "2024-12-31", seed: 71 } });
-  expect(bootstrap.ok()).toBeTruthy();
-  const ids: string[] = [];
+  await bootstrap(request, 24, 71);
   for (const name of ["组合策略A", "组合策略B"]) {
-    const created = await request.post("/api/paper/sessions", { headers: auth, data: { initial_cash: 1_000_000, name } });
+    const created = await request.post("/api/paper/sessions", { headers: AUTH, data: { initial_cash: 1_000_000, name } });
     expect(created.status()).toBe(201);
     const id = String((await created.json()).id);
-    ids.push(id);
-    const step = await request.post(`/api/paper/sessions/${id}/step`, { headers: auth, data: { days: 2 } });
+    const step = await request.post(`/api/paper/sessions/${id}/step`, { headers: AUTH, data: { days: 2 } });
     expect(step.ok()).toBeTruthy();
   }
   await page.goto("/paper");
@@ -335,7 +394,6 @@ test("paper portfolio aggregates two simulated sessions", async ({ page, request
   await expect(page.getByText("组合收益")).toBeVisible({ timeout: 30_000 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
-  expect(errors).toEqual([]);
   await page.screenshot({ path: "/tmp/qc-portfolio.png", fullPage: true });
-  void ids;
+  expect(errors).toEqual([]);
 });

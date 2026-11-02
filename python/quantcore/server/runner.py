@@ -9,6 +9,7 @@ replay and export all see the same artefacts as CLI runs.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -253,6 +254,12 @@ def run_data_update_job(payload: dict[str, Any], ctx: JobContext | None = None) 
             kwargs["column_mapping"] = payload["column_mapping"]
     elif name == "tushare" and payload.get("fixture_dir"):
         kwargs["fixture_dir"] = payload["fixture_dir"]
+    elif name in {"sina", "eastmoney"}:
+        kwargs["allow_network"] = os.environ.get("QC_ALLOW_NETWORK") == "1"
+        if payload.get("codes"):
+            kwargs["codes"] = list(payload["codes"])
+        if payload.get("limit") is not None:
+            kwargs["limit"] = int(payload["limit"])
     _progress(0.2, ctx)
     _check(ctx)
     provider = create_provider(name, **kwargs)

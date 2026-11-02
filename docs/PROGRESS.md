@@ -7,13 +7,13 @@
 ## 当前状态
 - M0：完成。`make setup/test`、wheel、macOS/Ubuntu 全量 CI + Windows pure-Python smoke；C++ Windows 未支持。
 - M1：C++ types/calendar/tpool/.qpanel/内核/指标/零拷贝绑定；ctest 95/95；cross-sectional neutralize 已实现并绑定。
-- M2：Synthetic/LocalFile/Tushare(fixture+live API 代码路径)/AKShare/mootdx；摄取/质量/快照(内容寻址+PIT 元数据)/Parquet+DuckDB+SQLite；PIT 财务视图；真实 Tushare Token 未验证。
+- M2：Synthetic/LocalFile/Tushare(fixture+live API 代码路径)/AKShare/mootdx + **Sina 公开真实数据源**；摄取/质量/快照(内容寻址+PIT 元数据)/Parquet+DuckDB+SQLite；PIT 财务视图；**数据体检**(覆盖率/缺口/OHLC/量额/涨跌停/复权/跨源)；真实 Sina 3 只样本 import→snapshot→integrity=ok→C++ 回测已跑通；真实 Tushare Token 未验证。
 - M3：event-driven 引擎，规则/费用/T+1/手数/涨跌停/停牌/除权除息/trace/指标；差分 6/6；风险限制/基准比较；引擎 300×965 月度调仓约 2.6ms。
 - M4：DSL/7 模板/lookahead/实验存储/HTML+可选 PDF 报告/CLI/replay/子进程 sandbox worker/C++ parallel engine batch sweep。
-- M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI；本地 toast/桌面通知。
-- M6：React 19 + Vite 八页（行情/选股/策略/回测/实验/研究/模拟/数据 + 设置）；ECharts 图表、Monaco 本地打包、交易解释、onboarding、浅/深色、密度、移动端；Playwright **18** 条通过（含 paper/多策略组合/稳健性/插件）。
+- M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI；本地 toast/桌面通知；R3 增 live 行情 REST/WS、数据体检、onboarding/presets/watchlist API。
+- M6：R3 重构——`/today` 驾驶舱 + `/market` 实时优先行情 + 8 页重做（结论先行/三态/新手模式），token 化设计系统与 17 个组件，AppBar/⌘K/移动端；Playwright **19** 条通过（含真实回测任务、数据体检、命令面板、移动端）。
 - M7：因子 IC/RankIC/ICIR、分层、衰减；参数扫描 + Sharpe 热力图；滚动验证；行业 FIFO 归因；Deflated Sharpe/PBO、成本敏感性、block bootstrap Monte Carlo、容量估计（近似口径）。
-- M9：完成——虚拟账户/回放/委托撤单/成交/T+1/费用/信号 CSV/提醒/JSON 持久化/本地插件/只读多策略组合/服务端模拟时钟连续推进；真实 vendor 实时 feed 未捆绑。
+- M9：完成——虚拟账户/回放/委托撤单/成交/T+1/费用/信号 CSV/提醒/JSON 持久化/本地插件/只读多策略组合/服务端模拟时钟连续推进；R3 提供可选实时行情（公开网页源、仅展示），无授权 vendor feed、无真实下单。
 - M8：完成——证券资料/PIT/ETF+可转债/合成分钟线/V2 dataset catalog；C++ 回测仍按 board 手数。
 - M10：wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS/Windows zip（Windows 包由 `windows-latest` CI 构建）；无签名/公证，未做安装运行验证。
 - 仓库：https://github.com/feiiiiii5/QuantCore （Apache-2.0）；申请季工作区未修改。
@@ -25,19 +25,19 @@
 
 ## 常用门禁与当前基线
 ```bash
-uv run pytest                                      # 240 collected / 238 passed / 2 skipped
+uv run pytest                                      # 321 collected / 319 passed / 2 skipped
 ctest --test-dir build/cmake --output-on-failure   # 95/95
 pnpm -C ui test                                    # UI vitest 10 passed（5 files）
-make lint                                          # ruff check/format + mypy 91 files 全绿
+make lint                                          # ruff check/format + mypy 104 files 全绿
 make verify-cpp                                    # C++ backend、差分 6/6、性能门禁（ratio 165x）
-make e2e                                           # UI 构建 + 隔离 qc serve + Playwright 18/18（需 Chrome）
+make e2e                                           # UI 构建 + 隔离 qc serve + Playwright 19/19（需 Chrome）
 make doctor                                        # 只读环境自检（本机 pass=13 warn=0 fail=0 skip=1）
 make demo                                          # 一条命令合成数据→快照→回测（约 2–3s，engine=cpp）
 make test-quick                                    # 快速回归（排除 e2e/bench/network）
 make ci-local                                      # 本地完整门禁
 ```
 - CI 最近 5 个 job 全绿：`test (macos-latest)`、`test (ubuntu-latest)`、`windows-smoke`、`ui`、`desktop-windows-package`；Playwright E2E 只在本地 `make e2e` 跑，不进 GitHub CI。
-- `docs/features.json` **121/121** 表示功能门禁有代码+证据，不等于真实 vendor 行情/签名安装包已完成。
+- `docs/features.json` **128/128** 表示功能门禁有代码+证据，不等于授权实时行情/全市场真实数据/签名安装包已完成。
 
 ## 开发/提交流程
 - Conventional Commits；只 stage 明确路径（禁止 `git add -A` / `git add .`）；push 前复跑相关门禁（至少 `make lint` + `make test`，UI 改动跑 `make e2e`，C++ 改动跑 `make verify-cpp`）。
@@ -102,16 +102,23 @@ make bench-scale
 - 模拟交易：部分成交（日成交量参与率上限，默认 10%）、`partial` 状态、跨交易日续成、逐笔费用/持仓/T+1；旧 session JSON 兼容；`docs/paper-trading.md`。
 - 测试：pytest 240 collected / 238 passed / 2 skipped（新增 44 条）；UI vitest 10；Playwright 18/18（修正订单状态中文映射后的断言）。
 
+## 重构轮增量（2026-11-02 R3：产品/UI/实时/真实数据/零基础）
+- 产品与设计：新增 `docs/PRODUCT.md`（理念/三支柱/创新点/市场与来源）与 `docs/DESIGN-SPEC.md`（IA、tokens、组件契约、逐页规格、新手模式、实时状态）。
+- UI 重构：`/today` 驾驶舱（市场状态带/自选/新手进度/最近研究/数据体检）、`/market` 实时优先行情；AppBar 实时指数条 + ⌘K 命令面板 + 新手模式；三套涨跌配色（红绿/绿红/色盲）、明暗主题、密度；11 个页面按统一体例重做；截图在 `docs/screenshots/`。
+- 实时行情（可选联网）：`/api/live/{status,indices,quotes}` + `WS /ws/live`；上海市场时钟、Eastmoney→Sina 双源降级、限速缓存、离线/休市/异常显式状态；默认完全离线，`QC_ALLOW_NETWORK=1` 才联网，测试走 fixtures。
+- 真实数据与准确性：Sina 公开 provider（全 A 股 5576 只 universe、约 2000 根日线、volume=股已实测、腾讯 qfq 近似复权并过滤 vendor 跳点）；数据体检 API/CLI；质量门禁把少量坏行隔离为告警而非整批失败。真实 3 只样本（600000/000001/300750，2024-01-01..2026-10-31，2049 根）质量 passed、0 隔离、integrity=ok、accuracy 全 0，并在真实快照上跑通 C++ 回测。
+- 零基础引导：`/api/onboarding` 4 步自动检测、6 个白话预设、`/api/watchlist`、首页新手清单、设置页新手模式；新增 `docs/TUTORIAL.md`（163 行零基础教程）。
+- 测试：pytest 321 collected / 319 passed / 2 skipped；Playwright 19/19；UI vitest 10；`make lint` / `make verify-cpp` / `make doctor` / `make demo` 全绿。
+
 ## 已知缺口
-1. M9：真实 vendor 实时 feed 未接（当前是历史快照/服务端模拟时钟）；部分成交已按「日成交量参与率上限」近似实现（无盘口/排队/滑点），公司行为未实现；不得声称可实盘。
+1. M9：实时行情来自公开网页接口（未授权、约 3 秒轮询、无 L2），仅展示；部分成交按「日成交量参与率上限」近似（无盘口/排队/滑点），公司行为未实现；不得声称可实盘。
 2. M8：分钟线是 SYNTHETIC 视图（由日线拆桶），C++ 引擎仍只做日线、无分钟级回测/撮合；C++ 回测仍按
    board 手数（ETF/可转债 paper 手数已实现，不能宣称完整回测规则）。
 3. M10：unsigned macOS/Windows zip 可构建（Windows zip 由 CI `windows-latest` 构建），但无签名/公证/自动更新，未做 Windows 安装/运行验证；后端不随包捆绑（默认需本地 `qc serve` 或 `QC_DESKTOP_URL`）。
-4. M2：Tushare live 路径仅进程内 fake Pro 契约测试，真实 Token/网络/限流/字段差异未验证；
-   全市场 5500×20y 基准与 10k sweep 未测；默认规模（800 证券 × 1208 天）的耗时与峰值 RSS 已由 `make bench-scale` 实测（见 `docs/PERFORMANCE.md`），不构成全市场结论。
+4. M2：Sina 公开接口非官方，约 2000 根日线、成交额按 OHLC×volume 估算、复权/公司行为为近似（`SINA_APPROX`）；全市场 5576 只导入未端到端验证（估算 30–45 分钟），本轮只验证 3 只样本；Eastmoney 在本机网络被限流；Tushare live 路径仅 fake Pro 契约测试，真实 Token 未验证；全市场 5500×20y 基准与 10k sweep 未测，默认规模（800×1208）已实测（见 `docs/PERFORMANCE.md`），不构成全市场结论。
 5. M7 口径：行业 FIFO 归因、DSR/PBO/成本敏感性/MC/容量均为研究近似。
 6. 规则 TODO(verify) 仍需外部官方来源核实（ST 幅度、盘后固定价历史、新股/退市整理、分红个税、部分费率）。
-7. `docs/features.json` **121/121**；功能门禁全 true，但上述限制意味着不得宣称生产级实盘/签名安装包已完成。
+7. `docs/features.json` **128/128**；功能门禁全 true，但上述限制意味着不得宣称授权实时行情/全市场真实数据/生产级实盘/签名安装包已完成。
 
 ## 续跑方法
 ```bash
@@ -124,4 +131,11 @@ make ci-local
 make e2e
 make desktop-smoke   # 可选
 uv run qc serve --port 8000 --open
+
+# 可选：联网实时行情 + 真实数据导入（默认关闭）
+QC_ALLOW_NETWORK=1 uv run qc serve --port 8000 --open
+QC_ALLOW_NETWORK=1 uv run qc data update --provider sina --codes 600000,000001,300750 \
+  --start 2024-01-01 --end 2026-10-31 --data-root data
+uv run qc snapshot build --data-root data --snapshots-root data/snapshots
+uv run qc data integrity --snapshots-root data/snapshots
 ```

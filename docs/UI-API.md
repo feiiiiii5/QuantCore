@@ -4,7 +4,7 @@ All routes are loopback-only, Bearer-authenticated (`Authorization: Bearer <toke
 The built UI is served by `qc serve` from the same origin, so no CORS is needed. For Vite dev,
 `vite.config.ts` proxies `/api`, `/ws`, `/health` to `http://127.0.0.1:8000`.
 
-WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>`; server validates Origin/Host/token.
+WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>` (jobs) and `/ws/live?token=<token>&codes=…` (live quotes); server validates Origin/Host/token.
 
 ## Meta / health
 - `GET /health` → `{status,version,engine_backend,engine_available,panel_available,synthetic_only,cors}`
@@ -43,6 +43,30 @@ WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>`; server valida
   `{code,name,board,dates[],open[],high[],low[],close[],volume[],amount[],turnover[],ma5[],ma20[],limit_up[],limit_down[],suspended[]}`
 - `GET /api/market/securities?snapshot=&query=&limit=200` →
   `[{sec_id,code,name,board,industry,last,change_pct,turnover,mktcap,float_mktcap,suspended,st}]`
+
+## Live market quotes (read-only, network opt-in)
+- Live quotes poll a public quote source only when the server is started with `QC_ALLOW_NETWORK=1`; the default is fully offline and the endpoints still answer with an explicit `off` state. No orders, no broker, no warehouse mutation. Sources: Eastmoney (primary, `push2` batch JSON) with Sina (`hq.sinajs.cn`) fallback; `QC_LIVE_INTERVAL` sets the poll interval (2–30s, default 3s).
+- `GET /api/live/status` →
+  `{enabled,source:"eastmoney"|"sina"|"none",state:"off"|"idle"|"connecting"|"live"|"error"|"closed",market:{phase:"pre_open"|"open"|"lunch"|"closed"|"holiday",label,is_trading_day,server_time,next_open,last_trade_date},as_of,latency_ms,subscribed,error,notice}`
+- `GET /api/live/indices` → `{as_of,source,stale,quotes:[…]}` for 上证指数/深证成指/创业板指/科创50 (codes 000001/399001/399006/000688).
+- `GET /api/live/quotes?codes=600000,000001` → same envelope; `codes` is 6-digit A-share codes (max 50, deduped); empty `codes` falls back to the persisted watchlist. Invalid code → 400.
+- Quote shape: `{code,name,price,prev_close,open,high,low,change,change_pct,volume,amount,turnover_pct,limit_up,limit_down,suspended,timestamp,source}`. `volume` is shares for stocks (Eastmoney lots ×100) and the index aggregate is display-only; closed/suspended rows fall back to the previous close with `suspended=true`.
+- `GET /api/watchlist` / `PUT /api/watchlist` `{codes:[…]}` (see onboarding section) is the server-side subscription list for the poller.
+- **WebSocket** `ws://127.0.0.1:<port>/ws/live?token=<token>&codes=600000,000001` pushes `{type:"snapshot",status,indices,quotes}` every poll interval; same Host/Origin/token checks as `/ws/jobs`.
+- The UI shows a green 实时 dot with the last update time, or an explicit 离线/休市 state with the snapshot date. Network errors are surfaced through `status.error/notice` instead of crashing the page.
+
+## Data integrity (data health)
+- `GET /api/data/integrity?snapshot=<id|prefix>` → `{status:"ok"|"warn"|"fail",generated_at,snapshot:{id,synthetic,source,n_sec,n_time,start,end}|null,coverage:{expected_cells,present_cells,coverage_pct,symbols,trading_days},checks:[{id,title,status:"pass"|"warn"|"fail",detail}],gaps:{missing_days,symbols_with_gaps,examples:[{code,date}]},accuracy:{ohlc_violations,volume_amount_mismatch,limit_violations,adjustment_breaks},cross_source:{checked,matched,max_rel_diff,source,note},note}`
+- Read-only and offline: audits the current snapshot panel (coverage by listing date, gaps/suspensions, OHLC invariants, limit-up/down consistency, adjustment continuity). `snapshot` omitted → latest snapshot or the explicit synthetic fallback (marked `snapshot.id="synthetic"`). Unknown snapshot → 404.
+- `cross_source` is skipped offline (`checked=0`, note says so); it is a hook for explicit cross-source spot checks, not a network call in the default path.
+- UI: 数据页「数据体检」卡片 / 首页摘要 / 回测结果页的可信度徽章 use this route; a `warn`/`fail` status must be shown rather than silently ignored.
+
+## Beginner onboarding + watchlist
+- `GET /api/onboarding` → `{first_run,beginner,steps:[{id:"data"|"backtest"|"result"|"data_health",title,description,action:"bootstrap"|"backtest"|"browse"|"data",label,done}],progress:{done,total}}`
+  - `done` is auto-detected (snapshot exists → data; experiment exists → backtest/result) plus explicit completed steps stored in SQLite meta; `first_run` flips after the first record.
+- `POST /api/onboarding/complete` `{step:<id>}` → updated state (idempotent; unknown step 400). `POST /api/onboarding/reset` → initial state.
+- `GET /api/onboarding/presets` → `[{id,name,tagline,description,plain_terms,risk_note,template,params,horizon,suitable_for}]`; templates/params are real built-in strategies (validated by tests), plain-language copy is UI copy, not investment advice.
+- `GET /api/watchlist` → `{codes:["600000",…]}`; `PUT /api/watchlist` `{codes:[…]}` → validated (6 ASCII digits, deduped, ≤50, invalid → 400) and persisted in SQLite meta. The live quote poller subscribes to this list.
 
 ## Screener
 - `GET /api/screener/presets` → `[{id,name,description,expression}]`

@@ -488,4 +488,23 @@ def quarantine_bad_rows(panel: PanelData) -> QuarantineResult:
         corporate_actions=panel.corporate_actions,
         meta={**panel.meta, "quarantined_rows": int(bad.sum())},
     )
-    return QuarantineResult(clean=clean, bad_rows=bad_rows, report=report, dropped=int(bad.sum()))
+    # Re-run quality on the cleaned panel: quarantined rows are reported as a warning and no
+    # longer hard-fail an import (real public feeds occasionally carry a handful of bad bars).
+    clean_report = run_quality_checks(clean)
+    dropped = int(bad.sum())
+    if dropped:
+        clean_report.add(
+            CheckIssue(
+                "quarantined_rows",
+                WARNING,
+                f"{dropped} bars were quarantined from the incoming data (kept in the "
+                "quarantine dataset, excluded from the panel)",
+                dropped,
+                _sample(
+                    bars,
+                    bad,
+                    ["date", "sec_id", "open", "high", "low", "close", "limit_up", "limit_down"],
+                ),
+            )
+        )
+    return QuarantineResult(clean=clean, bad_rows=bad_rows, report=clean_report, dropped=dropped)

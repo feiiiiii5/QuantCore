@@ -6,6 +6,7 @@ import {
 import type { Bars } from "../api/types";
 import type { ChartPalette } from "../theme";
 import { num } from "../lib/format";
+import { chartToken } from "../lib/tokens";
 
 interface Props {
   bars: Bars;
@@ -47,7 +48,7 @@ export default function KLineChart({ bars, palette, height = 430, showMA5 = true
       upColor: palette.up, downColor: palette.down, borderUpColor: palette.up, borderDownColor: palette.down,
       wickUpColor: palette.up, wickDownColor: palette.down,
     });
-    const ma5 = chart.addSeries(LineSeries, { color: "#eab308", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    const ma5 = chart.addSeries(LineSeries, { color: chartToken("--warn", "#eab308"), lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
     const ma20 = chart.addSeries(LineSeries, { color: palette.accent, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
     const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: "volume" }, priceScaleId: "volume", lastValueVisible: false, priceLineVisible: false });
     chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 }, visible: false });

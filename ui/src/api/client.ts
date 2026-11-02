@@ -6,6 +6,7 @@ import type {
   PaperSessionDetail, PaperSessionSummary, PBOResult, PluginBacktestAccepted, PluginInfo, PluginValidation,
   ScreenerPreset, ScreenerResult, ScreenerSaved, SecurityProfile, SecurityRow, SnapshotInfo, SnapshotStatus, SweepResult,
   Template, ValidationResult, WalkForwardResult,
+  LiveStatus, LiveQuotesPayload, WatchlistPayload, DataIntegrity, OnboardingState, StrategyPreset,
 } from "./types";
 
 const API_KEY = "qc_api";
@@ -40,6 +41,15 @@ export function configure(base: string, token: string): void {
 export function authHeaders(): HeadersInit {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export function wsLiveUrl(): string {
+  const base = getApiBase() || window.location.origin;
+  const url = new URL(base, window.location.origin);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/ws/live";
+  url.search = `?token=${encodeURIComponent(getToken())}`;
+  return url.toString();
 }
 
 export function wsUrl(jobId: string): string {
@@ -183,6 +193,24 @@ export const api = {
   sweep: (payload: Record<string, unknown>) => request<SweepResult>("/api/research/sweep", { method: "POST", body: JSON.stringify(payload) }),
   walkForward: (payload: Record<string, unknown>) => request<WalkForwardResult>("/api/research/walk_forward", { method: "POST", body: JSON.stringify(payload) }),
   attribution: (runId: string) => request<AttributionResult>("/api/research/attribution", { method: "POST", body: JSON.stringify({ run_id: runId }) }),
+
+  // live market / watchlist (read-only quotes; network is opt-in server side)
+  liveStatus: () => request<LiveStatus>("/api/live/status"),
+  liveIndices: () => request<LiveQuotesPayload>("/api/live/indices"),
+  liveQuotes: (codes: string[]) =>
+    request<LiveQuotesPayload>(`/api/live/quotes?codes=${codes.map(encodeURIComponent).join(",")}`),
+  watchlist: () => request<WatchlistPayload>("/api/watchlist"),
+  saveWatchlist: (codes: string[]) =>
+    request<WatchlistPayload>("/api/watchlist", { method: "PUT", body: JSON.stringify({ codes }) }),
+
+  // data integrity + beginner onboarding
+  dataIntegrity: (snapshot?: string) =>
+    request<DataIntegrity>(`/api/data/integrity${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),
+  onboarding: () => request<OnboardingState>("/api/onboarding"),
+  completeOnboardingStep: (step: string) =>
+    request<OnboardingState>("/api/onboarding/complete", { method: "POST", body: JSON.stringify({ step }) }),
+  resetOnboarding: () => request<OnboardingState>("/api/onboarding/reset", { method: "POST" }),
+  onboardingPresets: () => request<StrategyPreset[]>("/api/onboarding/presets"),
 };
 
 export type { SnapshotInfo, JobResult };

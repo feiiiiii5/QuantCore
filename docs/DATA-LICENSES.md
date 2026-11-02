@@ -21,3 +21,17 @@
 
 ## SBOM
 M10 生成 CycloneDX SBOM 并做许可证审计；新增依赖须在 `docs/DECISIONS.md` 记录。
+### 公网行情源（本轮新增）
+
+| 来源 | 用途 | 许可/条款 | 再分发 |
+|---|---|---|---|
+| 新浪财经公开行情（`vip.stock.finance.sina.com.cn` / `money.finance.sina.com.cn`） | 全市场 universe + 日线历史（主路径，免 token） | **非官方**公开网页接口，无 SLA、可能随时变更或限流；仅限个人研究自用，自设限速（≤2 并发、≥0.25s/请求、失败重试 2 次） | 不随仓库分发；抓取数据不得再分发/转售 |
+| 腾讯行情（`web.ifzq.gtimg.cn` fqkline qfq） | 前复权收盘，用于复权因子/公司行为推导（可选） | 同上：非官方公开接口，无 SLA；仅个人研究自用 | 同上 |
+| 东方财富公开接口（`push2.eastmoney.com` / `push2his.eastmoney.com`） | **备用**全市场日线（本机可能被限流：Empty reply） | 非官方公开网页接口，无 SLA；仅个人研究自用，自设限速 | 同上 |
+
+- 网络能力默认关闭，仅在运行时显式设置 `QC_ALLOW_NETWORK=1`（或 provider 参数
+  `allow_network=True`）后才会访问上述接口；默认测试与 UI 首启流程完全不联网。
+- 仓库内 `tests/fixtures/sina/`、`tests/fixtures/eastmoney/` 只保留**小体积录制/派生样本**
+  （1 页 universe、3 只股票若干日线、1 组构造的除权样本），用于离线测试；完整市场数据不入库、
+  不随包分发。
+- 数据仅为研究/模拟用途；任何结果须标注"历史表现不代表未来，不构成投资建议"。
