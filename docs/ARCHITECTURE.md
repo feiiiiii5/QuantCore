@@ -3,7 +3,7 @@
 ```
 ┌────────────────────────────── macOS / Windows / Linux (single user) ──────────────────────────────┐
 │  React 19 + Vite UI (ui/)  ──HTTP/WS, same origin, Bearer──►  FastAPI qc-server (python/quantcore/server) │
-│       │  ECharts / lightweight-charts / Monaco / TanStack Table        │                                  │
+│       │  lightweight-charts / Radix UI / framer-motion / Monaco        │                                  │
 │       │  loading/error/empty states, zh-CN, theme tokens               │  /api/market /screener /strategies │
 │       │                                                                │  /backtest /jobs /experiments        │
 │       └────────────────────────── Vite dev proxy / static SPA ────────┘  /data /research /onboarding       │
@@ -41,7 +41,7 @@
 
 ## 前端信息架构
 - 壳：八页导航（行情/选股/策略/回测/实验/研究/模拟/数据）+ 设置；顶部全局搜索（⌘K 聚焦）；底部状态栏；主题/密度/涨跌配色。
-- 行情：overview 指数/宽度/行业；K 线（轻量图表 + ECharts 指标）；证券搜索/表格。
+- 行情：overview 指数/宽度/行业；K 线（lightweight-charts）；证券搜索/虚拟表格。
 - 选股：表达式/预设 → 结果表 → CSV 导出/localStorage 方案。
 - 策略：模板 + JSON Schema 表单 + Monaco + validate/运行。
 - 回测：表单 → job → 轮询/WS 进度/取消 → 指标/净值回撤/逐笔/费用/交易解释 → replay/报告。

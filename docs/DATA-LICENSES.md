@@ -15,7 +15,7 @@
 ## 运行时依赖
 - C++：pybind11 (BSD-3)，Catch2 (BSL-1.0, test only)，Google Benchmark (Apache-2.0, bench only)。
 - Python：numpy (BSD-3), pandas (BSD-3), pyarrow (Apache-2.0), duckdb (MIT), pydantic (MIT), FastAPI (MIT), uvicorn (BSD-3), typer (MIT), jinja2 (BSD-3), keyring (MIT)。
-- UI：React (MIT), Vite (MIT), ECharts (Apache-2.0), KLineChart/lightweight-charts（许可证见 ADR）, Monaco (MIT), TanStack Table (MIT), Zustand (MIT)。
+- UI：React (MIT), Vite (MIT), Radix UI (MIT), framer-motion (MIT), sonner (MIT), cmdk (MIT), vaul (MIT), TradingView lightweight-charts (Apache-2.0), Monaco (MIT), TanStack Table/Virtual/Query (MIT), Zustand (MIT), lucide-react (ISC)。
 - **GPL/AGPL 不得进入分发包**；Backtrader (GPL-3.0) 仅作为 `dev` 可选、只在 `tests/reference` 交叉验证中使用，不随运行时/安装包分发。
 - Electron/electron-builder (MIT) 仅 M10 桌面壳。
 

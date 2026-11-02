@@ -6,7 +6,7 @@
 - 状态：accepted
 - 理由：qcore 的定点账本、.qpanel、回测语义是本项目差异化与可验证性的核心，必须自研；
   pybind11、scikit-build-core、Catch2、Google Benchmark、numpy/pandas/pyarrow/duckdb、
-  pydantic/FastAPI、React/Vite/ECharts/lightweight-charts 等直接采用成熟方案。GPL/AGPL 依赖不进入分发包。
+  pydantic/FastAPI、React/Vite/Radix UI/framer-motion/sonner/cmdk/vaul/lightweight-charts 等直接采用成熟方案。GPL/AGPL 依赖不进入分发包。
 
 ## ADR-002 C++20 + CMake + Ninja + scikit-build-core + pybind11
 - 状态：accepted
@@ -25,7 +25,7 @@
 ## ADR-005 前端图表
 - 状态：proposed（M6 前定稿）
 - K 线：KLineChart 与 lightweight-charts 均候选；按许可证、画线能力与包体积比较后定稿。
-- 分析图：ECharts；表格：TanStack Table + 虚拟滚动；编辑器：Monaco。
+- 分析图：TradingView lightweight-charts（已移除 ECharts）；弹层/原语：Radix UI；动效：framer-motion；表格：TanStack Table + 虚拟滚动；编辑器：Monaco。
 
 ## ADR-006 不引入 OpenMP
 - 状态：accepted
