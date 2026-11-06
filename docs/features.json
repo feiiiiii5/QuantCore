@@ -1058,7 +1058,7 @@
       "milestone": "R8",
       "title": "quote-driven persisted live paper accounts",
       "passes": true,
-      "evidence": "test_paper_live.py; valid post-order quote intervals, shared incremental-volume budget, per-source daily high-water marks across fallback/restart, T+1/fees/limits and persistence; real-server UI waiting-path E2E"
+      "evidence": "test_paper_live.py; valid post-order quote intervals, shared incremental-volume budget, shared per-security daily cumulative high-water mark across source switching/rollback/restart, including legacy counter migration, T+1/fees/limits and persistence; real-server UI waiting-path E2E"
     },
     {
       "id": "R8-003",
@@ -1102,7 +1102,7 @@
   "incremental_verification": {
     "date": "2026-11-06",
     "scope": "R8 local verification plus private Sites frontend publication; earlier external/platform evidence retains original dates; Python/C++ backend remains local",
-    "python": "579 passed / 2 skipped",
+    "python": "581 passed / 2 skipped",
     "cpp": "native version 0.1.1; current differential 6/6 and verify_cpp passed; sources unchanged, R7 ctest 101/101",
     "ui": "39 passed / 18 files",
     "checks": "ruff lint/format python, tests and new scripts (197 files); mypy 114 files; TypeScript/Vite build; isolated real-server E2E 20/20; actual candidate study generic replay 24/24",

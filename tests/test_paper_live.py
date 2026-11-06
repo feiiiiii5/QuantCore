@@ -340,6 +340,44 @@ def test_source_switch_and_restart_cannot_reuse_a_counted_volume_interval(clock,
     assert restored.session.orders[0].filled_qty == 200  # Only genuinely new volume counts.
 
 
+@pytest.mark.parametrize("legacy_sources", [False, True])
+def test_sources_share_daily_volume_budget_through_correction_and_restart(
+    clock, tmp_path, legacy_sources: bool
+) -> None:
+    account = engine(clock)
+    account.submit_order(code="600000", side="buy", qty=400)
+    refresh(account, clock, quote(clock, source="eastmoney", volume=10000))
+    for source, volume, expected_qty in (
+        ("eastmoney", 11000, 100),
+        ("sina", 11000, 100),  # Switching sources only establishes an interval baseline.
+        ("sina", 12000, 200),
+        ("eastmoney", 11000, 200),  # Returning primary lags the fallback's cumulative count.
+    ):
+        clock[0] += dt.timedelta(seconds=3)
+        refresh(account, clock, quote(clock, source=source, volume=volume))
+        assert account.session.orders[0].filled_qty == expected_qty
+
+    if legacy_sources:
+        observation = account.live["observations"]["600000"]
+        observation["volume"] = 11000
+        observation["source_volumes"] = {"eastmoney": 11000, "sina": 12000}
+    store = PaperStore(tmp_path)
+    store.save(account.session)
+    restored = LivePaperSessionEngine(store.load(account.session.id))
+    for volume in (12000, 11000, 12000):
+        clock[0] += dt.timedelta(seconds=3)
+        result = refresh(restored, clock, quote(clock, source="eastmoney", volume=volume))
+        assert result["fills"] == []  # The fallback already funded this cumulative interval.
+        assert restored.session.orders[0].filled_qty == 200
+        store.save(restored.session)
+        restored = LivePaperSessionEngine(store.load(account.session.id))
+
+    clock[0] += dt.timedelta(seconds=3)
+    result = refresh(restored, clock, quote(clock, source="eastmoney", volume=13000))
+    assert len(result["fills"]) == 1
+    assert restored.session.orders[0].filled_qty == 300
+
+
 @pytest.mark.parametrize(
     "code,limit,qty,name,year",
     [

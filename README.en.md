@@ -104,7 +104,7 @@ Production backtests require the native engine and report an error if the extens
 
 ### Inspectable validation
 
-Local validation on 2026-11-06: **579 Python tests passed / 2 skipped**, **39 frontend tests**, **20/20 real-server browser tests**, **6/6 C++/reference differential tests**, plus the native verification, type and build checks. C++ sources are unchanged in this round; the previous native test run passed **101/101**.
+Local validation on 2026-11-06: **581 Python tests passed / 2 skipped**, **39 frontend tests**, **20/20 real-server browser tests**, **6/6 C++/reference differential tests**, plus the native verification, type and build checks. C++ sources are unchanged in this round; the previous native test run passed **101/101**.
 
 Five identical-input runs over 200 securities × 965 days reduced median panel export time from **290.19ms to 82.80ms (3.50×)** with byte-identical output. Candidate signals were **3.83–5.89×** faster than the original pivot algorithm, with identical weights. The native backtest entry took about **1.73ms**; the warmed, verified-snapshot wrapper took **9.65ms**, excluding signal generation. See the [performance record](docs/PERFORMANCE.md) for samples, caching and end-to-end scope; these are not whole-market measurements.
 The [validation report](docs/acceptance-report.md) records scope, reproduced failures and unverified areas. The badge above links to the current CI state.

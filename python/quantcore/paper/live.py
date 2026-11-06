@@ -265,22 +265,26 @@ class LivePaperSessionEngine(PaperSessionEngine):
             sec = self.market.security(code, str(quote.get("name") or code))
             budget = 0
             source = quote.get("source")
-            source_key = str(source or "")
-            source_volumes: dict[str, float] = {}
+            prior_volume = 0.0
             if (
                 previous is not None
                 and previous_stamp is not None
                 and previous_stamp.date() == stamp.date()
             ):
-                source_volumes = dict(previous.get("source_volumes") or {})
-                # Seed old persisted observations that predate per-source watermarks.
-                previous_source = str(previous.get("source") or "")
-                source_volumes[previous_source] = max(
-                    float(source_volumes.get(previous_source) or 0),
+                # Both normalized feeds count shares in the same security/day. Migrate
+                # legacy per-source counters by their maximum, never the current source.
+                prior_volume = max(
                     float(previous.get("volume") or 0),
+                    max(
+                        (
+                            float(value or 0)
+                            for value in (previous.get("source_volumes") or {}).values()
+                        ),
+                        default=0.0,
+                    ),
                 )
-            prior_volume = float(source_volumes.get(source_key) or 0)
-            # Retain each source's daily high-water mark through fallback and restart.
+            # Advance even when a source switch or gap cannot fund a fill. Persist the
+            # shared high-water mark so a lagging/corrected source cannot reuse volume.
             counter_volume = max(volume, prior_volume)
             if (
                 previous is not None
@@ -290,13 +294,11 @@ class LivePaperSessionEngine(PaperSessionEngine):
                 and 0 < (stamp - previous_stamp).total_seconds() <= 30
             ):
                 budget = participation_cap(max(0, volume - prior_volume), self.participation)
-            source_volumes[source_key] = counter_volume
             self.live["observations"][code] = {
                 "timestamp": stamp.isoformat(),
                 "volume": counter_volume,
                 "price": price,
                 "source": source,
-                "source_volumes": source_volumes,
             }
             holding = self.session.positions.get(self.market.sec_ids[sec])
             if holding is not None:

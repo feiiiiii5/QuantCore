@@ -23,7 +23,7 @@
 - 模拟账户新增 `live` 模式与 `/refresh`，无需快照；下单后同源同日的新报价及新增成交量建立共享预算，保留 T+1、手数、费用、涨跌停、撤单与持久化。开页选中账户每 3 秒刷新；没有请求就不撮合，没有后台无人值守、盘口或真实下单。历史 `step/auto` 保留且与实时隔离，详见 [模拟模型](paper-trading.md)。
 - 新增 `trend_momentum`、`liquid_reversal`、`defensive_low_vol` 三候选，已以固定协议完成八只存续股票的小样本实测，保留失败结果与成本压力情景；原始价格、已识别事件向前信号因子与下一日执行分开。近似事件和存续样本不能证明严格 PIT 或可持续超额收益，详见 [策略研究](STRATEGY-STUDY.md)。
 - 本轮授权私有 Sites 前端发布；C++/Python、数据与账户仍在本机。准确 HTTPS `--allow-origin` 才启用该来源 CORS/PNA，保留 loopback、Bearer 与 WS 校验。网页版本、连接实测与浏览器限制见 [Sites 说明](SITES.md)；不能把前端发布写成云端后端或生产验收。
-- 本轮 Python 579 passed / 2 skipped、UI 39、真实服务 E2E 20/20、原生差分 6/6、verify_cpp、Ruff 197 文件、mypy 114 文件及前端构建通过。C++ 源码未改，上一轮 ctest 101/101；详细状态以 [验收报告](acceptance-report.md) 为准；下文各轮数字保留为当时证据。
+- 本轮 Python 581 passed / 2 skipped、UI 39、真实服务 E2E 20/20、原生差分 6/6、verify_cpp、Ruff 197 文件、mypy 114 文件及前端构建通过。C++ 源码未改，上一轮 ctest 101/101；详细状态以 [验收报告](acceptance-report.md) 为准；下文各轮数字保留为当时证据。
 
 ## 当前状态
 - R5：研究条件可比性、数据复用/来源链、账户与行情身份、收益口径和 worker 生命周期优化已完成；具体增量证据见上节。
