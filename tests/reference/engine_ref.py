@@ -116,6 +116,8 @@ def run_reference(
 
     def mark_to_market(day: int) -> None:
         for sec in range(n_sec):
+            if prices["suspended"][day, sec] > 0.5:
+                continue
             close_px = prices["close"][day, sec]
             if np.isfinite(close_px) and close_px > 0:
                 last_px[sec] = _px(close_px)

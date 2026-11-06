@@ -265,3 +265,26 @@ def test_consecutive_suspended_ex_dates_compound_reference_adjustments() -> None
         ),
     )
     np.testing.assert_array_equal(result.equity, reference.equity)
+
+
+@pytest.mark.parametrize("split", [1.0, 2.0])
+def test_finite_suspended_close_keeps_the_mark_until_trading_resumes(split: float) -> None:
+    panel = action_panel(split=split)
+    panel.calendar = TradingCalendar((*panel.calendar.dates, 20260109))
+    resumed = panel.bars.iloc[[-1]].copy()
+    resumed["date"] = 20260109
+    resumed_price = 11.0 if split == 1.0 else 6.0
+    resumed[["open", "close"]] = resumed_price
+    resumed["high"] = resumed_price + 0.2
+    resumed["low"] = resumed_price - 0.2
+    panel.bars = pd.concat([panel.bars, resumed], ignore_index=True)
+    suspended = panel.bars.date.isin([20260107, 20260108])
+    panel.bars.loc[suspended, ["open", "close"]] = 10.0
+    panel.bars.loc[suspended, "high"] = 10.2
+    panel.bars.loc[suspended, "low"] = 9.8
+    panel.bars.loc[suspended, "volume"] = 0
+    panel.bars.loc[suspended, "suspended"] = True
+    result = run_backtest(panel, weights(panel), config())
+    assert result.equity_yuan[:4].tolist() == pytest.approx([10_000] * 4)
+    expected_final = 10_500 if split == 1.0 else 11_000
+    assert result.equity_yuan[-1] == expected_final

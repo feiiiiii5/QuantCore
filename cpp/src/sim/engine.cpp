@@ -270,6 +270,10 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
 
     // 4) Mark to market at today's close (stale marks kept on missing/suspended data).
     for (size_t sec = 0; sec < ns; ++sec) {
+      // Providers may carry a finite pre-suspension close through halted bars.
+      // It must not overwrite an ex-date-adjusted mark or reference price.
+      if (PanelViews::flag(views.suspended, sec, i))
+        continue;
       const Px close_px = PanelViews::px(views.close, sec, i);
       if (close_px > 0) {
         ledger.mark(static_cast<int32_t>(sec), close_px);

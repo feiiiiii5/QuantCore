@@ -254,3 +254,35 @@ TEST_CASE("consecutive suspended ex-dates compound reference adjustments", "[eng
   CHECK(result.equity[3] == result.equity[1]);
   CHECK(result.final_position_qty[0] == 200000);
 }
+
+TEST_CASE("finite suspended closes cannot overwrite carried marks", "[engine][corporate]") {
+  bool split = true;
+  SECTION("split adjustment survives the ex-date and following suspended day") {}
+  SECTION("suspension without a corporate action preserves the last mark") {
+    split = false;
+  }
+  SynthPanel sp({20260105, 20260106, 20260107, 20260108, 20260109}, {synth_security("600000", 0)});
+  sp.bar_all(0, 10.0, 10.2, 9.8, 10.0);
+  sp.set("suspended", 0, 2, 1.0);
+  sp.set("suspended", 0, 3, 1.0);
+  sp.set("volume", 0, 2, 0.0);
+  sp.set("volume", 0, 3, 0.0);
+  const double resumed = split ? 6.0 : 11.0;
+  sp.bar(0, 4, resumed, resumed + 0.2, resumed - 0.2, resumed);
+  Panel panel = sp.build();
+  auto weights = nan_weights(5, 1);
+  weights[0] = {0.5};
+  BacktestConfig cfg = base_config();
+  if (split) {
+    CorporateAction ca;
+    ca.sec = 0;
+    ca.ex_date = 20260107;
+    ca.split_ratio = 2.0;
+    cfg.corporate_actions.push_back(ca);
+  }
+  const BacktestResult result = run(panel, cfg, weights);
+  CHECK(result.equity[2] == result.equity[1]);
+  CHECK(result.equity[3] == result.equity[1]);
+  CHECK(result.equity[4] == result.equity[1] + to_money(split ? 100000.0 : 50000.0));
+  CHECK(result.final_position_qty[0] == (split ? 100000 : 50000));
+}

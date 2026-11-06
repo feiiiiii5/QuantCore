@@ -365,7 +365,7 @@ class TushareProvider(DataProvider):
         if self.fixture_mode:
             frame = self._fixture_frame("daily_bars")
             normalized = normalize_tushare_daily(frame)
-            return subset_frame(normalized, start_i, end_i, codes=codes)
+            return _subset_tushare_frame(normalized, start_i, end_i, codes, date_column="date")
         self.ensure_available()
         # Live path: one call per security is required by Tushare's API; keep it simple.
         code_list = list(codes or [])
@@ -408,8 +408,8 @@ class TushareProvider(DataProvider):
         self.require("financials")
         if self.fixture_mode:
             frame = normalize_tushare_financials(self._fixture_frame("financials"))
-            return subset_frame(
-                frame, to_date_int(start), to_date_int(end), date_column="ann_date", codes=codes
+            return _subset_tushare_frame(
+                frame, to_date_int(start), to_date_int(end), codes, date_column="ann_date"
             )
         self.ensure_available()
         code_list = list(codes or [])
@@ -442,8 +442,8 @@ class TushareProvider(DataProvider):
         self.require("corporate_actions")
         if self.fixture_mode:
             frame = normalize_tushare_actions(self._fixture_frame("corporate_actions"))
-            return subset_frame(
-                frame, to_date_int(start), to_date_int(end), date_column="ex_date", codes=codes
+            return _subset_tushare_frame(
+                frame, to_date_int(start), to_date_int(end), codes, date_column="ex_date"
             )
         self.ensure_available()
         code_list = list(codes or [])

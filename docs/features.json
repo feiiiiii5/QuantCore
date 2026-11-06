@@ -1016,7 +1016,7 @@
       "milestone": "R7",
       "title": "native corporate actions and ledger metrics",
       "passes": true,
-      "evidence": "C++ 100/100; tests/test_corporate_backtest.py and tests/test_corporate_validation.py; split/dividend/missing-mark/FIFO, batch/snapshot/legacy replay and explicit unsupported rights/tax checks"
+      "evidence": "C++ 101/101; tests/test_corporate_backtest.py and tests/test_corporate_validation.py; split/dividend/missing-mark/FIFO, batch/snapshot/legacy replay and explicit unsupported rights/tax checks"
     },
     {
       "id": "R7-002",
@@ -1053,9 +1053,9 @@
   "incremental_verification": {
     "date": "2026-11-06",
     "scope": "R7 local verification; historical M0-M10 external/platform evidence retains original date; no deployment",
-    "python": "450 passed / 2 skipped",
-    "cpp": "100/100; native version 0.1.1",
+    "python": "459 passed / 2 skipped",
+    "cpp": "101/101; native version 0.1.1",
     "ui": "29 passed / 15 files",
-    "checks": "ruff lint/format 174 files; mypy 109 files; C++ differential 6/6 and existing verify_cpp gate; TypeScript/Vite build; isolated real-server E2E 19/19"
+    "checks": "ruff lint/format 175 files; mypy 109 files; C++ differential 6/6 and existing verify_cpp gate; TypeScript/Vite build; isolated real-server E2E 19/19"
   }
 }
