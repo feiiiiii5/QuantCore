@@ -11,7 +11,8 @@ C++20 核心 `qcore`，Python 控制面，React UI，本地优先、零云依赖
 - 网络层只用录制 fixture 测试；Tushare Token 等凭据缺失时用 Synthetic + fixture 完成开发。
 - 大陆网络：pip/uv 用清华镜像，npm 用 npmmirror，Homebrew 用中科大/清华镜像；见 `docs/DEV-SETUP.md`。
 - 单文件 ≤500 行；路由/模块按领域拆分。
-- 性能关键路径必须走 C++；Python 纯实现只允许在 `tests/reference/`。
+- 语言硬约束：系统必须实质使用 C/C++，当前原生核心统一使用 C++20 `qcore`；面板、数值内核与生产回测引擎保留在原生层，性能关键路径必须走 C++。Python 参考实现只允许在 `tests/reference/`。
+- 其余层按职责选型：Python 用于数据、策略编排、实验与 API，TypeScript/React 用于界面；后续重构必须保留 C/C++ 核心及其构建、绑定和验证链路。
 - 引擎性能优化需有相关基准、差分与确定性证据；其他改动按实际影响验证。发布构建禁用 `-march=native`。
 - 不实现真实下单；`BrokerGateway` 默认禁用；UI/报告标注“历史表现不代表未来，不构成投资建议”。
 

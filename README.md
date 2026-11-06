@@ -130,6 +130,7 @@ QC_ALLOW_NETWORK=1 uv run qc serve --port 8000 --open
 
 ## 技术与质量（给开发者）
 
+- **语言约束**：C/C++ 是系统核心的必选语言，当前采用 C++20；面板、数值内核与生产回测引擎由原生 `qcore` 执行。其余层按职责选型，保留 Python 控制面与 TypeScript 界面。
 - **架构**：C++20 `qcore`（mmap 面板、滚动/截面内核、事件驱动回测引擎，pybind11）+
   Python（数据、策略、实验、FastAPI）+ React 19 / Vite（界面）。
 - **界面栈**：Apple HIG + GitHub 成熟方案：Radix UI（无障碍原语）、framer-motion（动效）、
