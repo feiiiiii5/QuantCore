@@ -953,7 +953,7 @@
       "milestone": "R5",
       "title": "reuse saved experiment data with parent lineage",
       "passes": true,
-      "evidence": "tests/test_experiment_lineage.py: 4 passed; original snapshot/persisted panel and config retained, parameter overrides, custom store, original record unchanged"
+      "evidence": "tests/test_experiment_lineage.py: 7 passed; original snapshot/persisted panel and config retained, parameter overrides, custom store, original record unchanged; empty financial/corporate-action table schemas preserved across both save paths and source generations"
     },
     {
       "id": "R5-003",
@@ -990,7 +990,7 @@
   "incremental_verification": {
     "date": "2026-11-06",
     "scope": "R5 changes; historical M0-M10 evidence retained with original verification date",
-    "python": "370 passed / 2 skipped",
+    "python": "373 passed / 2 skipped",
     "ui": "19 passed",
     "checks": "ruff lint/format; mypy 106 files; C++ differential 6/6 + existing verify_cpp gate; UI build; isolated browser E2E 18/18; Playwright CLI research workflow, desktop/mobile no overflow and 0 console errors, no eager Monaco"
   }

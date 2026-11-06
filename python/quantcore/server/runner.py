@@ -84,10 +84,9 @@ def _save_panel(panel: PanelData, directory: Path) -> None:
     pd.DataFrame({"date": list(panel.calendar.dates)}).to_parquet(
         directory / "calendar.parquet", index=False
     )
-    if not panel.financials.empty:
-        panel.financials.to_parquet(directory / "financials.parquet", index=False)
-    if not panel.corporate_actions.empty:
-        panel.corporate_actions.to_parquet(directory / "corporate_actions.parquet", index=False)
+    # Empty table schemas are part of the panel's content hash too.
+    panel.financials.to_parquet(directory / "financials.parquet", index=False)
+    panel.corporate_actions.to_parquet(directory / "corporate_actions.parquet", index=False)
     (directory / "meta.json").write_text(
         json.dumps(panel.meta, ensure_ascii=False, default=str), encoding="utf-8"
     )

@@ -76,7 +76,12 @@ export default function BacktestPage() {
 
   useEffect(() => { setDraftStore(draft); }, [draft, setDraftStore]);
   useEffect(() => {
-    if (!sourceId || !sourceQuery.data || restoredSource.current === sourceId) return;
+    if (!sourceId) {
+      restoredSource.current = null;
+      setSnapshot((current) => current.startsWith("source:") ? "" : current);
+      return;
+    }
+    if (!sourceQuery.data || restoredSource.current === sourceId) return;
     try {
       setDraft(restoreDraft(sourceQuery.data, DEFAULTS));
       setSnapshot(`source:${sourceId}`);

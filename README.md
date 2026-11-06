@@ -136,7 +136,7 @@ QC_ALLOW_NETWORK=1 uv run qc serve --port 8000 --open
   sonner（通知）、cmdk（命令面板）、vaul（移动抽屉）、TradingView lightweight-charts（图表）、TanStack（表格/数据）。
 - **本地优先**：Parquet 权威数据 + DuckDB 查询 + SQLite 状态 + `.qpanel` 引擎输入；运行期零 CDN，
   token 只在本机；网络能力显式开启，测试只走录制 fixture。
-- **质量门禁**：pytest 370 passed / 2 skipped、Playwright 18/18、vitest 19、ruff/mypy 全绿；
+- **质量门禁**：pytest 373 passed / 2 skipped、Playwright 18/18、vitest 19、ruff/mypy 全绿；
   既有 CI 覆盖 macOS / Ubuntu / Windows smoke / UI / Windows 打包；当前优化的本机验证见验收报告。
 - **可验证**：`make verify-cpp` 检查 C++ 后端、C++/参考实现差分与性能门禁；
   `make e2e` 用隔离服务跑完整 UI 流程，不污染工作区。

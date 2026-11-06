@@ -3,12 +3,59 @@
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
+from quantcore.data.synthetic import generate_quick_panel
 from quantcore.experiments import ExperimentStore, run_experiment
-from quantcore.server.runner import run_backtest_job
+from quantcore.experiments.runner import _load_panel_data, _save_panel_data
+from quantcore.server.runner import _save_panel, run_backtest_job
 from quantcore.server.schemas import BacktestRequest
 from quantcore.strategy.spec import StrategySpec
+
+
+@pytest.mark.parametrize("save_panel", [_save_panel_data, _save_panel])
+def test_empty_optional_table_schemas_survive_panel_persistence(tmp_path: Path, save_panel) -> None:
+    panel = generate_quick_panel(n_sec=10, seed=9)
+    panel.financials = panel.financials.iloc[:0].copy()
+    assert panel.financials.empty and panel.corporate_actions.empty
+
+    save_panel(panel, tmp_path / "panel")
+    restored = _load_panel_data(tmp_path / "panel")
+
+    pd.testing.assert_frame_equal(restored.financials, panel.financials)
+    pd.testing.assert_frame_equal(restored.corporate_actions, panel.corporate_actions)
+    assert restored.content_hash() == panel.content_hash()
+
+
+def test_source_lineage_preserves_quick_panel_hash_across_generations(tmp_path: Path) -> None:
+    panel = generate_quick_panel(n_sec=10, seed=9)
+    assert panel.corporate_actions.empty and len(panel.corporate_actions.columns) > 0
+    store = ExperimentStore(tmp_path / "experiments")
+    source = run_experiment(
+        store, StrategySpec(name="quick_panel", template="buy_and_hold"), panel=panel
+    )
+    source_metadata = (source.directory / "metadata.json").read_bytes()
+    expected_hash = source.metadata["snapshot"]["content_hash"]
+    expected_equity = store.load_result(source.run_id).equity
+    previous_id = source.run_id
+
+    for _ in range(2):
+        child = run_backtest_job(
+            {
+                "source_run_id": previous_id,
+                "experiments_root": str(store.root),
+                "template": "buy_and_hold",
+                "params": {},
+            }
+        )
+        record = store.get(child["run_id"])
+        assert record.metadata["parent_run_id"] == previous_id
+        assert record.metadata["snapshot"]["content_hash"] == expected_hash
+        assert np.array_equal(store.load_result(record.run_id).equity, expected_equity)
+        previous_id = record.run_id
+
+    assert (source.directory / "metadata.json").read_bytes() == source_metadata
 
 
 @pytest.mark.parametrize("use_snapshot", [False, True])
