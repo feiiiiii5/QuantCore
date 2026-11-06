@@ -20,6 +20,8 @@
 - 原实现红测：跨起始日 50/50 组合错误显示 +3.3333%，持仓重开损失 20 元成本；证券切换保留旧报价、WS 停帧不再刷新、账户切换被迟到响应覆盖。对应回归均已通过。
 - 本机 Node 26 的原生 Web Storage 与现有 jsdom 环境冲突，因此测试显式关闭该 Node 实验能力；未更换锁定依赖。
 
+CI 安装补充：初次 PR CI 的 Ubuntu 在读取清华镜像的锁定 `httptools==0.9.0` Linux wheel 时返回 HTTP 403（[失败日志](https://github.com/feiiiiii5/QuantCore/actions/runs/42168507236/job/127730548537)）。PyPI 官方文件源上的同一文件已实际下载并核对 SHA-256，与原锁完全一致。锁内安装包 URL 统一改为官方文件源；索引、版本、依赖关系和哈希均未变化，不修改 workflow。 独立 TOML 审核确认仅 1540 个安装包地址发生前缀替换；镜像索引下的离线 locked dry-run 与 Linux 目标 dry-run 通过。本机使用官方构建索引的全新 frozen 安装通过，锁字节未漂移。
+
 验证取舍：本次没有修改 C++ 核心，不重新建立另一套撮合实现或重跑全市场规模试验；检查集中于收益、账本、数据身份、任务生命周期及真实界面。真实 Tushare Token、授权实时源、Windows 安装、签名包和实盘能力仍未验证。
 
 本次界面证据：[桌面对比](screenshots/research-comparison.png)、[手机对比](screenshots/research-comparison-mobile.png)，均为明确标注的 SYNTHETIC 数据。

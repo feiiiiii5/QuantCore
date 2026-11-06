@@ -24,3 +24,14 @@ export HOMEBREW_BOTTLE_DOMAIN=https://mirrors.tuna.tsinghua.edu.cn/homebrew-bott
 
 ## 外网受限时
 - 先换镜像/重试；仍失败则记录 `PROGRESS.md`，用 Synthetic + fixture 继续开发，不阻塞其他任务。
+
+## 安装包地址与镜像可用性
+
+`uv.lock` 的安装包地址使用 PyPI 官方文件源，版本与哈希保持锁定；开发索引仍可用清华镜像。
+如果本机无法连接镜像索引，可在保持锁文件的前提下将构建依赖索引切到官方源：
+
+```bash
+UV_DEFAULT_INDEX=https://pypi.org/simple UV_SYSTEM_CERTS=1 uv sync --frozen --all-extras --python 3.12
+```
+
+不要删除锁文件或升级依赖来绕过某个安装包的 HTTP 403；先核对下载地址与锁中的 SHA-256。
