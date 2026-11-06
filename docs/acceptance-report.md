@@ -1,7 +1,7 @@
 # 验收报告 — 对照任务书
 
 > 最新增量：2026-11-07，见首节；以下保留各轮实际证据。历史状态：2026-11-02（Apple 设计语言 + 成熟开源方案重构轮 R4）。M0–M10 功能门禁完成；R2（qc doctor/demo、部分成交、本地工具链）与 R3（产品理念、UI 重构、实时行情、真实数据、零基础引导）保持全绿；R4 按 Apple HIG 重做前端设计系统（Radix UI / framer-motion / sonner / cmdk / vaul / lightweight-charts），以 exchange-calendars 真实 XSHG 日历替换启发式，修复实时行情与 provider 的一组正确性问题，并端到端验证真实联网行情（REST + WebSocket）。授权 vendor 行情、签名/公证安装包仍是文档化限制。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（M0–M10 **134/134**，R5 增量 **6/6**，R6 增量 **4/4**，R7 增量 **5/5**，R8 增量 **7/7**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（M0–M10 **134/134**，R5 增量 **6/6**，R6 增量 **4/4**，R7 增量 **5/5**，R8 增量 **7/7**，R9 增量 **6/6**）。
 
 > **交接记录（2026-11-02）**：上一会话留下的迁移交接文档（377 行）的独有内容已吸收进
 > `docs/PROGRESS.md`（开发环境/门禁基线/提交流程/工作边界）与 `README.md` 文档索引，交接文件已删除；
@@ -15,13 +15,13 @@
 - 数据页以 `build_snapshot=true` 把导入与原生快照放在同一服务任务内，切页无需第二次请求；同 tab 刷新/返回按 API 地址恢复任务连接。缺失/非法任务和连接错误分别提示，后者保留记录供重试；不声称服务重启可继续原执行。
 - 取消为协作停止：已写入数据或快照保留，失败后先检查列表再手动重试快照；不是跨导入/快照事务回滚。自定义 data_root 默认使用该目录的 state.sqlite，显式路径仍可覆盖，experiments_root 另行配置。
 - 同快照要求原生缓存时，先核验不可变数据，再新增/修复派生 qpanel；缓存和 manifest 各自原子替换。manifest 发布失败会报错，重试可恢复；不改原数据、内容指纹或快照 ID。文件 SHA-256 改为流式读取，减少额外整文件拷贝，不承诺全流程恒定内存或新增速度倍数。
-- 行为证据：test_paper_corporate.py、test_paper_corporate_api.py、test_data_snapshot_chain.py、test_snapshot_native_upgrade.py、test_snapshot_checksum_memory.py 与 DataPage/PaperPage 界面回归。最终本地 Python **629 passed / 2 skipped**（51.08s）、UI **48 passed / 18 files**、真实服务浏览器 **21/21**（28.6s）；Ruff 检查/格式与 mypy（116 源文件）、TypeScript/Vite 通过。完整回归曾发现旧缓存测试依赖 read_bytes 监测点；改为文件哈希入口后保留所有复用/损坏行为断言，未放宽校验。
+- 行为证据：test_paper_corporate.py、test_paper_corporate_api.py、test_data_snapshot_chain.py、test_snapshot_native_upgrade.py、test_snapshot_checksum_memory.py 与 DataPage/PaperPage 界面回归。最终本地 Python **629 passed / 2 skipped**（51.08s）、UI **48 passed / 18 files**、真实服务浏览器 **21/21**（29.6s）；Ruff 检查/格式与 mypy（116 源文件）、TypeScript/Vite 通过。完整回归曾发现旧缓存测试依赖 read_bytes 监测点；改为文件哈希入口后保留所有复用/损坏行为断言，未放宽校验。
 
 - 本轮原生门禁：SYNTHETIC 300×965，差分 **6/6**；打开 0.163ms、20 因子 21.40ms、原生回测 3.11ms、含冷包装 170.56ms、参考 444.44ms。脚本单次读数，非五次中位数；全市场与 10k sweep 未跑。
 - 本地交付：实际编译 macOS 27 ARM64 / CPython 3.12 原生 wheel、sdist 和 UI；构建环境扫描 **83 包 / 0 已知漏洞**，自己的 editable 源码明确排除，未知跳过/扫描失败仍阻断。先前误把该已声明排除视为失败，已用真实结果及回归修复。wheel 在独立环境用冻结版本和哈希安装，模块/原生扩展来自新环境 site-packages，engine_backend=cpp；演示及净值/成交/指标重放一致。安装前 doctor 为 warn（缺数据/快照/开发测试二进制），无 fail；不是另一台干净机器或签名安装器验收。安装后的服务与随包 UI 另通过行情/K 线、回测、导入和公司行为 **4/4** 浏览器流程。离线安装首次因缓存缺包失败，联网按原锁和哈希安装成功，不宣称全离线安装。交付流程见 [RELEASE](RELEASE.md)。
 - 私有 Sites 更新到同一项目第 5 版，原生发布结果 succeeded；用户账户登录仍待本人完成，Sites→本机完整链路未验证。[公司行为桌面](screenshots/paper-corporate.png) / [手机](screenshots/paper-corporate-mobile.png) 为实际合成验收截图。
 - 产品研究：核对七类替代方案的官方资料，撤回“别人没有研究闭环”等无依据说法，明确目标用户假设、迁移成本和可否定的试用门槛。没有执行用户访谈、外联或付费意愿验证，见 [市场研究](MARKET-RESEARCH.md)。
-- 重复安装验收补充：首次四流程通过后，再次使用已有数据曾复现三项失败。其中导入 12 证券成功后行情仍选择先前 1 证券快照，是真实 `latest` 语义缺陷；另两项涉及测试起始数据与重复同名账户选择，不能归为安装环境故障。新增 A→B→重用 A/重启/失败发布回归，并用独立原子发布指针修复默认选择，原快照字节与创建时间保留；测试按新建账户 ID 定位。修复后快照相关 32 项与全量 629 项通过；最终安装包的重复使用浏览器复验另行核对。
+- 重复安装验收补充：首次四流程通过后，再次使用已有数据曾复现三项失败。其中导入 12 证券成功后行情仍选择先前 1 证券快照，是真实 `latest` 语义缺陷；另两项涉及测试起始数据与重复同名账户选择，不能归为安装环境故障。新增 A→B→重用 A/重启/失败发布回归，并用独立原子发布指针修复默认选择，原快照字节与创建时间保留；测试按新建账户 ID 定位。修复后快照相关 32 项与全量 629 项通过；安装版在已有混合快照与重复同名账户下重新通过全部四项流程（同一包的 3+1 项分两次验证）。修正选择器时曾误用 UI 未完整展示的账户 ID，造成一次测试超时；按实际展示前缀定位后通过，未放宽账户或账本断言。
 
 ## 2026-11-06 实时工作流、策略实测与 Sites（R8 / Q-005）
 

@@ -78,3 +78,12 @@ the bundled UI against `qc serve --ui-dir ui/dist`. UI browser checks require a 
 The unsigned desktop shell, Windows smoke coverage and private Sites frontend are separate delivery paths.
 They do not establish signed installers, Windows C++ install/run support, real broker execution, production readiness or returns.
 This script builds local files and does not tag, push, upload or publish them.
+
+## Locally exercised bundle
+
+On 2026-11-07, a macOS 27 ARM64 / CPython 3.12 bundle was built and all payload checksums verified.
+A separate virtual environment installed frozen, hashed runtime requirements and the emitted wheel, then ran the
+native demo, exact replay, and four browser flows against the installed service and bundled UI. Repeated use exposed
+and led to a fix for reused-snapshot selection; preserved mixed snapshots were included in the repeat check.
+The build-environment audit examined 83 packages with no known vulnerabilities and explicitly omitted the editable
+project. This was the same physical Mac, not another clean machine or every supported platform.

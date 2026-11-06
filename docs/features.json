@@ -1129,18 +1129,26 @@
       "title": "streaming snapshot file checksums",
       "passes": true,
       "evidence": "tests/test_snapshot_checksum_memory.py; real 16 MiB file digest exact and measured Python checksum allocation bounded below 2 MiB; builder/reader use streaming SHA-256 rather than whole-file read. Not a whole-pipeline memory or speed claim."
+    },
+    {
+      "id": "R9-006",
+      "milestone": "R9",
+      "title": "last successful snapshot publication survives content reuse and restart",
+      "passes": true,
+      "evidence": "tests/test_snapshot_publication.py: A then B then reused A selects A for Workspace and CLI, including restart; original manifest bytes unchanged; failed repair/publication retains prior choice; absent/stale/malformed publication records use legacy fallback. Installed-browser repeat verified data selection after mixed prior snapshots."
     }
   ],
   "verified_at": "2026-11-02",
   "verified_by": "local gates: pytest (all green, see acceptance report); ctest 95/95; UI vitest 10; Playwright e2e 18/18 (redesigned UI); ruff/mypy; make verify-cpp; make doctor/demo; ui-audit 10 routes + mobile + dark (0 console errors, 0 overflow); real-data pipeline: Sina 3-name import + snapshot + qc data integrity (status ok) + cpp backtest; live quotes verified with QC_ALLOW_NETWORK=1 (REST + /ws/live frames)",
   "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display and local virtual matching only, no real routing or L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope. Historical paper now supports a pre-tax ex-date cash/per-lot split approximation; prior-account past events are not reconstructed, and live paper has no corporate-action feed. Cancellation of data jobs does not roll back committed warehouse/snapshot output.",
   "incremental_verification": {
-    "date": "2026-11-06",
-    "scope": "R8 local verification plus private Sites frontend publication; earlier external/platform evidence retains original dates; Python/C++ backend remains local",
-    "python": "581 passed / 2 skipped",
+    "date": "2026-11-07",
+    "scope": "R9 local verification and private Sites frontend v5; earlier external/platform evidence keeps its original dates; Python/C++ backend remains local",
+    "python": "629 passed / 2 skipped",
     "cpp": "native version 0.1.1; current differential 6/6 and verify_cpp passed; sources unchanged, R7 ctest 101/101",
-    "ui": "39 passed / 18 files",
-    "checks": "ruff lint/format python, tests and new scripts (197 files); mypy 114 files; TypeScript/Vite build; isolated real-server E2E 20/20; actual candidate study generic replay 24/24",
-    "unverified": "authenticated browser Sites-to-loopback full flow; real Tushare token; full market scale; signed installers; real brokerage"
+    "ui": "48 passed / 18 files",
+    "checks": "ruff lint/format 202 files; mypy 116 source files; TypeScript/Vite build; isolated real-server E2E 21/21; prior R8 candidate-study generic replay 24/24",
+    "unverified": "authenticated browser Sites-to-loopback full flow; real Tushare token; full market scale; signed installers; real brokerage",
+    "local_delivery": "macOS 27 ARM64 / CPython 3.12 native wheel installed in a separate environment with frozen hashed runtime requirements; cpp demo and exact equity/trades/metrics replay; 4 installed-server/browser flows including repeated data reuse; build environment audit 83 packages with no known vulnerabilities, editable project explicitly omitted; not separate-machine or signed-installer validation"
   }
 }
