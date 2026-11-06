@@ -352,8 +352,10 @@ def _attach_benchmark(
         raise BacktestError(f"benchmark security has no bars: {code}")
     close_by_date = {
         int(day): float(value)
-        for day, value in zip(series["date"], series["close"], strict=False)
-        if np.isfinite(float(value)) and float(value) > 0
+        for day, value, suspended in zip(
+            series["date"], series["close"], series["suspended"], strict=False
+        )
+        if not suspended and np.isfinite(float(value)) and float(value) > 0
     }
     base = 0.0
     shares = 1.0

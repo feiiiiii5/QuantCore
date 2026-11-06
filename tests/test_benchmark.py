@@ -158,3 +158,48 @@ def test_benchmark_missing_window_boundary_does_not_claim_excess_return(missing:
     result = run_backtest(panel, weights(panel), config(benchmark_code="600000"))
     assert result.benchmark["complete_window"] is False
     assert result.metrics["excess_return"] is None
+
+
+@pytest.mark.parametrize("resume", [False, True])
+def test_benchmark_excludes_stale_suspended_quotes_through_actions(resume: bool) -> None:
+    from tests.test_corporate_backtest import action_panel, config, weights
+
+    panel = action_panel(cash=0.5, split=2.0)
+    suspended = panel.bars.date == 20260107 if resume else panel.bars.date >= 20260107
+    panel.bars.loc[suspended, ["open", "high", "low", "close"]] = 10.0
+    panel.bars.loc[suspended, "volume"] = 0
+    panel.bars.loc[suspended, "suspended"] = True
+    result = run_backtest(panel, weights(panel), config(benchmark_code="600000"))
+    assert result.benchmark["equity"] == [10000, 10000, None, 10000 if resume else None]
+    assert result.metrics["benchmark_return"] == 0
+    assert result.benchmark["complete_window"] is resume
+    assert result.metrics["excess_return"] == (0 if resume else None)
+    assert result.benchmark["daily_observations"] == 1
+    assert result.metrics["tracking_error"] is None
+    assert result.metrics["information_ratio"] is None
+
+
+def test_benchmark_waits_for_first_tradable_quote_before_receiving_actions() -> None:
+    from tests.test_corporate_backtest import action_panel, config
+
+    panel = action_panel(cash=0.5, split=2.0)
+    panel.corporate_actions["ex_date"] = 20260106
+    panel.bars.loc[:1, ["open", "high", "low", "close"]] = 10.0
+    panel.bars.loc[:1, "volume"] = 0
+    panel.bars.loc[:1, "suspended"] = True
+    panel.bars.loc[3, ["open", "high", "low", "close"]] = 9.5
+    result = run_backtest(panel, np.full((4, 1), np.nan), config(benchmark_code="600000"))
+    assert result.benchmark["equity"] == [None, None, 10000, 20000]
+    assert result.metrics["benchmark_return"] == 1
+    assert result.benchmark["complete_window"] is False
+    assert result.metrics["excess_return"] is None
+
+
+def test_unsuspended_benchmark_retains_dividends_as_cash_without_reinvestment() -> None:
+    from tests.test_corporate_backtest import action_panel, config, weights
+
+    panel = action_panel(cash=0.5)
+    panel.bars.loc[3, ["open", "high", "low", "close"]] = 19.0
+    result = run_backtest(panel, weights(panel), config(benchmark_code="600000"))
+    assert result.benchmark["equity"] == [10000, 10000, 10000, 19500]
+    assert result.metrics["benchmark_return"] == 0.95

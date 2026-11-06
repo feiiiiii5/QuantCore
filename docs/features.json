@@ -1053,7 +1053,7 @@
   "incremental_verification": {
     "date": "2026-11-06",
     "scope": "R7 local verification; historical M0-M10 external/platform evidence retains original date; no deployment",
-    "python": "459 passed / 2 skipped",
+    "python": "463 passed / 2 skipped",
     "cpp": "101/101; native version 0.1.1",
     "ui": "29 passed / 15 files",
     "checks": "ruff lint/format 175 files; mypy 109 files; C++ differential 6/6 and existing verify_cpp gate; TypeScript/Vite build; isolated real-server E2E 19/19"
