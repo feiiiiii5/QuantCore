@@ -32,6 +32,8 @@ Build, frontend, SBOM and audit logs remain in the printed staging directory, ou
 - `quantcore-<version>.tar.gz` source distribution.
 - `quantcore-ui-<version>.tar.gz`, containing the freshly built `dist/` frontend directory.
 - `sbom.cdx.json`: offline inventory derived from Python and frontend lockfiles.
+- `requirements.txt`: runtime dependencies exported from the unchanged frozen Python lockfile, including hashes;
+  install these with `--require-hashes`, then install the native wheel with `--no-deps` as shown in `INSTALL.md`.
 - `pip-audit.json` and `audit-summary.json`: this run's dependency audit report and explicit outcome.
 - `INSTALL.md`: wheel installation, UI extraction, local self-check, synthetic demo and server commands.
 - `SHA256SUMS`: SHA-256 for payload files, excluding the manifest itself.

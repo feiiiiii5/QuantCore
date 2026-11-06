@@ -171,6 +171,22 @@ def main() -> int:
     print(f"[release] staging: {work}", flush=True)
     try:
         require_step(
+            [
+                "uv",
+                "export",
+                "--frozen",
+                "--no-dev",
+                "--no-emit-project",
+                "--format",
+                "requirements-txt",
+                "--output-file",
+                str(bundle / "requirements.txt"),
+            ],
+            root,
+            environment,
+            work / "requirements.log",
+        )
+        require_step(
             ["uv", "build", "--python", sys.executable, "--out-dir", str(bundle)],
             root,
             environment,
@@ -197,7 +213,8 @@ def main() -> int:
             "Verify SHA256SUMS first: `sha256sum -c SHA256SUMS` or macOS "
             "`shasum -a 256 -c SHA256SUMS`. Checksums detect corruption, not publisher identity.\n\n"
             f"```sh\nuv venv --python {python_version} .venv\n"
-            f"uv pip install --python .venv/bin/python ./{wheel.name}\n"
+            "uv pip install --python .venv/bin/python --require-hashes -r requirements.txt\n"
+            f"uv pip install --python .venv/bin/python --no-deps ./{wheel.name}\n"
             f"mkdir -p ui\ntar -xzf quantcore-ui-{version}.tar.gz -C ui\n"
             ".venv/bin/qc doctor\n.venv/bin/qc demo --data-root data\n"
             ".venv/bin/qc serve --data-root data --ui-dir ui/dist --port 8000 --open\n```\n\n"

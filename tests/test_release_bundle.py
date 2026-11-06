@@ -42,6 +42,9 @@ args = sys.argv[1:]
 if args[0] == "run":
     args = [arg for arg in args[1:] if arg != "--no-sync"]
     os.execv(sys.executable, [sys.executable, *args[1:]])
+if args[0] == "export":
+    Path(args[args.index("--output-file") + 1]).write_text("fixture-dependency==1 --hash=sha256:fixture\\n")
+    raise SystemExit(0)
 out = Path(args[args.index("--out-dir") + 1]) if "--out-dir" in args else Path("dist")
 out.mkdir(parents=True, exist_ok=True)
 wheel = out / "quantcore-0.1.0-cp312-cp312-macosx_11_0_arm64.whl"
@@ -126,6 +129,8 @@ def test_mac_checksum_fallback_and_stale_artifacts_cannot_contaminate_bundle(rel
     assert len(list(bundle.glob("*.whl"))) == len(list(bundle.glob("quantcore-0.1.0.tar.gz"))) == 1
     assert (bundle / "quantcore-ui-0.1.0.tar.gz").exists()
     assert (bundle / "sbom.cdx.json").exists() and (bundle / "INSTALL.md").exists()
+    assert (bundle / "requirements.txt").read_text().startswith("fixture-dependency==1 --hash=")
+    assert "--require-hashes -r requirements.txt" in (bundle / "INSTALL.md").read_text()
     assert json.loads((bundle / "audit-summary.json").read_text())["status"] == "passed"
     assert (root / "dist/quantcore-stale.whl").read_text() == "unrelated old wheel"
     assert list((root / "dist").glob("release-previous-*/prior.txt"))
