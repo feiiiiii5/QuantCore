@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "data": {
+    "content_hash": "4f64173c537a6cdd3559f48c1233b804ca4eff96dbe2175a35a169c2618db602",
+    "source": "SINA",
+    "synthetic": false,
+    "n_sec": 8,
+    "n_time": 640,
+    "first_date": 20240318,
+    "last_date": 20261106,
+    "universe": [
+      {
+        "sec_id": "SZ.000001",
+        "code": "000001",
+        "name": "平安银行",
+        "board": "MAIN",
+        "list_date": 0,
+        "delist_date": 0
+      },
+      {
+        "sec_id": "SZ.000063",
+        "code": "000063",
+        "name": "中兴通讯",
+        "board": "MAIN",
+        "list_date": 0,
+        "delist_date": 0
+      },
+      {
+        "sec_id": "SZ.000100",
+        "code": "000100",
+        "name": "TCL科技",
+        "board": "MAIN",
+        "list_date": 0,
+        "delist_date": 0
+      },
+      {
+        "sec_id": "SZ.000333",
+        "code": "000333",
+        "name": "美的集团",
+        "board": "MAIN",
+        "list_date": 0,
+        "delist_date": 0
+      },
+      {
+        "sec_id": "SZ.000568",
+        "code": "000568",
+        "name": "泸州老窖",
+        "board": "MAIN",
+        "list_date": 0,
+        "delist_date": 0
+      },
+      {
+        "sec_id": "SZ.000651",
+        "code": "000651",
+        "name": "格力电器",
+        "board": "MAIN",
+        "list_date": 0,
+        "delist_date": 0
+      },
+      {
+        "sec_id": "SZ.000725",
+        "code": "000725",
+        "name": "京东方Ａ",
+        "board": "MAIN",
+        "list_date": 0,
+        "delist_date": 0
+      },
+      {
+        "sec_id": "SZ.000858",
+        "code": "000858",
+        "name": "五 粮 液",
+        "board": "MAIN",
+        "list_date": 0,
+        "delist_date": 0
+      }
+    ]
+  },
+  "date_protocol": {
+    "development_start": 20250401,
+    "holdout_start": 20260101
+  },
+  "candidate_specs": [
+    {
+      "name": "trend_momentum",
+      "template": "trend_momentum",
+      "params": {
+        "lookback": 252,
+        "skip": 21,
+        "trend_window": 200,
+        "top_n": 3,
+        "rebalance": "monthly"
+      },
+      "universe": {
+        "exclude_st": true,
+        "exclude_suspended": true,
+        "min_price": 1.0,
+        "min_list_days": 0,
+        "min_amount": 0.0
+      },
+      "description": "",
+      "version": "1"
+    },
+    {
+      "name": "liquid_reversal",
+      "template": "liquid_reversal",
+      "params": {
+        "lookback": 5,
+        "amount_lookback": 20,
+        "liquidity_quantile": 0.5,
+        "trend_lookback": 60,
+        "top_n": 3,
+        "rebalance": "weekly"
+      },
+      "universe": {
+        "exclude_st": true,
+        "exclude_suspended": true,
+        "min_price": 1.0,
+        "min_list_days": 0,
+        "min_amount": 0.0
+      },
+      "description": "",
+      "version": "1"
+    },
+    {
+      "name": "defensive_low_vol",
+      "template": "defensive_low_vol",
+      "params": {
+        "lookback": 60,
+        "trend_lookback": 120,
+        "top_n": 3,
+        "rebalance": "monthly"
+      },
+      "universe": {
+        "exclude_st": true,
+        "exclude_suspended": true,
+        "min_price": 1.0,
+        "min_list_days": 0,
+        "min_amount": 0.0
+      },
+      "description": "",
+      "version": "1"
+    },
+    {
+      "name": "equal_weight_buy_hold",
+      "template": "buy_and_hold",
+      "params": {},
+      "universe": {
+        "exclude_st": true,
+        "exclude_suspended": true,
+        "min_price": 1.0,
+        "min_list_days": 0,
+        "min_amount": 0.0
+      },
+      "description": "",
+      "version": "1"
+    }
+  ],
+  "phase_definitions": [
+    {
+      "name": "development",
+      "start": 20250401,
+      "end": 20251231,
+      "warmup": {
+        "required_preceding_bars": 252,
+        "available_preceding_rows": 251,
+        "valid_preceding_by_security": {
+          "SZ.000001": 251,
+          "SZ.000063": 251,
+          "SZ.000100": 251,
+          "SZ.000333": 251,
+          "SZ.000568": 251,
+          "SZ.000651": 251,
+          "SZ.000725": 251,
+          "SZ.000858": 251
+        },
+        "sufficient": false
+      }
+    },
+    {
+      "name": "holdout",
+      "start": 20260105,
+      "end": 20261106,
+      "warmup": {
+        "required_preceding_bars": 252,
+        "available_preceding_rows": 437,
+        "valid_preceding_by_security": {
+          "SZ.000001": 437,
+          "SZ.000063": 437,
+          "SZ.000100": 437,
+          "SZ.000333": 437,
+          "SZ.000568": 437,
+          "SZ.000651": 437,
+          "SZ.000725": 437,
+          "SZ.000858": 437
+        },
+        "sufficient": true
+      }
+    },
+    {
+      "name": "holdout_2026",
+      "start": 20260105,
+      "end": 20261106,
+      "warmup": {
+        "required_preceding_bars": 252,
+        "available_preceding_rows": 437,
+        "valid_preceding_by_security": {
+          "SZ.000001": 437,
+          "SZ.000063": 437,
+          "SZ.000100": 437,
+          "SZ.000333": 437,
+          "SZ.000568": 437,
+          "SZ.000651": 437,
+          "SZ.000725": 437,
+          "SZ.000858": 437
+        },
+        "sufficient": true
+      }
+    }
+  ],
+  "selection_policy": "fixed_parameters_no_fitting_no_result_based_selection",
+  "results": [
+    {"phase": "development", "candidate": "trend_momentum", "cost_case": "base", "run_id": "candidate_study_20261106T140428_48c1bc28", "start": 20250401, "end": 20251231, "total_return": 0.052115637500000034, "annualized_return": 0.06891576913042319, "sharpe": 0.4682879098206964, "max_drawdown": 0.09638663685393656, "fees_cny": 2437.4625, "trade_count": 28, "average_exposure": 0.8715442633169326, "excess_equal_weight": 0.0460953555000001, "signal_hash": "48c1bc289ed583d1f68544432382dadd8823be1362ed401d9bfe441f99777244", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "development", "candidate": "trend_momentum", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_48c1bc28_2", "start": 20250401, "end": 20251231, "total_return": 0.047344772800000046, "annualized_return": 0.06256177928503903, "sharpe": 0.4339021630255613, "max_drawdown": 0.09773954168677135, "fees_cny": 4866.3272, "trade_count": 27, "average_exposure": 0.8721245181336637, "excess_equal_weight": 0.041918589000000006, "signal_hash": "48c1bc289ed583d1f68544432382dadd8823be1362ed401d9bfe441f99777244", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "development", "candidate": "liquid_reversal", "cost_case": "base", "run_id": "candidate_study_20261106T140428_c05c8b27", "start": 20250401, "end": 20251231, "total_return": -0.034028694400000004, "annualized_return": -0.04440107826367801, "sharpe": -0.10502581743819543, "max_drawdown": 0.23400523580147015, "fees_cny": 12552.9944, "trade_count": 84, "average_exposure": 0.9458421930231059, "excess_equal_weight": -0.040048976399999936, "signal_hash": "c05c8b273ef2121444609e851b89728e80017f0f842eeedbbb720dda74a795cf", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "development", "candidate": "liquid_reversal", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_c05c8b27_2", "start": 20250401, "end": 20251231, "total_return": -0.05098721149999996, "annualized_return": -0.06634837107847791, "sharpe": -0.2124617321763817, "max_drawdown": 0.23978281382727595, "fees_cny": 24886.5115, "trade_count": 85, "average_exposure": 0.9460099703970157, "excess_equal_weight": -0.0564133953, "signal_hash": "c05c8b273ef2121444609e851b89728e80017f0f842eeedbbb720dda74a795cf", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "development", "candidate": "defensive_low_vol", "cost_case": "base", "run_id": "candidate_study_20261106T140428_1439b962", "start": 20250401, "end": 20251231, "total_return": 0.006334417199999942, "annualized_return": 0.008317860507692343, "sharpe": 0.12934844035725052, "max_drawdown": 0.09210618347175681, "fees_cny": 1853.0828, "trade_count": 30, "average_exposure": 0.9863910792460472, "excess_equal_weight": 0.0003141352000000097, "signal_hash": "1439b962b5d1ecc6bb0bf054d2eaa95802cc73eba4df00a2fb7aa59d455bd8cc", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "development", "candidate": "defensive_low_vol", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_1439b962_2", "start": 20250401, "end": 20251231, "total_return": 0.0034867182000000163, "annualized_return": 0.004576458968086561, "sharpe": 0.102291381702001, "max_drawdown": 0.09288201176391131, "fees_cny": 3713.1818, "trade_count": 30, "average_exposure": 0.9864774053451688, "excess_equal_weight": -0.0019394656000000232, "signal_hash": "1439b962b5d1ecc6bb0bf054d2eaa95802cc73eba4df00a2fb7aa59d455bd8cc", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "development", "candidate": "equal_weight_buy_hold", "cost_case": "base", "run_id": "candidate_study_20261106T140428_2a7c0931", "start": 20250401, "end": 20251231, "total_return": 0.006020281999999932, "annualized_return": 0.007904977052521911, "sharpe": 0.12791377136292625, "max_drawdown": 0.08151474469342646, "fees_cny": 304.918, "trade_count": 8, "average_exposure": 0.9523558441553583, "excess_equal_weight": 0.0, "signal_hash": "2a7c0931d14785f69b2703bb93264185566b8c4c2c219cdecba44132f77159c6", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "development", "candidate": "equal_weight_buy_hold", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_2a7c0931_2", "start": 20250401, "end": 20251231, "total_return": 0.0054261838000000395, "annualized_return": 0.0071242342710984286, "sharpe": 0.12270145458178652, "max_drawdown": 0.08155898269390849, "fees_cny": 610.0162, "trade_count": 8, "average_exposure": 0.9529161241247606, "excess_equal_weight": 0.0, "signal_hash": "2a7c0931d14785f69b2703bb93264185566b8c4c2c219cdecba44132f77159c6", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout", "candidate": "trend_momentum", "cost_case": "base", "run_id": "candidate_study_20261106T140428_48c1bc28_3", "start": 20260105, "end": 20261106, "total_return": 0.17523772569999996, "annualized_return": 0.21419669848096934, "sharpe": 0.8391145550527621, "max_drawdown": 0.23666442061862902, "fees_cny": 3199.2743, "trade_count": 26, "average_exposure": 0.9914404887849199, "excess_equal_weight": 0.22658846729999993, "signal_hash": "48c1bc289ed583d1f68544432382dadd8823be1362ed401d9bfe441f99777244", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout", "candidate": "trend_momentum", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_48c1bc28_4", "start": 20260105, "end": 20261106, "total_return": 0.16762787749999997, "annualized_return": 0.20475286025835993, "sharpe": 0.8100077038111664, "max_drawdown": 0.23891520683152967, "fees_cny": 6405.3225, "trade_count": 27, "average_exposure": 0.9915454328826269, "excess_equal_weight": 0.21959255439999992, "signal_hash": "48c1bc289ed583d1f68544432382dadd8823be1362ed401d9bfe441f99777244", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout", "candidate": "liquid_reversal", "cost_case": "base", "run_id": "candidate_study_20261106T140428_c05c8b27_3", "start": 20260105, "end": 20261106, "total_return": -0.05008238060000003, "annualized_return": -0.05988893730140299, "sharpe": 0.01125528477124481, "max_drawdown": 0.2188636508814895, "fees_cny": 10302.1806, "trade_count": 76, "average_exposure": 0.8969777790824005, "excess_equal_weight": 0.0012683609999999401, "signal_hash": "c05c8b273ef2121444609e851b89728e80017f0f842eeedbbb720dda74a795cf", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout", "candidate": "liquid_reversal", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_c05c8b27_4", "start": 20260105, "end": 20261106, "total_return": -0.0732795625, "annualized_return": -0.08741492153454544, "sharpe": -0.07138395974752963, "max_drawdown": 0.2268712949994368, "fees_cny": 20357.1625, "trade_count": 74, "average_exposure": 0.8964508119468495, "excess_equal_weight": -0.021314885600000055, "signal_hash": "c05c8b273ef2121444609e851b89728e80017f0f842eeedbbb720dda74a795cf", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout", "candidate": "defensive_low_vol", "cost_case": "base", "run_id": "candidate_study_20261106T140428_1439b962_3", "start": 20260105, "end": 20261106, "total_return": 0.26388429560000004, "annualized_return": 0.32510163417498505, "sharpe": 1.4121141721482844, "max_drawdown": 0.11374105389863365, "fees_cny": 3539.9044, "trade_count": 35, "average_exposure": 0.9881426513504419, "excess_equal_weight": 0.3152350372, "signal_hash": "1439b962b5d1ecc6bb0bf054d2eaa95802cc73eba4df00a2fb7aa59d455bd8cc", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout", "candidate": "defensive_low_vol", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_1439b962_4", "start": 20260105, "end": 20261106, "total_return": 0.25775207330000005, "annualized_return": 0.31737766677125445, "sharpe": 1.3844515412554865, "max_drawdown": 0.11538199025803042, "fees_cny": 7071.6267, "trade_count": 35, "average_exposure": 0.9887060304945612, "excess_equal_weight": 0.3097167502, "signal_hash": "1439b962b5d1ecc6bb0bf054d2eaa95802cc73eba4df00a2fb7aa59d455bd8cc", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout", "candidate": "equal_weight_buy_hold", "cost_case": "base", "run_id": "candidate_study_20261106T140428_223f2f95", "start": 20260105, "end": 20261106, "total_return": -0.05135074159999997, "annualized_return": -0.06139752757627581, "sharpe": -0.29079997644215844, "max_drawdown": 0.15268092903719854, "fees_cny": 303.7416, "trade_count": 8, "average_exposure": 0.9536337918149091, "excess_equal_weight": 0.0, "signal_hash": "223f2f956b4ab85fb9ec534449d34e69f20281664d95b28efe47196ea84212d0", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout", "candidate": "equal_weight_buy_hold", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_223f2f95_2", "start": 20260105, "end": 20261106, "total_return": -0.05196467689999995, "annualized_return": -0.062127596776461624, "sharpe": -0.2953697563477447, "max_drawdown": 0.15276747814839386, "fees_cny": 607.6769, "trade_count": 8, "average_exposure": 0.9542326317808759, "excess_equal_weight": 0.0, "signal_hash": "223f2f956b4ab85fb9ec534449d34e69f20281664d95b28efe47196ea84212d0", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout_2026", "candidate": "trend_momentum", "cost_case": "base", "run_id": "candidate_study_20261106T140428_48c1bc28_5", "start": 20260105, "end": 20261106, "total_return": 0.17523772569999996, "annualized_return": 0.21419669848096934, "sharpe": 0.8391145550527621, "max_drawdown": 0.23666442061862902, "fees_cny": 3199.2743, "trade_count": 26, "average_exposure": 0.9914404887849199, "excess_equal_weight": 0.22658846729999993, "signal_hash": "48c1bc289ed583d1f68544432382dadd8823be1362ed401d9bfe441f99777244", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout_2026", "candidate": "trend_momentum", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_48c1bc28_6", "start": 20260105, "end": 20261106, "total_return": 0.16762787749999997, "annualized_return": 0.20475286025835993, "sharpe": 0.8100077038111664, "max_drawdown": 0.23891520683152967, "fees_cny": 6405.3225, "trade_count": 27, "average_exposure": 0.9915454328826269, "excess_equal_weight": 0.21959255439999992, "signal_hash": "48c1bc289ed583d1f68544432382dadd8823be1362ed401d9bfe441f99777244", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout_2026", "candidate": "liquid_reversal", "cost_case": "base", "run_id": "candidate_study_20261106T140428_c05c8b27_5", "start": 20260105, "end": 20261106, "total_return": -0.05008238060000003, "annualized_return": -0.05988893730140299, "sharpe": 0.01125528477124481, "max_drawdown": 0.2188636508814895, "fees_cny": 10302.1806, "trade_count": 76, "average_exposure": 0.8969777790824005, "excess_equal_weight": 0.0012683609999999401, "signal_hash": "c05c8b273ef2121444609e851b89728e80017f0f842eeedbbb720dda74a795cf", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout_2026", "candidate": "liquid_reversal", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_c05c8b27_6", "start": 20260105, "end": 20261106, "total_return": -0.0732795625, "annualized_return": -0.08741492153454544, "sharpe": -0.07138395974752963, "max_drawdown": 0.2268712949994368, "fees_cny": 20357.1625, "trade_count": 74, "average_exposure": 0.8964508119468495, "excess_equal_weight": -0.021314885600000055, "signal_hash": "c05c8b273ef2121444609e851b89728e80017f0f842eeedbbb720dda74a795cf", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout_2026", "candidate": "defensive_low_vol", "cost_case": "base", "run_id": "candidate_study_20261106T140428_1439b962_5", "start": 20260105, "end": 20261106, "total_return": 0.26388429560000004, "annualized_return": 0.32510163417498505, "sharpe": 1.4121141721482844, "max_drawdown": 0.11374105389863365, "fees_cny": 3539.9044, "trade_count": 35, "average_exposure": 0.9881426513504419, "excess_equal_weight": 0.3152350372, "signal_hash": "1439b962b5d1ecc6bb0bf054d2eaa95802cc73eba4df00a2fb7aa59d455bd8cc", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout_2026", "candidate": "defensive_low_vol", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_1439b962_6", "start": 20260105, "end": 20261106, "total_return": 0.25775207330000005, "annualized_return": 0.31737766677125445, "sharpe": 1.3844515412554865, "max_drawdown": 0.11538199025803042, "fees_cny": 7071.6267, "trade_count": 35, "average_exposure": 0.9887060304945612, "excess_equal_weight": 0.3097167502, "signal_hash": "1439b962b5d1ecc6bb0bf054d2eaa95802cc73eba4df00a2fb7aa59d455bd8cc", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout_2026", "candidate": "equal_weight_buy_hold", "cost_case": "base", "run_id": "candidate_study_20261106T140428_223f2f95_3", "start": 20260105, "end": 20261106, "total_return": -0.05135074159999997, "annualized_return": -0.06139752757627581, "sharpe": -0.29079997644215844, "max_drawdown": 0.15268092903719854, "fees_cny": 303.7416, "trade_count": 8, "average_exposure": 0.9536337918149091, "excess_equal_weight": 0.0, "signal_hash": "223f2f956b4ab85fb9ec534449d34e69f20281664d95b28efe47196ea84212d0", "engine_version": "0.1.1", "synthetic": false},
+    {"phase": "holdout_2026", "candidate": "equal_weight_buy_hold", "cost_case": "stress", "run_id": "candidate_study_20261106T140428_223f2f95_4", "start": 20260105, "end": 20261106, "total_return": -0.05196467689999995, "annualized_return": -0.062127596776461624, "sharpe": -0.2953697563477447, "max_drawdown": 0.15276747814839386, "fees_cny": 607.6769, "trade_count": 8, "average_exposure": 0.9542326317808759, "excess_equal_weight": 0.0, "signal_hash": "223f2f956b4ab85fb9ec534449d34e69f20281664d95b28efe47196ea84212d0", "engine_version": "0.1.1", "synthetic": false}
+  ]
+}

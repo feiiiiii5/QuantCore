@@ -136,7 +136,7 @@ export default function HomePage() {
                 </div>
                 <div className="kpi-value">{view.close == null ? "—" : num(view.close)}</div>
                 <Sparkline values={fallbackSpark(view.spark, view.close)} positive={(view.changePct ?? 0) >= 0} height={30} />
-                <small>{view.source === "live" ? t.appbar.live : view.source === "snapshot" ? t.common.snapshot : t.common.notAvailable}</small>
+                <small>{view.source === "live" ? tone === "live" && !liveIndices.data?.stale ? t.appbar.live : "最近报价" : view.source === "snapshot" ? t.common.snapshot : t.common.notAvailable}</small>
               </div>
             ))}
           </div>
@@ -153,7 +153,7 @@ export default function HomePage() {
         <Panel
           title={t.home.watchlist}
           subtitle={t.home.watchlistHint}
-          actions={liveEnabled ? <Badge tone="ok" dot>{t.appbar.live}</Badge> : <Badge tone="warn" dot>{t.market.offlineSnapshot}</Badge>}
+          actions={liveEnabled ? <Badge tone={tone === "live" && liveQuotes.data?.stale === false ? "ok" : "warn"} dot>{tone === "live" && liveQuotes.data?.stale === false ? t.appbar.live : "最近报价 / 本地回退"}</Badge> : <Badge tone="warn" dot>{t.market.offlineSnapshot}</Badge>}
           bodyClassName="home-watchlist-body"
         >
           <div className="stack">

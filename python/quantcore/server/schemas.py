@@ -52,6 +52,7 @@ class HealthView(BaseModel):
     panel_available: bool
     synthetic_only: bool = True
     cors: bool = False
+    allowed_origins: list[str] = Field(default_factory=list)
 
 
 class DoctorCheckView(BaseModel):
@@ -198,9 +199,10 @@ TERMINAL_JOB_STATUSES = ("done", "failed", "cancelled")
 
 # ---------------------------------------------------------------- paper trading (M9)
 class PaperSessionCreateRequest(BaseModel):
-    """Create a simulated session over one immutable snapshot (never a real account)."""
+    """Create a historical or quote-driven simulated account."""
 
     model_config = ConfigDict(extra="forbid")
+    mode: Literal["historical", "live"] = "historical"
     snapshot: str | None = Field(default=None, max_length=200)
     initial_cash: float = Field(default=1_000_000.0, gt=0, le=1e12, description="CNY")
     start: int | str | None = None

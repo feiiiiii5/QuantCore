@@ -174,13 +174,17 @@ export interface Bars {
   low: number[];
   close: number[];
   volume: number[];
-  amount: number[];
-  turnover: number[];
+  amount: Array<number | null>;
+  turnover: Array<number | null>;
   ma5: Array<number | null>;
   ma20: Array<number | null>;
   limit_up: number[];
   limit_down: number[];
   suspended: number[];
+  source?: string;
+  synthetic?: boolean;
+  as_of?: string | null;
+  note?: string;
 }
 
 export interface DatasetInfo {
@@ -582,6 +586,7 @@ export interface AttributionResult {
 
 export interface PaperSessionSummary {
   id: string;
+  mode?: "historical" | "live";
   name: string;
   status: string;
   snapshot: string | null;
@@ -619,6 +624,7 @@ export interface PaperPosition {
   market_value: number;
   pnl: number;
   pnl_pct: number;
+  quote_timestamp?: string | null;
 }
 
 export interface PaperOrder {
@@ -665,6 +671,12 @@ export interface PaperSessionDetail {
   trades: PaperTrade[];
   equity_curve: Array<{ date: number; equity: number }>;
   fills?: Array<Record<string, unknown>>;
+  live?: {
+    state: string;
+    as_of: string | null;
+    notice: string;
+    quotes: Array<{ code: string; timestamp: string | null; reason: string | null; price: number | null }>;
+  };
 }
 
 export interface OverfittingResult {
@@ -862,6 +874,8 @@ export interface LiveQuote {
   suspended: boolean;
   timestamp: string | null;
   source: string;
+  stale?: boolean;
+  received_at?: string | null;
 }
 
 export interface LiveQuotesPayload {

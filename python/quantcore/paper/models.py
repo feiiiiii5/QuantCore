@@ -281,6 +281,10 @@ class PaperSession:
     schema_version: int = SCHEMA_VERSION
 
     # -- derived views -----------------------------------------------------
+    @property
+    def mode(self) -> str:
+        return str(self.config.get("mode", "historical"))
+
     def market_value(self) -> float:
         return _round_money(
             sum(position.qty * position.last for position in self.positions.values())
@@ -305,6 +309,7 @@ class PaperSession:
             "id": self.id,
             "name": self.name,
             "status": self.status,
+            "mode": self.mode,
             "snapshot": self.snapshot.get("id"),
             "snapshot_meta": self.snapshot,
             "current_date": int(self.current_date),

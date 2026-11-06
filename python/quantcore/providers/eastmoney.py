@@ -447,6 +447,7 @@ class EastmoneyProvider(DataProvider):
             board=infer_board(code),
             st=self._st_by_sec.get(sec_id, False),
             source="EASTMONEY",
+            actions=actions,
         )
         return bars[(bars["date"] >= start) & (bars["date"] <= end)].reset_index(drop=True)
 

@@ -1,4 +1,4 @@
-"""Built-in strategy templates (7) and their parameter schemas."""
+"""Built-in strategies and research candidates with their parameter schemas."""
 
 from __future__ import annotations
 
@@ -29,14 +29,26 @@ from .registry import (
     template_param_model,
     template_params_schema,
 )
+from .research import (
+    DefensiveLowVolParams,
+    DefensiveLowVolStrategy,
+    LiquidReversalParams,
+    LiquidReversalStrategy,
+    TrendMomentumParams,
+    TrendMomentumStrategy,
+)
 
 __all__ = [
     "BuyAndHoldParams",
     "BuyAndHoldStrategy",
+    "DefensiveLowVolParams",
+    "DefensiveLowVolStrategy",
     "DividendQualityParams",
     "DividendQualityStrategy",
     "DualMAParams",
     "DualMAStrategy",
+    "LiquidReversalParams",
+    "LiquidReversalStrategy",
     "LowVolParams",
     "LowVolStrategy",
     "MomentumParams",
@@ -47,6 +59,8 @@ __all__ = [
     "SmallCapLiquidityStrategy",
     "TemplateEntry",
     "TemplateParams",
+    "TrendMomentumParams",
+    "TrendMomentumStrategy",
     "create_template",
     "get_template_entry",
     "list_templates",

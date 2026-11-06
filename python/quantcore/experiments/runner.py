@@ -220,6 +220,10 @@ class ReplayResult:
 def replay_experiment(store: ExperimentStore, run_id: str) -> ReplayResult:
     """Re-run a stored experiment and compare equity/trades/metrics bit-for-bit."""
     record = store.get(run_id)
+    if record.kind == "candidate_study":
+        from ..research.candidates import replay_candidate_run
+
+        return replay_candidate_run(store, run_id)
     metadata = record.metadata
     stored = store.load_result(run_id)
     strategy_payload = metadata.get("strategy")

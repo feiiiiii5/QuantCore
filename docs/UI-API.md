@@ -1,7 +1,10 @@
-# UI ⇄ API contract v2 (enterprise local workbench)
+# UI ⇄ API contract v2 (local research workbench)
 
-All routes are loopback-only, Bearer-authenticated (`Authorization: Bearer <token>`), JSON.
-The built UI is served by `qc serve` from the same origin, so no CORS is needed. For Vite dev,
+The server binds only to loopback. `/api/*` routes require `Authorization: Bearer <token>`; `/health` is public.
+The built UI is served by `qc serve` from the same origin; CORS is disabled by default. An optional private Sites frontend
+uses explicit, repeatable `qc serve --allow-origin https://exact-origin` entries. Only these HTTPS origins receive CORS and
+Private Network Access preflight support; Host, Origin, Bearer and WebSocket checks remain enforced. This does not host the
+C++/Python backend in Sites. See [Sites setup](SITES.md) for browser permissions and connection checks. For Vite dev,
 `vite.config.ts` proxies `/api`, `/ws`, `/health` to `http://127.0.0.1:8000`.
 
 WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>` (jobs) and `/ws/live?token=<token>&codes=…` (live quotes); server validates Origin/Host/token.
@@ -27,7 +30,7 @@ WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>` (jobs) and `/w
   "engine_backend": "cpp",
   "engine_available": true,
   "panel_available": true,
-  "root": "/Users/me/QuantCore",
+  "root": "<workspace>",
   "counts": {"pass": 10, "warn": 2, "fail": 0, "skip": 2},
   "checks": [
     {"id": "python", "title": "Python runtime", "status": "pass", "detail": "Python 3.12.x (...); project .venv", "hint": "", "required": true},
@@ -45,12 +48,14 @@ WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>` (jobs) and `/w
   `[{sec_id,code,name,board,industry,last,change_pct,turnover,mktcap,float_mktcap,suspended,st}]`
 
 ## Live market quotes (read-only, network opt-in)
-- Live quotes poll a public quote source only when the server is started with `QC_ALLOW_NETWORK=1`; the default is fully offline and the endpoints still answer with an explicit `off` state. No orders, no broker, no warehouse mutation. Sources: Eastmoney (primary, `push2` batch JSON) with Sina (`hq.sinajs.cn`) fallback; `QC_LIVE_INTERVAL` sets the poll interval (2–30s, default 3s).
+- Live quotes poll a public quote source only when the server is started with `QC_ALLOW_NETWORK=1`; the default is fully offline and the endpoints still answer with an explicit `off` state. These routes do not submit orders or mutate research data. The separate live paper API can consume the cached quotes for virtual fills; there is no broker. Sources: Eastmoney (primary, `push2` batch JSON) with Sina (`hq.sinajs.cn`) fallback; `QC_LIVE_INTERVAL` sets the poll interval (2–30s, default 3s).
 - `GET /api/live/status` →
   `{enabled,source:"eastmoney"|"sina"|"none",state:"off"|"idle"|"connecting"|"live"|"error"|"closed",market:{phase:"pre_open"|"open"|"lunch"|"closed"|"holiday",label,is_trading_day,server_time,next_open,last_trade_date},as_of,latency_ms,subscribed,error,notice}`
 - `GET /api/live/indices` → `{as_of,source,stale,quotes:[…]}` for 上证指数/深证成指/创业板指/科创50 (codes 000001/399001/399006/000688).
 - `GET /api/live/quotes?codes=600000,000001` → same envelope; `codes` is 6-digit A-share codes (max 50, deduped); empty `codes` falls back to the persisted watchlist. Invalid code → 400.
-- Quote shape: `{code,name,price,prev_close,open,high,low,change,change_pct,volume,amount,turnover_pct,limit_up,limit_down,suspended,timestamp,source}`. `volume` is shares for stocks (Eastmoney lots ×100) and the index aggregate is display-only; closed/suspended rows fall back to the previous close with `suspended=true`.
+- Quote shape: `{code,name,price,prev_close,open,high,low,change,change_pct,volume,amount,turnover_pct,limit_up,limit_down,suspended,timestamp,source,stale}`. `volume` is shares for stocks (Eastmoney lots ×100) and the index aggregate is display-only; closed/suspended rows fall back to the previous close with `suspended=true`.
+- Quote `timestamp` is the source time, never the fetch time. Missing, invalid or old source times mark the individual row stale; an aggregate live status does not certify every row. Stock/index groups and omitted or stale symbols have independent fallback, so a response can mix sources.
+- `GET /api/live/bars?code=600000&limit=600` (10–2000) → the market-bars OHLCV/MA shape plus `{synthetic:false,source,as_of,note}`. No snapshot is needed. Eastmoney raw daily bars fall back to Sina; unsupported amount/turnover are null. `as_of` is fetch/cache time, not a guaranteed trade timestamp. Bounded in-memory cache: 32 keys, 60s during pre-open/open/lunch, otherwise 300s. Data is display-only and never writes snapshots/warehouse. Network disabled → 409; both sources fail → 503; invalid code → 400. The UI searches codes directly and merges only valid fresh quotes into the current candle.
 - `GET /api/watchlist` / `PUT /api/watchlist` `{codes:[…]}` (see onboarding section) is the server-side subscription list for the poller.
 - **WebSocket** `ws://127.0.0.1:<port>/ws/live?token=<token>&codes=600000,000001` pushes `{type:"snapshot",status,indices,quotes}` every poll interval; same Host/Origin/token checks as `/ws/jobs`.
 - The UI shows a green 实时 dot with the last update time, or an explicit 离线/休市 state with the snapshot date. Network errors are surfaced through `status.error/notice` instead of crashing the page.
@@ -125,12 +130,15 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 `{detail:string|object}`; 400 validation, 401/403 auth, 404, 409 conflict, 422 pydantic/template validation, 500 internal (no stack in body).
 
 ## Paper trading (M9, local simulation only — no real orders)
-- `POST /api/paper/sessions` body `{snapshot?,initial_cash?,start?,end?,name?}` → **201** session view
+- `POST /api/paper/sessions` body `{mode?:"historical"|"live",snapshot?,initial_cash?,start?,end?,name?}` → **201** session view
 - `GET /api/paper/sessions` → list; `GET /api/paper/sessions/{sid}` → `{session,snapshot,account:{cash,market_value,equity,pnl,pnl_pct},positions[],orders[],trades[],equity_curve[]}`
 - `POST /api/paper/sessions/{sid}/step` body `{}`/`{days}`/`{to_date}` → detail + `fills[]`; `POST .../reset`
 - `POST .../orders` body `{code|sec_id,side:"buy"|"sell",qty,order_type:"market"|"limit",limit_price?}` → `{order}`
 - `POST .../orders/{oid}/cancel`; `GET .../signals.csv`; `DELETE /api/paper/sessions/{sid}`
-- Orders fill on the next `step` at the next open / limit touch; board lots, T+1, price limits, suspensions and fee model are reused from backtest config. Sessions persist as atomic JSON under `data_root/paper/`; no broker, no network.
+- `mode` defaults to historical; old sessions remain historical. Historical mode needs a snapshot and fills on the next `step` at the next open / limit touch. Live creation needs no snapshot; snapshot/start/end do not determine live execution.
+- `POST /api/paper/sessions/{sid}/refresh` (no body) → detail + `fills[]` + `live:{state,as_of,notice,quotes[]}` for live sessions only (historical → 400). The route reads public quotes for holdings/open orders and persists valuation, observations and virtual fills. Each position can include `quote_timestamp`.
+- Live matching requires enabled quotes, an open market, valid fresh source timestamps and post-order incremental volume (default shared 10% budget per security). First observations, source/date changes and long gaps establish a baseline; repeated quotes and cumulative-volume rollback do not create new capacity. See [paper semantics](paper-trading.md) for exact age/gap/limit rules.
+- Board lots, T+1, price limits, suspensions, fees and cancellation apply. Sessions persist as atomic JSON under `data_root/paper/`. Only refresh requests match live orders: the selected open UI page requests them every 3s; the quote poller alone does not. No broker, real orders, order book or corporate-action processing.
 
 ## Research robustness (M7 advanced)
 - `POST /api/research/overfitting` `{run_id,n_trials?}` → `{observations,periods_per_year,sharpe,deflated_sharpe,expected_max_sharpe,n_trials,skew,kurtosis,verdict}`
@@ -171,7 +179,7 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 - Local plugin backtest jobs set `sandbox_worker=true`: custom strategy code runs in a child Python process (`quantcore.strategy.worker`) with CPU/file-size limits, loads one immutable snapshot, writes a weights `.npy`, and the engine runs in the parent. Static AST audit remains the interface check; this is process isolation, not a multi-tenant security boundary.
 
 ## Paper auto-run (M9, simulated clock)
-- `POST /api/paper/sessions/{sid}/auto` `{interval_ms?:50..60000, days_per_tick?:1..30}` starts a server-side simulated clock that steps the existing historical session (no live market feed); `POST .../auto/stop`; `GET .../auto` status.
+- `POST /api/paper/sessions/{sid}/auto` `{interval_ms?:50..60000, days_per_tick?:1..30}` starts a server-side simulated clock that steps the existing historical session (live mode → 400; no live market feed); `POST .../auto/stop`; `GET .../auto` status.
 - Runs are daemon threads, persist each step, stop at session end/delete; UI button and 1s polling while active.
 
 ## V2 datasets (M8-005)

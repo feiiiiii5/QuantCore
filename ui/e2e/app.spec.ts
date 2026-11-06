@@ -413,3 +413,31 @@ test("local strategy plugin lists, audits and runs in professional mode", async 
   await page.screenshot({ path: "/tmp/qc-plugin.png", fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test("live paper account accepts virtual orders and waits when the quote source is off", async ({ page, request }) => {
+  const errors = await prepare(page);
+  await page.goto("/paper");
+  await page.getByRole("combobox", { name: "行情模式" }).selectOption("live");
+  await page.getByRole("textbox", { name: "会话名称", exact: true }).fill("浏览器实时模拟");
+  const created = page.waitForResponse((response) => response.url().endsWith("/api/paper/sessions") && response.request().method() === "POST");
+  await page.getByRole("button", { name: "创建会话", exact: true }).click();
+  const session = await (await created).json();
+  expect(session.mode).toBe("live");
+  expect(session.snapshot).toBeNull();
+  await expect(page.getByRole("button", { name: "刷新实时账户", exact: true })).toBeVisible();
+  await page.getByRole("combobox", { name: "代码", exact: true }).fill("600000");
+  const submitted = page.waitForResponse((response) => response.url().endsWith(`/api/paper/sessions/${session.id}/orders`) && response.request().method() === "POST");
+  await page.getByRole("button", { name: "提交委托", exact: true }).click();
+  expect((await submitted).ok()).toBeTruthy();
+  await page.getByRole("button", { name: "刷新实时账户", exact: true }).click();
+  const response = await request.get(`/api/paper/sessions/${session.id}`, { headers: AUTH });
+  const detail = await response.json();
+  expect(detail.session.mode).toBe("live");
+  expect(detail.orders).toHaveLength(1);
+  expect(detail.orders[0].status).toBe("pending");
+  expect(detail.positions).toHaveLength(0);
+  expect(detail.trades).toHaveLength(0);
+  expect(detail.live.state).not.toBe("live");
+  await page.screenshot({ path: "/tmp/qc-live-paper.png", fullPage: true });
+  expect(errors).toEqual([]);
+});

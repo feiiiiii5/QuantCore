@@ -1,12 +1,22 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02（Apple 设计语言 + 成熟开源方案重构轮 R4）。M0–M10 功能门禁完成；R2（qc doctor/demo、部分成交、本地工具链）与 R3（产品理念、UI 重构、实时行情、真实数据、零基础引导）保持全绿；R4 按 Apple HIG 重做前端设计系统（Radix UI / framer-motion / sonner / cmdk / vaul / lightweight-charts），以 exchange-calendars 真实 XSHG 日历替换启发式，修复实时行情与 provider 的一组正确性问题，并端到端验证真实联网行情（REST + WebSocket）。授权 vendor 行情、签名/公证安装包仍是文档化限制。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（M0–M10 **134/134**，R5 增量 **6/6**，R6 增量 **4/4**，R7 增量 **5/5**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（M0–M10 **134/134**，R5 增量 **6/6**，R6 增量 **4/4**，R7 增量 **5/5**，R8 增量 **7/7**）。
 
 > **交接记录（2026-11-02）**：上一会话留下的迁移交接文档（377 行）的独有内容已吸收进
 > `docs/PROGRESS.md`（开发环境/门禁基线/提交流程/工作边界）与 `README.md` 文档索引，交接文件已删除；
 > `docs/ARCHITECTURE.md` 与 `docs/RELEASE.md` 中与当前代码事实不符的历史表述（导航数量、子进程资源限制、
 > Playwright 数量、Windows 验证状态）已修正。下列已知限制保持原文，未做弱化。
+
+## 2026-11-06 实时工作流、策略实测与 Sites（R8 / Q-005）
+
+- 本地最终检查：Python **579 passed / 2 skipped**（45.46s）；UI **39 passed / 18 files**；真实服务浏览器 **20/20**（26.8s）；Ruff 检查与格式 **195 文件**、mypy **114 文件**及 TypeScript/Vite 构建通过。C++ 源码本轮未改，上一轮 ctest **101/101**；本轮原生扩展 0.1.1 的既有验证脚本与差分 **6/6** 再次通过。
+- 行情与 K 线：逐证券源时间/陈旧状态、Eastmoney→Sina 缺项回退、独立日线接口及直接代码查看、当前蜡烛更新。真实公开源仅实测 600000 的闭市报价和 60 根日线；不将闭市样本说成盘中时延验证。
+- 模拟交易：新增实时模式，按有效源时间和下单后新增成交量撮合；首帧/换源/过长缺口重建基线。修复涨跌停缺失时错误成交、累计量回拨与跨源切回重启后重复使用成交量；对应回归在修复前失败。真实服务 E2E 验证创建账户、下单、离线等待；盘中真实报价成交尚未在浏览器验证。账户不处理公司行为或盘口排队，无真实下单。
+- 性能：相同输入与五次采样，面板导出 **290.19→82.80ms**，字节相同；三候选信号相对原 pivot 算法 **3.83–5.89×**，权重相同。原生入口 **1.73ms** 与暖 Snapshot 包装 **9.65ms** 分开记录，不混作端到端；方法、采样及未测规模见 [性能记录](PERFORMANCE.md)。原选股回归的计数位置随字段物化入口更新，保留实际 API 结果与每字段一次的约束，未放宽断言。
+- 策略与数据：实现三候选并以固定协议完成八只存续股 **5120 条日线、34 条近似现金事件**的小样本开发/留出与成本压力研究，**24/24** 实验通过通用重放。保留反转策略亏损结果；样本选择、未知到账日、非 PIT 与近似事件限制见 [策略实测](STRATEGY-STUDY.md)。加性 qfq 差价漂移不再制造假分红，在线/离线共用因果因子重建，原始 OHLCV 未为质量门删改。
+- Sites：发布同一私有前端，C++/Python/数据/账户保留本机；精确 HTTPS 来源允许 CORS/PNA，Bearer、Host/Origin 和 WS 校验保持有效。设置只在健康及受保护元数据均成功时报告连接；保存另一服务后清旧查询和共享 WS，旧帧不能污染新连接。真实已登录浏览器的 Sites→loopback/PNA/WS 完整链路未验证，原因与操作见 [Sites 说明](SITES.md)。
+- 当前界面证据：[行情](screenshots/market.png)、[实时模拟离线等待](screenshots/live-paper.png)、[成本情景](screenshots/cost-sensitivity.png)，均为实际界面和明确标注的合成演示数据。未重新验证全市场、真实 Tushare Token、授权 L2、签名安装包或实盘。
 
 ## 2026-11-06 全仓正确性与性能收敛（R7）
 
@@ -206,19 +216,19 @@ make bench-scale
 - [x] 本地优先/运行期零 CDN：数据、策略、Monaco、lightweight-charts 均本地打包；UI 无远程字体/资源。
 - [x] 同源部署：`qc serve` 同时提供 `/api` 与 `ui/dist`；Vite dev 使用 `/api` `/ws` `/health` 代理到 8000。
 - [x] 仅研究与模拟：无真实下单；`BrokerGateway` 未实现；界面与报告有“不构成投资建议”。
-- [x] 认证：Bearer token、Host/Origin 校验、无 CORS、loopback only；token 从 `qc serve --open` URL 持久化后立即从地址栏移除。
+- [x] 认证：Bearer token、Host/Origin 校验、默认无 CORS、可显式允许准确 HTTPS 来源、loopback only；token 从 `qc serve --open` URL 持久化后立即从地址栏移除。
 - [x] 合成数据标 `SYNTHETIC`；真实 A 股数据可经 Sina 公开接口导入（`QC_ALLOW_NETWORK=1`，非商用、不得再分发），Tushare 真实网络需 Token，未验证。
 - [x] features.json 全 true：**134/134**（R4 新增 6 项：XSHG 真实日历、provider/live 正确性修复、Apple 设计系统 v2、统一 lightweight-charts、UI 共享 WebSocket、前端工程/dev proxy/audit harness）。
 - [x] 网络默认关闭：实时行情与真实数据导入均需显式 `QC_ALLOW_NETWORK=1`；测试只走录制 fixtures，不联网。
 - [x] 真实数据准确性实测（2026-11-02）：Sina 3 只样本 2049 根日线，质量门禁 passed、0 告警、0 隔离行；`qc data integrity` status=ok、coverage=100%、accuracy 全 0；真实快照上 C++ 回测成功（synthetic=false/source=SINA）。
-- [x] 实时行情：REST/WS、双源降级、真实 XSHG 日历、离线/休市/异常显式状态；UI 通过共享 WebSocket 消费并回退轮询；仅展示用途，不参与下单。
+- [x] 实时行情：REST/WS、双源降级、真实 XSHG 日历、离线/休市/异常显式状态；UI 通过共享 WebSocket 消费并回退轮询；用于展示与本地虚拟账户，不参与真实下单。
 - [x] 真实联网验证（2026-11-02）：QC_ALLOW_NETWORK=1 下 /api/live/status=live、source=sina、WS 帧含真实个股与 4 指数，浏览器读数实时更新且 0 console error。
 - [x] M8 分钟线（SYNTHETIC）/V2 dataset catalog、M9 模拟时钟连续模拟已完成（限制见下）。
 - [ ] 真实 Tushare 数据跑通：无 Token，未验证（Sina 公开接口已跑通，作为替代真实源）。
 - [ ] 全市场 5500×20y / 10000 组 sweep：未测；默认规模（800 证券 × 1208 天）的耗时与峰值 RSS 已由 `make bench-scale` 实测（见 `docs/PERFORMANCE.md`），不外推为全市场结论。
 
 ## 已知缺口（按优先级）
-1. **行情/交易限制**：实时行情来自公开网页接口（Sina/Eastmoney，未授权、无 SLA，约 3 秒轮询、无 L2/盘口），仅展示；模拟交易部分成交为「日成交量参与率上限」近似（无排队/滑点），公司行为（分红送转对持仓的调整）仍未实现；不得声称可实盘。
+1. **行情/交易限制**：实时行情来自公开网页接口（Sina/Eastmoney，未授权、无 SLA，约 3 秒轮询、无 L2/盘口），用于展示和本地虚拟账户；历史模拟按日成交量、实时模拟按新增成交量参与率近似（无排队/滑点），公司行为（分红送转对持仓的调整）仍未实现；不得声称可实盘。
 2. **真实数据限制**：Sina 公开接口非官方、约 2000 根日线（约 2018 年起）；无真实成交额（按 OHLC×volume 估算，已标注）；复权/公司行为由腾讯 qfq 近似推导（`SINA_APPROX`，已过滤 vendor 跳点，但仍是近似）；全市场导入（5576 只）实测约 30–45 分钟，本轮只端到端验证了 3 只样本；Eastmoney 端点在本机网络被限流；Tushare 真实 Token 未验证。
 3. **M8 限制**：分钟线为 SYNTHETIC 视图；C++ 回测仍按 board 手数（ETF/可转债 paper 手数已实现）。
 4. **M7 口径**：归因仍为行业 FIFO 近似；DSR/PBO/成本/MC/容量为研究近似。

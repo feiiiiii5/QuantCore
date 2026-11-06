@@ -16,17 +16,26 @@
 - 已验证：Python **373 passed / 2 skipped**；ruff lint/format 与 mypy（106 源文件）通过；UI **19/19**；既有真实服务 E2E **18/18**；C++ 差分 **6/6**，300×965 合成规模引擎约 2.79ms、20 因子约 24ms。上述数字是本机检查，不代表全市场或实盘能力。
 - 本机 Node 26 的原生 Web Storage 与现有 jsdom 测试环境冲突，UI 测试使用 `NODE_OPTIONS=--no-experimental-webstorage`；依赖版本与哈希未更新。随后 GitHub Ubuntu 安装在清华镜像的 `httptools` Linux wheel 返回 403；已将锁内安装包地址改为 PyPI 官方文件源，保留镜像索引、依赖图、版本和全部哈希，消除区域镜像文件地址依赖。
 
+## 2026-11-06 Q-005：行情、实时模拟、候选策略与私有前端
+
+- 生产回测保留 C++20 `qcore`；面板导出优化在相同 200 证券 × 965 日、五次输入下为 290.19ms → 82.80ms（3.50 倍），字节完全一致，原生回测约 1.73ms。暖 Snapshot 约 9.65ms、可变 Panel 约 36.75ms；三候选信号相对原 pivot 算法加速 3.83–5.89 倍、权重一致；方法与范围见 [性能记录](PERFORMANCE.md)，不外推全市场。
+- 公开报价保留源时间戳和逐证券陈旧状态；单股与指数独立失败降级，不以整体 live 状态掩盖缺失证券。新增 `/api/live/bars`，无需研究快照读取不复权日线；内存缓存不改变研究数据，行情页直接代码搜索并更新当前蜡烛。
+- 模拟账户新增 `live` 模式与 `/refresh`，无需快照；下单后同源同日的新报价及新增成交量建立共享预算，保留 T+1、手数、费用、涨跌停、撤单与持久化。开页选中账户每 3 秒刷新；没有请求就不撮合，没有后台无人值守、盘口或真实下单。历史 `step/auto` 保留且与实时隔离，详见 [模拟模型](paper-trading.md)。
+- 新增 `trend_momentum`、`liquid_reversal`、`defensive_low_vol` 三候选，已以固定协议完成八只存续股票的小样本实测，保留失败结果与成本压力情景；原始价格、已识别事件向前信号因子与下一日执行分开。近似事件和存续样本不能证明严格 PIT 或可持续超额收益，详见 [策略研究](STRATEGY-STUDY.md)。
+- 本轮授权私有 Sites 前端发布；C++/Python、数据与账户仍在本机。准确 HTTPS `--allow-origin` 才启用该来源 CORS/PNA，保留 loopback、Bearer 与 WS 校验。网页版本、连接实测与浏览器限制见 [Sites 说明](SITES.md)；不能把前端发布写成云端后端或生产验收。
+- 本轮 Python 579 passed / 2 skipped、UI 39、真实服务 E2E 20/20、原生差分 6/6、verify_cpp、Ruff 195 文件、mypy 114 文件及前端构建通过。C++ 源码未改，上一轮 ctest 101/101；详细状态以 [验收报告](acceptance-report.md) 为准；下文各轮数字保留为当时证据。
+
 ## 当前状态
 - R5：研究条件可比性、数据复用/来源链、账户与行情身份、收益口径和 worker 生命周期优化已完成；具体增量证据见上节。
 - M0：完成。`make setup/test`、wheel、macOS/Ubuntu 全量 CI + Windows pure-Python smoke；C++ Windows 未支持。
 - M1：C++ types/calendar/tpool/.qpanel/内核/指标/零拷贝绑定；ctest 95/95；cross-sectional neutralize 已实现并绑定。
 - M2：Synthetic/LocalFile/Tushare(fixture+live API 代码路径)/AKShare/mootdx + **Sina 公开真实数据源**；摄取/质量/快照(内容寻址+PIT 元数据)/Parquet+DuckDB+SQLite；PIT 财务视图；**数据体检**(覆盖率/缺口/OHLC/量额/涨跌停/复权/跨源)；真实 Sina 3 只样本 import→snapshot→integrity=ok→C++ 回测已跑通；真实 Tushare Token 未验证。
 - M3：event-driven 引擎，规则/费用/T+1/手数/涨跌停/停牌/除权除息/trace/指标；差分 6/6；风险限制/基准比较；引擎 300×965 月度调仓约 2.6ms。
-- M4：DSL/7 模板/lookahead/实验存储/HTML+可选 PDF 报告/CLI/replay/子进程 sandbox worker/C++ parallel engine batch sweep。
-- M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/no-CORS、GZip；`qc serve` 同源托管 UI；本地 toast/桌面通知；R3 增 live 行情 REST/WS、数据体检、onboarding/presets/watchlist API；R4 真实 XSHG 交易日历（exchange-calendars）、live/provider 正确性修复、UI 共享 WS 消费。
+- M4：DSL/基础与三款研究候选模板/lookahead/实验存储/HTML+可选 PDF 报告/CLI/replay/子进程 sandbox worker/C++ parallel engine batch sweep。
+- M5：FastAPI UI-API v2；SQLite 任务队列、协作取消、崩溃恢复、WebSocket、Bearer/Host/Origin/默认关闭 CORS、精确 HTTPS 来源可选 CORS/PNA、GZip；`qc serve` 同源托管 UI；本地 toast/桌面通知；R3 增 live 行情 REST/WS、数据体检、onboarding/presets/watchlist API；R4 真实 XSHG 交易日历（exchange-calendars）、live/provider 正确性修复、UI 共享 WS 消费。
 - M6：R4 重构——Apple HIG 设计系统 v2（毛玻璃/34px 标题/8pt 网格/克制动效），Radix UI + framer-motion + sonner + cmdk + vaul + lightweight-charts（移除 echarts，初始 JS 1.09MB→0.60MB），10 页重写；Playwright **18** 条、ui-audit 10 路由 0 console/0 溢出；R3 的 /today、/market、结论先行与新手模式保留。
 - M7：因子 IC/RankIC/ICIR、分层、衰减；参数扫描 + Sharpe 热力图；滚动验证；行业 FIFO 归因；Deflated Sharpe/PBO、成本敏感性、block bootstrap Monte Carlo、容量估计（近似口径）。
-- M9：完成——虚拟账户/回放/委托撤单/成交/T+1/费用/信号 CSV/提醒/JSON 持久化/本地插件/只读多策略组合/服务端模拟时钟连续推进；R3 提供可选实时行情（公开网页源、仅展示），无授权 vendor feed、无真实下单。
+- M9：完成——虚拟账户/回放/委托撤单/成交/T+1/费用/信号 CSV/提醒/JSON 持久化/本地插件/只读多策略组合/服务端模拟时钟连续推进；Q-005 新增公开实时报价驱动的虚拟账户；无授权 vendor feed、无真实下单，刷新请求才推进撮合。
 - M8：完成——证券资料/PIT/ETF+可转债/合成分钟线/V2 dataset catalog；C++ 回测仍按 board 手数。
 - M10：wheel/UI/文档/许可/SBOM/audit/release/perf gate + Electron dev shell + unsigned macOS/Windows zip（Windows 包由 `windows-latest` CI 构建）；无签名/公证，未做安装运行验证。
 - 仓库：https://github.com/feiiiiii5/QuantCore （Apache-2.0）；申请季工作区未修改。
@@ -49,7 +58,7 @@ make demo                                          # 一条命令合成数据→
 make test-quick                                    # 快速回归（排除 e2e/bench/network）
 make ci-local                                      # 本地完整门禁
 ```
-- CI 最近 5 个 job 全绿：`test (macos-latest)`、`test (ubuntu-latest)`、`windows-smoke`、`ui`、`desktop-windows-package`；Playwright E2E 只在本地 `make e2e` 跑，不进 GitHub CI。
+- 历史检查记录（不代表当前远端状态）：CI 当时 5 个 job 全绿：`test (macos-latest)`、`test (ubuntu-latest)`、`windows-smoke`、`ui`、`desktop-windows-package`；Playwright E2E 只在本地 `make e2e` 跑，不进 GitHub CI。
 - `docs/features.json` **134/134** 表示功能门禁有代码+证据，不等于授权实时行情/全市场真实数据/签名安装包已完成。
 
 ## 开发/提交流程
@@ -69,7 +78,7 @@ make ci-local                                      # 本地完整门禁
 
 ## 本轮实际验证
 ```bash
-cd /Users/fei/Desktop/QuantCore
+# 在自己的专用检出目录运行
 make lint
 # ruff check/format 通过；mypy 91 files 无问题
 
@@ -133,7 +142,7 @@ make bench-scale
 - 验证：pytest 352 passed/2 skipped、ctest 95/95、Playwright 18/18、vitest 10、ruff/mypy 105 files；真实联网行情 /api/live/status=live + WS 帧（浦发 10.14 / 平安 11.58 + 4 指数）。
 
 ## 本地稳健性研究修正（2026-11-06 R6）
-- 当前阶段仅本地构建、测试与验收，不部署；C/C++ 为硬约束，生产回测保持 C++20 `qcore`。
+- 当时阶段仅本地构建、测试与验收，未部署；后续 Q-005 已授权私有 Sites 前端。C/C++ 为硬约束，生产回测保持 C++20 `qcore`。
 - 修正 PBO relative-rank 方向与并列平均秩、因子分组偏移，以及 Monte Carlo 首日相对初始资金的回撤。
 - 成本敏感性改为按费用情景展示的条形图与指标表；默认、小数及单点均通过真实 C++ 回测到界面的流程验证。
 - 本地 Python 383 passed/2 skipped、Vitest 20、Playwright 19/19；Ruff/mypy、UI build、C++ verify gate 通过。详细证据见验收报告 R6；本轮未推送或部署。
@@ -146,11 +155,11 @@ make bench-scale
 - 最终 Python 463 passed/2 skipped、C++ 101/101、Vitest 29、真实服务 Playwright 19/19；Ruff/mypy、UI build、C++ verify 与差分 6/6 通过。详细范围见验收报告 R7；未部署。
 
 ## 已知缺口
-1. M9：实时行情来自公开网页接口（未授权、约 3 秒轮询、无 L2），仅展示；UI 已用共享 WS 消费，但数据源本身仍非授权 feed；模拟账户部分成交按「日成交量参与率上限」近似（无盘口/排队/滑点），模拟账户公司行为未实现；不得声称可实盘。
+1. M9：实时行情来自非授权公开网页接口（约 3 秒轮询、无 L2）；可展示和驱动本地虚拟成交。历史模拟按逐订单日量参与率、实时模拟按同证券共享新增量预算近似；均无盘口/排队/滑点和公司行为。实时仅请求刷新时撮合，不是无人值守服务，不得声称可实盘。
 2. M8：分钟线是 SYNTHETIC 视图（由日线拆桶），C++ 引擎仍只做日线、无分钟级回测/撮合；C++ 回测仍按
    board 手数（ETF/可转债 paper 手数已实现，不能宣称完整回测规则）。
 3. M10：unsigned macOS/Windows zip 可构建（Windows zip 由 CI `windows-latest` 构建），但无签名/公证/自动更新，未做 Windows 安装/运行验证；后端不随包捆绑（默认需本地 `qc serve` 或 `QC_DESKTOP_URL`）。
-4. M2：Sina 公开接口非官方，约 2000 根日线、成交额按 OHLC×volume 估算、复权/公司行为为近似（`SINA_APPROX`）；全市场 5576 只导入未端到端验证（估算 30–45 分钟），本轮只验证 3 只样本；Eastmoney 在本机网络被限流；Tushare live 路径仅 fake Pro 契约测试，真实 Token 未验证；全市场 5500×20y 基准与 10k sweep 未测，默认规模（800×1208）已实测（见 `docs/PERFORMANCE.md`），不构成全市场结论。
+4. M2：Sina 公开接口非官方，约 2000 根日线、成交额按 OHLC×volume 估算、复权/公司行为为近似（`SINA_APPROX`）；全市场 5576 只导入未端到端验证（估算 30–45 分钟），早期只验证 3 只样本，Q-005 另有八股研究样本，仍未覆盖全市场；Eastmoney 在本机曾被限流；Tushare live 路径仅 fake Pro 契约测试，真实 Token 未验证；全市场 5500×20y 基准与 10k sweep 未测，默认规模（800×1208）已实测（见 `docs/PERFORMANCE.md`），不构成全市场结论。
    exchange-calendars XSHG 数据到 2026-12-31，之后回退星期几；增量 ingest 不重算历史 adj_factor（分红季建议全量重建）；qfq 跳点过滤存在末端/大送转/20% 判板边界（详见 `docs/AUDIT-R3.md`）。
 5. M7 口径：行业 FIFO 归因、DSR/PBO/成本敏感性/MC/容量均为研究近似。
 6. 规则 TODO(verify) 仍需外部官方来源核实（ST 幅度、盘后固定价历史、新股/退市整理、分红个税、部分费率）。
@@ -158,7 +167,7 @@ make bench-scale
 
 ## 续跑方法
 ```bash
-cd /Users/fei/Desktop/QuantCore
+# 在自己的专用检出目录运行
 export UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 make setup
 make doctor          # 环境自检（只读离线）

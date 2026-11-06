@@ -18,7 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from .clock import market_clock, market_phase, now_shanghai
+from .clock import SHANGHAI_TZ, market_clock, market_phase, now_shanghai
+from .history import DailyHistory
 from .quotes import (
     INDEX_SPECS,
     HttpxQuoteHttp,
@@ -79,7 +80,9 @@ class LiveQuoteService:
         self.http = http or HttpxQuoteHttp()
         self.config = config or config_from_env()
         self.clock = clock or now_shanghai
+        self.history = DailyHistory(self.http, self.clock)
         self._cache: dict[str, Quote] = {}
+        self._received: dict[str, datetime] = {}
         self._as_of: datetime | None = None
         self._source = "none"
         self._latency_ms: float | None = None
@@ -151,40 +154,84 @@ class LiveQuoteService:
     ) -> list[Quote]:
         fetcher = fetch_eastmoney_quotes if source == "eastmoney" else fetch_sina_quotes
         quotes: list[Quote] = []
-        if indexes:
-            quotes.extend(await fetcher(self.http, indexes, now=now, as_index=True))
-        if stocks:
-            quotes.extend(await fetcher(self.http, stocks, now=now))
+        errors: list[str] = []
+        for targets, as_index in ((indexes, True), (stocks, False)):
+            if not targets:
+                continue
+            try:
+                quotes.extend(await fetcher(self.http, targets, now=now, as_index=as_index))
+            except Exception as exc:
+                errors.append(str(exc))
+        if errors and not quotes:
+            raise QuoteSourceError("; ".join(errors))
         return quotes
 
     async def _fetch(self, stocks: list[str], indexes: list[str]) -> None:
         now = self.clock()
         started = time.perf_counter()
+        requested = set(stocks + indexes)
+        primary_error: Exception | None = None
         try:
             quotes = await self._fetch_group(stocks, indexes, now=now, source="eastmoney")
-            source = "eastmoney"
-            if not quotes:
-                raise QuoteSourceError("eastmoney returned no quotes")
-        except Exception as primary:  # fallback source
-            LOGGER.info("live primary source eastmoney failed, trying sina: %s", primary)
+        except Exception as exc:
+            primary_error = exc
+            quotes = []
+        found = {quote.code: quote for quote in quotes if quote.code in requested}
+        missing = requested - found.keys()
+        for code, quote in found.items():
+            age = self._source_age(quote, now)
+            if age is None or (market_phase(now) == "open" and age > self._freshness_seconds()):
+                missing.add(code)
+        if missing:
+            LOGGER.info("live primary source omitted %s, trying sina: %s", missing, primary_error)
             try:
-                quotes = await self._fetch_group(stocks, indexes, now=now, source="sina")
-                source = "sina"
-            except Exception as secondary:  # report both sources in the error
-                LOGGER.warning(
-                    "live quote sources failed: eastmoney=%s sina=%s", primary, secondary
+                fallback = await self._fetch_group(
+                    [code for code in stocks if code in missing],
+                    [code for code in indexes if code in missing],
+                    now=now,
+                    source="sina",
                 )
-                raise QuoteSourceError(
-                    f"eastmoney failed ({primary}); sina failed ({secondary})"
-                ) from secondary
-            if not quotes:
-                raise QuoteSourceError("sina returned no quotes") from primary
+                found.update({quote.code: quote for quote in fallback if quote.code in missing})
+            except Exception as secondary:
+                if not found:
+                    raise QuoteSourceError(
+                        f"eastmoney failed ({primary_error}); sina failed ({secondary})"
+                    ) from secondary
+        if not found:
+            raise QuoteSourceError("quote sources returned no requested quotes")
         self._latency_ms = round((time.perf_counter() - started) * 1000.0, 1)
-        self._source = source
+        self._source = next(iter(found.values())).source
         self._as_of = now
         self._error = None
-        for quote in quotes:
+        for quote in found.values():
             self._cache[quote.code] = quote
+            self._received[quote.code] = now
+
+    def _stale(self, code: str) -> bool:
+        received = self._received.get(code)
+        now = self.clock()
+        source_age = self._source_age(self._cache.get(code), now)
+        return (
+            received is None
+            or source_age is None
+            or max((now - received).total_seconds(), source_age) > self._freshness_seconds()
+        )
+
+    def _freshness_seconds(self) -> float:
+        return max(10.0, self.config.interval_seconds * 4)
+
+    @staticmethod
+    def _source_age(quote: Quote | None, now: datetime) -> float | None:
+        if quote is None or not quote.timestamp:
+            return None
+        try:
+            stamp = datetime.fromisoformat(quote.timestamp)
+            if stamp.tzinfo is None:
+                stamp = stamp.replace(tzinfo=SHANGHAI_TZ)
+            age = (now - stamp).total_seconds()
+            return age if age >= -5 else None
+        except ValueError:
+            return None
 
     async def refresh(self, codes: list[str] | None = None) -> None:
         """Fetch the requested stock codes (plus indices/watchlist by default)."""
@@ -219,10 +266,12 @@ class LiveQuoteService:
         phase = self._market()["phase"]
         if phase in {"closed", "holiday"}:
             return "closed"
-        if self._error and self._as_of is None:
+        if self._error:
             return "error"
         if self._as_of is None:
             return "connecting"
+        if not any(not self._stale(code) for code in self._cache):
+            return "idle"
         age = (self.clock() - self._as_of).total_seconds()
         if age > max(10.0, self.config.interval_seconds * 4):
             return "idle"
@@ -243,12 +292,13 @@ class LiveQuoteService:
 
     async def status(self) -> LiveStatusSnapshot:
         state = self._state()
+        stamps = [quote.timestamp for quote in self._cache.values() if quote.timestamp]
         return {
             "enabled": self.config.enabled,
             "source": self._source,
             "state": state,
             "market": self._market(),
-            "as_of": None if self._as_of is None else self._as_of.isoformat(timespec="seconds"),
+            "as_of": max(stamps) if stamps else None,
             "latency_ms": self._latency_ms,
             "subscribed": len(self._cache),
             "error": self._error,
@@ -256,20 +306,22 @@ class LiveQuoteService:
         }
 
     def _payload(self, quotes: list[Quote]) -> LiveStatusSnapshot:
-        now = self.clock()
-        stale = True
-        if self._as_of is not None:
-            age = (now - self._as_of).total_seconds()
-            stale = age > max(10.0, self.config.interval_seconds * 4)
+        stamps = [quote.timestamp for quote in quotes if quote.timestamp]
+        stale = not quotes or any(self._stale(quote.code) for quote in quotes)
         display: list[dict[str, Any]] = []
         for quote in quotes:
             item = quote.to_dict()
+            item["stale"] = self._stale(quote.code)
+            received_at = self._received.get(quote.code)
+            item["received_at"] = (
+                None if received_at is None else received_at.isoformat(timespec="seconds")
+            )
             if item["code"].startswith("idx:"):
                 item["code"] = item["code"][4:]
             display.append(item)
         return {
-            "as_of": None if self._as_of is None else self._as_of.isoformat(timespec="seconds"),
-            "source": self._source,
+            "as_of": min(stamps) if stamps else None,
+            "source": quotes[0].source if quotes else "none",
             "stale": stale,
             "quotes": display,
         }
@@ -279,10 +331,7 @@ class LiveQuoteService:
             return
         missing = [code for code in codes if code not in self._cache]
         phase = self._market()["phase"]
-        stale = self._as_of is None or (
-            (self.clock() - self._as_of).total_seconds()
-            > max(10.0, self.config.interval_seconds * 4)
-        )
+        stale = any(self._stale(code) for code in codes)
         if not missing and not (stale and phase in {"pre_open", "open", "lunch"}):
             return
         try:
@@ -297,10 +346,7 @@ class LiveQuoteService:
             return
         missing = [target for target in self._index_targets if target not in self._cache]
         phase = self._market()["phase"]
-        stale = self._as_of is None or (
-            (self.clock() - self._as_of).total_seconds()
-            > max(10.0, self.config.interval_seconds * 4)
-        )
+        stale = any(self._stale(code) for code in self._index_targets)
         if not missing and not (stale and phase in {"pre_open", "open", "lunch"}):
             return
         try:
@@ -335,6 +381,11 @@ class LiveQuoteService:
             "indices": await self.indices(),
             "quotes": await self.quotes(codes),
         }
+
+    async def bars(self, code: str, limit: int = 600) -> dict[str, Any]:
+        if not self.config.enabled:
+            raise QuoteSourceError(OFFLINE_NOTICE)
+        return await self.history.bars(normalize_code(code), limit)
 
 
 __all__ = [

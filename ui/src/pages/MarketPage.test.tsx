@@ -8,10 +8,11 @@ import { useWorkspace } from "../store/workspace";
 import MarketPage from "./MarketPage";
 
 vi.mock("../api/client", () => ({ api: {
-  securities: vi.fn(), overview: vi.fn(), liveStatus: vi.fn(), liveIndices: vi.fn(), watchlist: vi.fn(),
+  securities: vi.fn(), overview: vi.fn(), liveStatus: vi.fn(), liveIndices: vi.fn(), liveQuotes: vi.fn(), liveBars: vi.fn(), watchlist: vi.fn(),
   bars: vi.fn(), securityProfile: vi.fn(), financials: vi.fn(), dataIntegrity: vi.fn(),
 } }));
 vi.mock("../components/KLineChart", () => ({ default: () => null }));
+vi.mock("../lib/liveStream", () => ({ subscribeLiveQuotes: () => () => undefined }));
 vi.mock("../components/VirtualTable", () => ({
   default: ({ data }: { data: SecurityRow[] }) => <div>{data.map((row) => <span key={row.sec_id}>{row.name}</span>)}</div>,
 }));
@@ -47,5 +48,26 @@ describe("market whole-snapshot search and watchlist", () => {
     fireEvent.click(screen.getByRole("radio", { name: "我的自选 1" }));
     await waitFor(() => expect(api.securities).toHaveBeenCalledWith("", 1000, [row.code]));
     expect(await screen.findByText(row.name)).toBeInTheDocument();
+  });
+
+  it("opens a public daily chart by code even when the security is absent from the local snapshot", async () => {
+    vi.mocked(api.securities).mockResolvedValue([]);
+    vi.mocked(api.liveStatus).mockResolvedValue({ enabled: true, state: "closed", market: { phase: "closed", last_trade_date: 20261106 } } as never);
+    vi.mocked(api.liveIndices).mockResolvedValue({ quotes: [] } as never);
+    vi.mocked(api.liveQuotes).mockResolvedValue({ quotes: [], stale: true } as never);
+    vi.mocked(api.liveBars).mockResolvedValue({
+      code: "603999", name: "非本地证券", dates: ["2026-11-06"], close: [10], open: [10], high: [11], low: [9],
+      volume: [100], amount: [1000], turnover: [null], ma5: [null], ma20: [null], limit_up: [], limit_down: [], suspended: [],
+      synthetic: false, source: "eastmoney", note: "公开日线 · 不复权",
+    } as never);
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })}>
+      <MemoryRouter><MarketPage /></MemoryRouter>
+    </QueryClientProvider>);
+    const input = await screen.findByRole("textbox", { name: "搜索代码 / 名称 / 行业" });
+    fireEvent.change(input, { target: { value: "603999" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(await screen.findByText("603999 非本地证券")).toBeInTheDocument();
+    await waitFor(() => expect(api.liveBars).toHaveBeenCalledWith("603999"));
+    expect(screen.getByText(/公开日线 · 不复权 · eastmoney/)).toBeInTheDocument();
   });
 });

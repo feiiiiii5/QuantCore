@@ -59,6 +59,8 @@ class FakeHttp:
         self.text_calls = 0
         self.index_rows = [_eastmoney_payload()["data"]["diff"][2]]
         self.stock_rows = _eastmoney_payload()["data"]["diff"][:2]
+        for row in self.index_rows + self.stock_rows:
+            row["f124"] = int(_at("2026-11-02T10:15:30").timestamp())
 
     async def get_json(self, url: str, *, headers: dict[str, str] | None = None):
         self.json_calls += 1
@@ -277,6 +279,70 @@ def test_stale_cached_quote_is_refreshed_even_when_not_in_watchlist() -> None:
     assert http.json_calls > calls_after_first  # refreshed, not silently stale
 
 
+def test_index_refresh_does_not_keep_an_unwatched_stock_fresh() -> None:
+    http = FakeHttp()
+    now = [_at("2026-11-02T10:15:30")]
+    service = LiveQuoteService(http=http, config=LiveConfig(enabled=True), clock=lambda: now[0])
+    asyncio.run(service.quotes(["600000"]))
+    now[0] += dt.timedelta(seconds=30)
+    asyncio.run(service.refresh())  # the background poller only requests indices
+    http.stock_rows[0]["f2"] = "11.00"
+    http.stock_rows[0]["f124"] = int(now[0].timestamp())
+    calls = http.json_calls
+    payload = asyncio.run(service.quotes(["600000"]))
+    assert payload["quotes"][0]["price"] == 11.0
+    assert http.json_calls > calls
+
+
+def test_partial_primary_response_falls_back_for_missing_stock() -> None:
+    http = FakeHttp()
+    http.stock_rows = []
+    service = LiveQuoteService(
+        http=http, config=LiveConfig(enabled=True), clock=lambda: _at("2026-11-02T10:15:30")
+    )
+    payload = asyncio.run(service.quotes(["600000"]))
+    assert payload["quotes"][0]["code"] == "600000"
+    assert payload["quotes"][0]["source"] == "sina"
+    assert http.text_calls > 0
+
+
+def test_source_timestamp_is_not_replaced_by_receive_time() -> None:
+    now = _at("2026-11-02T10:15:30")
+    raw = _eastmoney_payload()
+    assert parse_eastmoney_payload(raw, now=now)[0].timestamp is None
+    raw["data"]["diff"][0]["f124"] = int(_at("2026-11-02T10:14:00").timestamp())
+    assert parse_eastmoney_payload(raw, now=now)[0].timestamp == "2026-11-02T10:14:00+08:00"
+    assert parse_sina_payload(_sina_text(), now=now)[0].timestamp == "2026-11-02T10:15:30+08:00"
+
+
+def test_old_source_data_stays_stale_even_when_just_fetched() -> None:
+    http = FakeHttp()
+    service = LiveQuoteService(
+        http=http, config=LiveConfig(enabled=True), clock=lambda: _at("2026-11-02T10:30:00")
+    )
+    payload = asyncio.run(service.quotes(["600000"]))
+    assert payload["stale"] is True
+    assert payload["quotes"][0]["timestamp"] == "2026-11-02T10:15:30+08:00"
+    assert asyncio.run(service.status())["state"] == "idle"
+
+
+def test_index_failure_does_not_discard_a_healthy_primary_stock_quote() -> None:
+    class IndexFailure(FakeHttp):
+        async def get_json(self, url, *, headers=None):
+            if "1.000001" in url:
+                raise ConnectionError("index endpoint unavailable")
+            return await super().get_json(url, headers=headers)
+
+    http = IndexFailure()
+    http.stock_rows[0]["f2"] = "11.00"
+    service = LiveQuoteService(
+        http=http, config=LiveConfig(enabled=True), clock=lambda: _at("2026-11-02T10:15:30")
+    )
+    payload = asyncio.run(service.quotes(["600000"]))
+    assert payload["quotes"][0]["source"] == "eastmoney"
+    assert payload["quotes"][0]["price"] == 11.0
+
+
 # ------------------------------------------------------- real XSHG calendar
 # 2024 Spring Festival: closed 2024-02-09 .. 2024-02-18, reopens 2024-02-19.
 def test_clock_uses_the_real_xshg_calendar() -> None:
@@ -373,6 +439,11 @@ def test_out_of_bounds_calendar_falls_back_without_crashing(
     weekend = _at("2026-11-07T10:00:00")
     assert market_phase(weekend) == "holiday"
     assert next_open(_at("2026-11-06T16:00:00")) == _at("2026-11-09T09:30:00")
+    # This is explicitly the weekday fallback, not a claim about holiday sessions.
+    assert next_open(_at("2026-11-30T16:00:00")) == _at("2026-12-01T09:30:00")
+    assert next_open(_at("2026-12-31T16:00:00")) == _at("2027-01-01T09:30:00")
+    assert last_trade_date(_at("2027-01-01T09:00:00")) == 20261231
+    assert last_trade_date(_at("2026-11-02T09:00:00")) == 20261030
 
 
 # ------------------------------------------------- live REST/WS contract shape

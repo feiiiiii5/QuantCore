@@ -1045,17 +1045,67 @@
       "title": "corporate-action benchmark and missing-quote semantics",
       "passes": true,
       "evidence": "tests/test_benchmark.py; cash retained without reinvestment, missing-window excess return null and adjacent quote-pair tracking"
+    },
+    {
+      "id": "R8-001",
+      "milestone": "R8",
+      "title": "fresh per-security quotes and independent daily candles",
+      "passes": true,
+      "evidence": "test_live_quotes.py, test_live_history.py and MarketPage.test.tsx; true source timestamps, stale states, per-code fallback, history independent of snapshots and live candle updates; public 600000 history/quote probe after close"
+    },
+    {
+      "id": "R8-002",
+      "milestone": "R8",
+      "title": "quote-driven persisted live paper accounts",
+      "passes": true,
+      "evidence": "test_paper_live.py; valid post-order quote intervals, shared incremental-volume budget, per-source daily high-water marks across fallback/restart, T+1/fees/limits and persistence; real-server UI waiting-path E2E"
+    },
+    {
+      "id": "R8-003",
+      "milestone": "R8",
+      "title": "equivalent vectorized panels and strategy signals",
+      "passes": true,
+      "evidence": "test_panel_matrix.py, test_qpanel_export.py and screener performance; 17-field matrix and 10-template equivalence; five-sample export 3.50x, candidate signals 3.83-5.89x, identical hashes; performance-q005.json"
+    },
+    {
+      "id": "R8-004",
+      "milestone": "R8",
+      "title": "three fixed candidate strategies and reproducible study",
+      "passes": true,
+      "evidence": "test_research_strategies.py, test_candidate_study.py; actual eight-survivor 5120-bar sample, predeclared phases/costs and 24/24 generic replays; STRATEGY-STUDY.md records losing results and non-PIT/source limitations"
+    },
+    {
+      "id": "R8-005",
+      "milestone": "R8",
+      "title": "additive adjustment validation and causal research factors",
+      "passes": true,
+      "evidence": "test_public_adjustment.py, test_research_signal_adjustment.py and test_research_sample_workflow.py; offset drift no longer creates false cash events, online/offline share finalization with identical panel hashes"
+    },
+    {
+      "id": "R8-006",
+      "milestone": "R8",
+      "title": "private Sites frontend with exact local API bridge",
+      "passes": true,
+      "evidence": "test_site_bridge.py, connection.test.ts; explicit HTTPS origins, PNA preflight and protected API/WS; private frontend published, authenticated browser-to-loopback end-to-end remains unverified; SITES.md"
+    },
+    {
+      "id": "R8-007",
+      "milestone": "R8",
+      "title": "authenticated connection probes and stream switching",
+      "passes": true,
+      "evidence": "connection.test.ts and liveStream.test.ts; current draft values verified against protected metadata, old requests/cache/socket callbacks isolated after API/token changes; UI 39 passed"
     }
   ],
   "verified_at": "2026-11-02",
   "verified_by": "local gates: pytest (all green, see acceptance report); ctest 95/95; UI vitest 10; Playwright e2e 18/18 (redesigned UI); ruff/mypy; make verify-cpp; make doctor/demo; ui-audit 10 routes + mobile + dark (0 console errors, 0 overflow); real-data pipeline: Sina 3-name import + snapshot + qc data integrity (status ok) + cpp backtest; live quotes verified with QC_ALLOW_NETWORK=1 (REST + /ws/live frames)",
-  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display only, no L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope.",
+  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display and local virtual matching only, no real routing or L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope.",
   "incremental_verification": {
     "date": "2026-11-06",
-    "scope": "R7 local verification; historical M0-M10 external/platform evidence retains original date; no deployment",
-    "python": "463 passed / 2 skipped",
-    "cpp": "101/101; native version 0.1.1",
-    "ui": "29 passed / 15 files",
-    "checks": "ruff lint/format 175 files; mypy 109 files; C++ differential 6/6 and existing verify_cpp gate; TypeScript/Vite build; isolated real-server E2E 19/19"
+    "scope": "R8 local verification plus private Sites frontend publication; earlier external/platform evidence retains original dates; Python/C++ backend remains local",
+    "python": "579 passed / 2 skipped",
+    "cpp": "native version 0.1.1; current differential 6/6 and verify_cpp passed; sources unchanged, R7 ctest 101/101",
+    "ui": "39 passed / 18 files",
+    "checks": "ruff lint/format python, tests and new scripts (195 files); mypy 114 files; TypeScript/Vite build; isolated real-server E2E 20/20; actual candidate study generic replay 24/24",
+    "unverified": "authenticated browser Sites-to-loopback full flow; real Tushare token; full market scale; signed installers; real brokerage"
   }
 }

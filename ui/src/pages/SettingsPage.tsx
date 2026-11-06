@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Bell, CheckCircle2, Database, MinusCircle, PlugZap, ShieldCheck, Stethoscope, Wifi, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { configure, getApiBase, getToken } from "../api/client";
+import { configure, getApiBase, getToken, isApiError, probeConnection } from "../api/client";
 import { useDataStatus, useDoctor, useHealth, useLiveStatus, useMeta } from "../api/queries";
 import {
   Badge, Button, Callout, Field, Input, List, ListRow, ListSep, PageHeader, Panel, Segmented, Switch,
@@ -10,6 +11,7 @@ import { applyAppearance, readAppearance, type Appearance } from "../lib/appeara
 import { doctorCheckLabel, doctorCountsSummary, doctorStatusColor } from "../lib/doctor";
 import { dateInt } from "../lib/format";
 import { ensureNotificationPermission } from "../lib/notify";
+import { resetLiveStreams } from "../lib/liveStream";
 import { setBeginner, useBeginner } from "../store/ui";
 import { zhCN as t } from "../i18n/zh-CN";
 import "./pages.css";
@@ -33,6 +35,7 @@ function doctorTone(status: string): "ok" | "warn" | "danger" | "neutral" {
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [base, setBase] = useState(getApiBase());
   const [token, setToken] = useState(getToken());
   const [theme, setTheme] = useState<Appearance["theme"]>(INITIAL_APPEARANCE.theme);
@@ -40,6 +43,8 @@ export default function SettingsPage() {
   const [colorMode, setColorMode] = useState<Appearance["colorMode"]>(INITIAL_APPEARANCE.colorMode);
   const [saved, setSaved] = useState(false);
   const [test, setTest] = useState("");
+  const [testing, setTesting] = useState(false);
+  const probeId = useRef(0);
   const [notifyState, setNotifyState] = useState<string>(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [doctorError, setDoctorError] = useState("");
   const beginner = useBeginner();
@@ -50,21 +55,37 @@ export default function SettingsPage() {
   const doctor = useDoctor();
 
   const save = () => {
+    probeId.current += 1;
+    setTesting(false);
+    const previousBase = getApiBase();
+    const previousToken = getToken();
     configure(base, token);
+    const connectionChanged = previousBase !== getApiBase() || previousToken !== getToken();
+    if (connectionChanged) {
+      // Reset also cancels old requests; their results must not repopulate the new server's cache.
+      void queryClient.resetQueries();
+      resetLiveStreams();
+    }
     applyAppearance({ theme, density, colorMode });
     window.dispatchEvent(new Event("qc-settings"));
     setSaved(true);
     setTest("");
-    void health.refetch(); void meta.refetch(); void data.refetch(); void live.refetch();
+    if (!connectionChanged) {
+      void health.refetch(); void meta.refetch(); void data.refetch(); void live.refetch();
+    }
   };
   const check = async () => {
+    const id = ++probeId.current;
+    setTesting(true);
     setTest("测试中…");
     try {
-      const result = await health.refetch();
-      if (result.error) throw result.error;
-      setTest(`已连接：${result.data?.engine_backend ?? "?"} · v${result.data?.version ?? "?"}`);
-    } catch (error) { setTest(`连接失败：${error instanceof Error ? error.message : "unknown"}`); }
+      const result = await probeConnection(base, token);
+      if (probeId.current === id) setTest(`已连接：${result.meta.engine_backend} · v${result.meta.version}（当前填写值，保存后生效）`);
+    } catch (error) {
+      if (probeId.current === id) setTest(`连接失败：${error instanceof Error ? error.message : "unknown"}`);
+    } finally { if (probeId.current === id) setTesting(false); }
   };
+  const clearTest = () => { probeId.current += 1; setTest(""); setTesting(false); setSaved(false); };
   const runSelfCheck = async () => {
     setDoctorError("");
     try {
@@ -78,38 +99,43 @@ export default function SettingsPage() {
     window.dispatchEvent(new Event("qc-settings"));
   };
   const liveEnabled = live.data?.enabled === true;
-  const connected = health.isError ? "danger" : health.data ? "ok" : "neutral";
-  const connectedLabel = health.isError ? "未连接" : health.data ? "已连接" : "检测中";
+  const verifying = health.isFetching || meta.isFetching;
+  const connectionError = health.error || meta.error;
+  const authFailed = isApiError(meta.error) && [401, 403].includes(meta.error.status);
+  const authenticated = Boolean(health.data && meta.data);
+  const connected = verifying ? "neutral" : connectionError ? "danger" : authenticated ? "ok" : "neutral";
+  const connectedLabel = verifying ? "检测中" : authFailed ? "验证失败" : connectionError ? "未连接" : authenticated ? "已连接" : "检测中";
   const latestSnapshot = data.data?.snapshots[0] ?? null;
 
   return (
     <div className="page">
       <PageHeader
         title="设置"
-        subtitle="服务连接、数据与网络、外观与新手模式；所有设置只存本机，不上传、不联网。"
+        subtitle="服务连接、数据与网络、外观与新手模式；设置保存在当前浏览器，测试连接会请求填写的服务地址。"
         actions={(
           <>
-            <Button variant="secondary" icon={PlugZap} onClick={() => void check()}>测试连接</Button>
+            <Button variant="secondary" icon={PlugZap} loading={testing} disabled={testing} onClick={() => void check()}>测试连接</Button>
             <Button variant="primary" onClick={save}>保存设置</Button>
           </>
         )}
       />
 
+      {import.meta.env.VITE_QC_DEFAULT_API_BASE ? <Callout tone="info" title="Sites 测试入口：连接本机服务">先在你的电脑启动 QuantCore，并允许当前网页来源，再填写启动时显示的 Token。API 已预填本机地址；计算与数据仍在本机。<p><code>uv run qc serve --allow-origin {window.location.origin}</code></p></Callout> : null}
       {saved ? <Callout tone="success" title="已保存（仅本机 localStorage）">连接地址、Token 与外观设置已生效；刷新页面后仍保留。</Callout> : null}
-      {test ? <Callout tone={test.startsWith("已连接") ? "success" : "danger"} title={test} /> : null}
+      {test ? <Callout tone={test.startsWith("已连接") ? "success" : testing ? "info" : "danger"} title={test} /> : null}
 
       <div className="grid grid-2">
         <div className="stack">
           <Panel title="本地服务" subtitle="qc serve 默认同源；分离部署时填完整地址">
             <div className="stack">
               <Field label="API 地址" hint="留空 = 同源（qc serve 托管 UI）">
-                <Input value={base} onChange={(event) => setBase(event.target.value)} placeholder="留空 = 同源" autoComplete="off" spellCheck={false} aria-label="API 地址" />
+                <Input value={base} onChange={(event) => { setBase(event.target.value); clearTest(); }} placeholder="留空 = 同源" autoComplete="off" spellCheck={false} aria-label="API 地址" />
               </Field>
-              <Field label="Bearer Token" hint="由 qc serve --open 自动写入；不进入日志、不发送到第三方">
-                <Input value={token} onChange={(event) => setToken(event.target.value)} type="password" autoComplete="new-password" spellCheck={false} placeholder="留空 = 无 Token" aria-label="Bearer Token" />
+              <Field label="Bearer Token" hint="填写 qc serve 输出的 Token；仅发送到上方配置的 API 地址">
+                <Input value={token} onChange={(event) => { setToken(event.target.value); clearTest(); }} type="password" autoComplete="new-password" spellCheck={false} placeholder="留空 = 无 Token" aria-label="Bearer Token" />
               </Field>
               <List inset>
-                <ListRow title="连接状态" subtitle={health.isError ? "无法连接本地服务" : `引擎 ${health.data?.engine_backend ?? "…"} · 版本 ${health.data?.version ?? meta.data?.version ?? "—"}`} trailing={<Badge tone={connected} dot>{connectedLabel}</Badge>} />
+                <ListRow title="已保存连接状态" subtitle={connectionError ? `${authFailed ? "Token 验证失败" : "无法连接本地服务"}：${connectionError.message}` : `引擎 ${meta.data?.engine_backend ?? "…"} · 版本 ${meta.data?.version ?? "—"}`} trailing={<Badge tone={connected} dot>{connectedLabel}</Badge>} />
                 <ListRow title="数据根目录" subtitle={<span className="mono-wrap">{meta.data?.data_root ?? "—"}</span>} />
               </List>
             </div>
@@ -119,7 +145,7 @@ export default function SettingsPage() {
             <div className="stack">
               <Callout tone={liveEnabled ? "success" : "warn"} title={liveEnabled ? "网络已开启" : "网络默认关闭"} action={<Button variant="ghost" size="sm" onClick={() => navigate("/data")}>去数据页</Button>}>
                 {liveEnabled
-                  ? `实时行情已开启（来源 ${live.data?.source ?? "none"}）。公开数据只读，绝不用于交易。`
+                  ? `实时行情已开启（来源 ${live.data?.source ?? "none"}）。用于行情展示与本地模拟，不提交真实委托。`
                   : "启动 qc serve 前设置环境变量 QC_ALLOW_NETWORK=1 并重启，才可开启实时行情与公开数据导入；未开启时全站不发起外部请求。"}
               </Callout>
               <List inset>

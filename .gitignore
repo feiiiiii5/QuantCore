@@ -41,3 +41,6 @@ desktop/dist/
 # Playwright artifacts
 ui/test-results/
 ui/playwright-report/
+
+# Local Sites source export and publication artifacts
+.sites/

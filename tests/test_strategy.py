@@ -33,12 +33,15 @@ EXPECTED_TEMPLATES = {
     "dividend_quality",
     "small_cap_liquidity",
     "multi_factor",
+    "trend_momentum",
+    "liquid_reversal",
+    "defensive_low_vol",
 }
 
 
-def test_seven_templates_contract(small_panel) -> None:
+def test_template_catalog_contract(small_panel) -> None:
     assert set(template_ids()) == EXPECTED_TEMPLATES
-    assert len(list_templates()) == 7
+    assert len(list_templates()) == 10
     for template_id in template_ids():
         strategy = create_template(template_id, {})
         weights = strategy.generate_targets(small_panel)

@@ -192,7 +192,7 @@ export function marketReadings(input: { quote?: LiveQuote | null; bars?: Bars | 
   const high = lastIndex >= 0 ? bars!.high[lastIndex] : profile?.quote.high ?? null;
   const low = lastIndex >= 0 ? bars!.low[lastIndex] : profile?.quote.low ?? null;
   const change = close != null && preClose != null ? close - preClose : null;
-  const changePct = profile?.quote.change_pct ?? (change != null && preClose ? (change / preClose) * 100 : null);
+  const changePct = change != null && preClose ? (change / preClose) * 100 : profile?.quote.change_pct ?? null;
   const amplitude = high != null && low != null && preClose ? ((high - low) / preClose) * 100 : null;
   return {
     price: close,
@@ -209,7 +209,7 @@ export function marketReadings(input: { quote?: LiveQuote | null; bars?: Bars | 
     limitUp: lastIndex >= 0 ? bars!.limit_up[lastIndex] : null,
     limitDown: lastIndex >= 0 ? bars!.limit_down[lastIndex] : null,
     suspended: Boolean(lastIndex >= 0 ? bars!.suspended[lastIndex] : profile?.quote.suspended),
-    updatedAt: profile?.quote.date ? String(profile.quote.date) : bars?.dates.length ? bars.dates[bars.dates.length - 1] : null,
+    updatedAt: bars?.dates.length ? bars.dates[bars.dates.length - 1] : profile?.quote.date ? String(profile.quote.date) : null,
     source: close != null ? "snapshot" : "none",
   };
 }
@@ -218,4 +218,29 @@ export function updatedAtLabel(readings: MarketReadings): string {
   if (readings.source === "live") return formatClock(readings.updatedAt);
   if (!readings.updatedAt) return "—";
   return dateInt(readings.updatedAt);
+}
+
+/** Apply one source-timestamped quote to its raw daily candle, keeping other days intact. */
+export function withLiveCandle(bars: Bars, quote?: LiveQuote | null): Bars {
+  if (!quote || quote.code !== bars.code || !quote.timestamp || bars.synthetic) return bars;
+  const stamp = new Date(quote.timestamp);
+  if (!Number.isFinite(stamp.getTime()) || quote.open == null || quote.high == null || quote.low == null || quote.price <= 0) return bars;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(stamp);
+  const part = (kind: string) => parts.find((value) => value.type === kind)?.value ?? "";
+  const day = `${part("year")}-${part("month")}-${part("day")}`;
+  const lastDay = bars.dates.at(-1);
+  if (lastDay && day < lastDay) return bars;
+  const append = day !== lastDay;
+  const update = <T,>(values: T[], value: T) => append ? [...values, value] : [...values.slice(0, -1), value];
+  const close = update(bars.close, quote.price);
+  const moving = (window: number) => close.length < window ? null : close.slice(-window).reduce((sum, value) => sum + value, 0) / window;
+  return {
+    ...bars,
+    name: quote.name || bars.name,
+    dates: update(bars.dates, day),
+    open: update(bars.open, quote.open), high: update(bars.high, quote.high), low: update(bars.low, quote.low), close,
+    volume: update(bars.volume, quote.volume), amount: update(bars.amount, quote.amount),
+    turnover: update(bars.turnover, quote.turnover_pct),
+    ma5: update(bars.ma5, moving(5)), ma20: update(bars.ma20, moving(20)),
+  };
 }

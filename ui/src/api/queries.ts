@@ -27,6 +27,7 @@ export const qk = {
   liveStatus: ["live", "status"] as const,
   liveIndices: ["live", "indices"] as const,
   liveQuotes: (codes: string[]) => ["live", "quotes", codes.join(",")] as const,
+  liveBars: (code: string | null) => ["live", "bars", code ?? ""] as const,
   watchlist: ["live", "watchlist"] as const,
   dataIntegrity: (snapshot?: string) => ["data", "integrity", snapshot ?? "latest"] as const,
   onboarding: ["onboarding"] as const,
@@ -179,6 +180,16 @@ export function useCapacity() {
 /** Server-side live status (polled); keeps the UI honest about offline/synthetic modes. */
 export function useLiveStatus() {
   return useQuery({ queryKey: qk.liveStatus, queryFn: api.liveStatus, refetchInterval: 5_000, staleTime: 2_000, retry: false });
+}
+export function useLiveBars(code: string | null, enabled = true) {
+  return useQuery({
+    queryKey: qk.liveBars(code),
+    queryFn: () => api.liveBars(code!),
+    enabled: enabled && !!code,
+    staleTime: 30_000,
+    refetchInterval: enabled ? 60_000 : false,
+    retry: 1,
+  });
 }
 export function useLiveIndices(enabled = true) {
   return useQuery({ queryKey: qk.liveIndices, queryFn: api.liveIndices, refetchInterval: 5_000, staleTime: 2_000, retry: false, enabled });

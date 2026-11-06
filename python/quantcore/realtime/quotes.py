@@ -7,6 +7,7 @@ test suite only exercises the pure parsers against recorded fixtures.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import re
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from typing import Any, Protocol
 import httpx
 
 from ..errors import QuantCoreError
-from .clock import market_phase, now_shanghai
+from .clock import SHANGHAI_TZ, market_phase, now_shanghai
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -180,6 +181,16 @@ def _num(value: Any) -> float | None:
     return number if number == number else None  # NaN check
 
 
+def _source_timestamp(epoch: Any) -> str | None:
+    value = _num(epoch)
+    if value is None or value <= 0:
+        return None
+    try:
+        return dt.datetime.fromtimestamp(value, tz=SHANGHAI_TZ).isoformat(timespec="seconds")
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 def _quote_from_numbers(
     *,
     code: str,
@@ -264,7 +275,7 @@ def parse_eastmoney_payload(
             turnover=_num(row.get("f8")),
             limit_up=_num(row.get("f51")),
             limit_down=_num(row.get("f52")),
-            timestamp=now.isoformat(timespec="seconds"),
+            timestamp=_source_timestamp(row.get("f124")),
             source="eastmoney",
             now=now,
         )
@@ -304,7 +315,12 @@ def parse_sina_payload(
         amount = _num(fields[9]) or 0.0
         stamp = None
         if len(fields) >= 32 and fields[30] and fields[31]:
-            stamp = f"{fields[30]}T{fields[31]}"
+            with contextlib.suppress(ValueError):
+                stamp = (
+                    dt.datetime.fromisoformat(f"{fields[30]}T{fields[31]}")
+                    .replace(tzinfo=SHANGHAI_TZ)
+                    .isoformat(timespec="seconds")
+                )
         quote = _quote_from_numbers(
             code=code,
             name=name,
@@ -318,7 +334,7 @@ def parse_sina_payload(
             turnover=None,
             limit_up=None,
             limit_down=None,
-            timestamp=stamp or now.isoformat(timespec="seconds"),
+            timestamp=stamp,
             source="sina",
             now=now,
         )
@@ -343,7 +359,7 @@ async def fetch_eastmoney_quotes(
     quotes: list[Quote] = []
     for batch in _chunks([normalize_target(code) for code in codes], 50):
         secids = ",".join(secid(code) for code in batch)
-        fields = "f12,f13,f14,f2,f3,f4,f5,f6,f8,f15,f16,f17,f18,f51,f52"
+        fields = "f12,f13,f14,f2,f3,f4,f5,f6,f8,f15,f16,f17,f18,f51,f52,f124"
         url = f"{EASTMONEY_URL}?fltt=2&invt=2&fields={fields}&secids={secids}"
         payload = await http.get_json(
             url,

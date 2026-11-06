@@ -1,8 +1,8 @@
-"""Paper-trading API (M9): local simulation only, no real order routing or network.
+"""Paper-trading API: local virtual accounts over historical data or public live quotes.
 
 State persists under ``<data_root>/paper/paper_<hex>.json`` (atomic JSON); every mutation
-is serialised per session with :class:`quantcore.paper.PaperStore` locks.  Prices come only
-from the immutable snapshot referenced by the session.
+is serialised per session with :class:`quantcore.paper.PaperStore` locks. Historical
+accounts use immutable snapshots; live accounts read the existing quote service.
 """
 
 from __future__ import annotations
@@ -15,7 +15,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 
 from ..errors import QuantCoreError
-from ..paper import PaperError, PaperMarketData, PaperSession, PaperSessionEngine, PaperStore
+from ..paper import (
+    LivePaperSessionEngine,
+    PaperError,
+    PaperMarketData,
+    PaperSession,
+    PaperSessionEngine,
+    PaperStore,
+)
 from ..paper.portfolio import build_portfolio
 from .schemas import (
     PaperAutoRequest,
@@ -50,6 +57,8 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
 
     def _engine_for(session: PaperSession) -> PaperSessionEngine:
+        if session.mode == "live":
+            return LivePaperSessionEngine(session)
         reference = str(session.snapshot.get("id") or "")
         try:
             snapshot = workspace.snapshot(reference or None)
@@ -84,6 +93,14 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
 
     @app.post("/api/paper/sessions", status_code=201)
     def create_session(payload: PaperSessionCreateRequest) -> Any:
+        if payload.mode == "live":
+            session = LivePaperSessionEngine.create_live(
+                initial_cash=float(payload.initial_cash),
+                name=payload.name,
+                now=app.state.live.clock(),
+            )
+            store.save(session)
+            return json_safe(session.session_view())
         try:
             snapshot = workspace.snapshot(payload.snapshot)
         except (FileNotFoundError, QuantCoreError) as exc:
@@ -136,6 +153,10 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
             session = store.load(session_id)
         except PaperError as exc:
             _fail(exc)
+        if session.mode == "live":
+            raise HTTPException(
+                status_code=400, detail="live accounts use quote refresh, not historical auto-run"
+            )
         if session.status != "active" or session.current_date >= session.end_date:
             raise HTTPException(status_code=409, detail="paper session is already finished")
         stop = threading.Event()
@@ -220,6 +241,32 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
     @app.get("/api/paper/sessions/{session_id}")
     def get_session(session_id: str) -> Any:
         return json_safe(_load_engine(session_id).detail())
+
+    @app.post("/api/paper/sessions/{session_id}/refresh")
+    async def refresh_session(session_id: str) -> Any:
+        try:
+            session = store.load(session_id)
+        except PaperError as exc:
+            _fail(exc)
+        if session.mode != "live":
+            raise HTTPException(
+                status_code=400, detail="quote refresh requires a live paper account"
+            )
+        codes = sorted(
+            {position.code for position in session.positions.values()}
+            | {order.code for order in session.orders if order.is_open}
+        )
+        live = app.state.live
+        quotes = await live.quotes(codes) if codes else {"quotes": [], "stale": False}
+        status = await live.status()
+        with store.session_lock(session_id):
+            try:
+                session = store.load(session_id)
+                result = LivePaperSessionEngine(session).refresh(quotes, status, now=live.clock())
+                store.save(session)
+            except PaperError as exc:
+                _fail(exc)
+        return json_safe(result)
 
     @app.post("/api/paper/sessions/{session_id}/step")
     def step_session(session_id: str, payload: PaperStepRequest | None = None) -> Any:
