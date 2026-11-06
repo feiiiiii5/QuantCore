@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { subscribeLiveQuotes } from "../lib/liveStream";
-import type { LiveQuotesPayload } from "./types";
 
 export const qk = {
   health: ["health"] as const,
@@ -184,32 +183,27 @@ export function useLiveStatus() {
 export function useLiveIndices(enabled = true) {
   return useQuery({ queryKey: qk.liveIndices, queryFn: api.liveIndices, refetchInterval: 5_000, staleTime: 2_000, retry: false, enabled });
 }
-/** Live quotes: one shared WebSocket per code set, with HTTP polling as a safety net. */
+/** Keyed quote cache shared by WebSocket updates and a regular HTTP refresh. */
 export function useLiveQuotes(codes: string[], enabled = true) {
   const client = useQueryClient();
   const codeKey = codes.join(",");
-  const [streamData, setStreamData] = useState<LiveQuotesPayload | null>(null);
   useEffect(() => {
-    if (!enabled || codes.length === 0) {
-      setStreamData(null);
-      return;
-    }
+    if (!enabled || codes.length === 0) return;
     return subscribeLiveQuotes(codes, (message) => {
       client.setQueryData(qk.liveQuotes(codes), message.quotes);
-      setStreamData(message.quotes);
     });
     // codeKey captures the code list; codes is re-read from the closure of this render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codeKey, enabled, client]);
-  const query = useQuery({
+  return useQuery({
     queryKey: qk.liveQuotes(codes),
     queryFn: () => api.liveQuotes(codes),
-    refetchInterval: streamData ? false : 15_000,
+    // Keep refreshing after a socket has delivered its last frame or disconnected.
+    refetchInterval: 15_000,
     staleTime: 2_000,
     retry: false,
-    enabled: enabled && codes.length > 0 && streamData == null,
+    enabled: enabled && codes.length > 0,
   });
-  return streamData ? { ...query, data: streamData, isStreaming: true } : query;
 }
 export function useWatchlist() {
   return useQuery({ queryKey: qk.watchlist, queryFn: api.watchlist, staleTime: 30_000 });

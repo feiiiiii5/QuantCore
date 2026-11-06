@@ -1,97 +1,97 @@
-# QUICKSTART — 中文快速上手
+# QuantCore 快速上手
 
-> 完全零基础？先读 [TUTORIAL.md](TUTORIAL.md)：从安装到看懂第一个回测，每节都有“你应该看到”。
+先用合成示例跑通 C++ 回测和界面，再导入自己的数据。完整操作说明见[使用教程](TUTORIAL.md)。
 
-## 1. 安装
-- macOS（Apple Silicon/Intel）或 Windows（Linux 其次）。
-- 依赖：Python 3.12、CMake ≥3.26、Ninja、Node ≥20 + pnpm、C++20 编译器（Apple clang ≥15 / MSVC 2022 / gcc ≥12）。
-- 中国大陆网络镜像见 `DEV-SETUP.md`。
+## 1. 准备环境
+
+完整源码运行目前支持 macOS 或 Linux。需要 Python 3.12、[uv](https://docs.astral.sh/uv/)、C++20 编译器、CMake ≥ 3.26、Ninja、Node.js ≥ 20 和 pnpm。
+Windows 目前只有 Python smoke 与未签名客户端壳，完整 C++ 后端尚不支持。
 
 ```bash
 git clone https://github.com/feiiiiii5/QuantCore.git
 cd QuantCore
-make setup
-```
-
-## 2. 合成数据（三步跑通 CLI）
-```bash
-uv run qc data update --provider synthetic --n-sec 200 --start 2020-01-02 --end 2024-12-31
-uv run qc snapshot build
-uv run qc backtest run --template dual_ma --start 2021-01-01 --end 2024-12-31
-```
-输出会写明 `engine_backend == "cpp"`；结果含净值、回撤、指标与逐笔交易。
-
-### 本地自检 / 一键演示
-```bash
-make doctor   # 环境自检（Python / C++ 扩展 / 前端构建 / 数据目录）
-make demo     # 合成数据 + 快照 + 示例回测，一条命令跑通
-```
-完整的本地测试路线（verify-local / bench-scale / 故障排查）见 [`LOCAL-TESTING.md`](LOCAL-TESTING.md)。
-
-## 3. 启动本地工作台
-```bash
+uv sync --frozen --python 3.12 --default-index https://pypi.org/simple
+pnpm -C ui install --frozen-lockfile
 pnpm -C ui build
-uv run qc serve --port 8000 --open
 ```
-- `qc serve` 只监听 `127.0.0.1`，需要 Bearer token；终端会打印带 token 的 URL，浏览器打开后 token 自动保存并从地址栏移除。
-- 首次进入首页「今日」可用“**一键示例**”：生成 SYNTHETIC 面板/快照并跑一次示例回测；新手模式默认开启，按首页清单 4 步即可上手。
-- 页面：今日 / 行情 / 选股 / 策略 / 回测 / 实验 / 研究 / 数据 / 模拟 / 设置；⌘K（Ctrl+K）打开命令面板。
-- 无快照时行情接口会用 40 只合成回退，便于先看 UI；正式研究请先建快照。
-- 设计/交互规范见 [`DESIGN-SPEC.md`](DESIGN-SPEC.md)，产品理念见 [`PRODUCT.md`](PRODUCT.md)。
 
-## 4. 前端开发
+`uv sync` 会安装项目并编译 `_qcore` 原生扩展。安装阶段需要联网；镜像与工具链排查见 [DEV-SETUP.md](DEV-SETUP.md)。
+
+## 2. 生成第一份实验
+
 ```bash
-# 终端 A
-uv run qc serve --port 8000
-# 终端 B
-pnpm -C ui dev
-# Vite: http://127.0.0.1:5173，代理 /api /ws /health 到 8000
+uv run --no-sync qc demo --data-root data
 ```
-开发模式仍需在设置页填 token（或访问 `http://127.0.0.1:5173/?token=<token>`）。
 
-## 5. 真实数据
+这条命令会生成明确标记为 `SYNTHETIC` 的数据、建立快照、通过 C++ 引擎运行示例策略，并保存实验与 HTML 报告。
+输出 JSON 包含 `engine_backend: "cpp"`、`snapshot_id`、`run_id` 和报告路径。
 
-### Sina 公开源（免 Token，联网）
+示例用于熟悉流程，不能解释为真实市场结论。
+
+## 3. 打开本地工作台
+
 ```bash
-# 网络默认关闭；显式开启后才允许外部请求。公开数据仅限自用、不得再分发。
-QC_ALLOW_NETWORK=1 uv run qc data update --provider sina \
+uv run --no-sync qc serve --data-root data --port 8000 --open
+```
+
+演示与服务使用相同的 `data` 目录，因而能读取刚生成的快照。实验记录默认位于 `experiments`。
+服务只监听 `127.0.0.1`；终端输出的带 token 地址会由 `--open` 打开，token 保存后会从地址栏移除。
+
+打开后可以：
+
+1. 在“实验”查看刚生成的回测结果。
+2. 点击“沿用数据与参数”，修改一个参数生成有来源链接的新实验。
+3. 选中两份实验，对比归一化曲线与数据、资金、费用和规则差异。
+4. 点击“继续研究”，对保存的实验运行成本敏感性或 Monte Carlo；PBO 需要选择至少两份实验。
+
+因子诊断、参数扫描和固定参数分段回测有独立配置，不会自动继承当前实验的全部设置。
+界面支持新手/专业模式、深浅色、移动端布局，以及 ⌘K / Ctrl+K 命令面板。
+
+## 4. 使用自己的数据
+
+网络数据接入默认关闭。导入后，先检查数据质量，再构建快照，并在回测时明确选择该快照。
+**CLI 回测省略 `--snapshot` 时会新建合成数据，不会自动使用最近导入的数据。**
+
+查看已有快照：
+
+```bash
+uv run --no-sync qc snapshot list --snapshots-root data/snapshots
+```
+
+使用 CLI 时，将实际快照 ID 传给 `qc backtest run` 的 `--snapshot` 参数，并保持 `--snapshots-root data/snapshots`；也可以直接在回测界面选择该快照。
+
+### 可选 Sina 公开日线
+
+```bash
+QC_ALLOW_NETWORK=1 uv run --no-sync qc data update --provider sina \
   --codes 600000,000001,300750 --start 2024-01-01 --end 2026-10-31 --data-root data
-uv run qc snapshot build --data-root data --snapshots-root data/snapshots
-uv run qc data integrity --snapshots-root data/snapshots   # 体检通过再回测
-uv run qc backtest run --template dual_ma --start 2024-06-01 --end 2026-10-31
+uv run --no-sync qc snapshot build --data-root data --snapshots-root data/snapshots
+uv run --no-sync qc data integrity --snapshots-root data/snapshots
 ```
-真实 3 只样本已实测：质量 passed、覆盖率 100%、integrity=ok、C++ 回测成功。成交额为估算、复权/公司行为为近似，详见 `DATA-LICENSES.md`。
 
-### Tushare（需要 Token）
+随后按上面的方式明确选择构建出的快照。公开源并非授权行情 feed；日线深度、成交额估算、复权和公司行为近似等限制见 [DATA-LICENSES.md](DATA-LICENSES.md)。本次文档更新未重新验证真实网络导入。
+
+Tushare 等 provider 接口属于可选集成，真实 Token 路径及其网络许可配置仍需验证，不作为这份快速上手的运行前提。
+
+### 可选实时行情
+
 ```bash
-export TUSHARE_TOKEN=...   # 或按 DEV-SETUP 写入系统钥匙串
-uv run qc data update --provider tushare --start 2010-01-01 --end 2024-12-31
-uv run qc snapshot build
-uv run qc backtest run --template multi_factor --start 2020-01-01 --end 2024-12-31
+QC_ALLOW_NETWORK=1 uv run --no-sync qc serve --data-root data --port 8000 --open
 ```
-> 真实 Tushare 网络路径本轮未验证（无 Token）；请先用小样本验证质量报告。
 
-### 实时行情（可选，联网）
-`QC_ALLOW_NETWORK=1 uv run qc serve --open` 后行情页约每 3 秒刷新（Sina/Eastmoney 公开源，仅展示）；
-关闭网络时显示最近快照并标注“离线快照”。接口见 `UI-API.md`。
+公开实时源仅作展示，不是授权 L2 行情，不连接券商。关闭网络时显示离线数据状态。
 
-## 6. 研究
-- UI `/research`：因子 IC/分层/衰减、参数扫描热力图、滚动验证、行业归因、稳健性。
-- HTTP：`POST /api/research/factor`、`/sweep`、`/walk_forward`、`/attribution`，契约见 `UI-API.md`。
-- 参数扫描服务端同步上限 200 组合；更大规模请用 CLI/离线任务。
+## 5. 本地自检与开发
 
-## 7. 测试
 ```bash
-make lint          # ruff + mypy
-make test          # pytest + ctest
-make verify-cpp    # C++ 后端/差分/性能
-make e2e           # UI 构建 + 隔离 qc serve + Playwright（需要 Chrome）
+uv run --no-sync qc doctor
 ```
 
-## 8. 常见问题
-- `engine_backend == "missing"`：先 `make build`，再 `uv run python -c "import quantcore; print(quantcore.engine_backend())"`。
-- 页面空白/401：确认 `qc serve` 仍在运行；设置页填地址与 token；或访问 `/?token=<token>`。
-- 找不到页面：旧链接 `/` 会跳转到 `/today`；实时/真实数据相关按钮需先设置 `QC_ALLOW_NETWORK=1` 并重启 `qc serve`。
-- 数据导入失败：查看 `qc data quality` 报告或数据页「数据体检」；少量坏行会被隔离并告警，网络层测试使用录制 fixture。
-- 快照/实验路径：默认 `data/snapshots/`、`experiments/`；`qc serve --data-root ...` 可隔离。
-- 规则/费率未核实：见 `rules-sources.md`，代码与界面标 `TODO(verify)`；本项目不构成投资建议。
+开发验证需要额外安装开发依赖：
+
+```bash
+uv sync --frozen --all-extras --python 3.12 --default-index https://pypi.org/simple
+```
+
+相关命令与范围见 [LOCAL-TESTING.md](LOCAL-TESTING.md)，数据和接口契约见 [UI-API.md](UI-API.md)。
+当前阶段以本地测试为主，不部署上线，也不提供真实下单能力。

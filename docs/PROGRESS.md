@@ -1,10 +1,23 @@
 # PROGRESS — 当前进度
 
 > 每阶段结束记录：完成项、验证命令与结果、已知缺口、下一步、续跑方法。上下文清空后据此恢复。
-> 更新时间：2026-11-02。
+> 更新时间：2026-11-06。
 > 交接记录（2026-11-02）：上一会话交接文档的独有信息已并入本文件，交接文件已删除；续跑以本文件为准。
 
+## 2026-11-06：研究证据与账户正确性优化
+
+- 空表往返：两条实验保存路径都写入空财务/公司行为表，保留列与类型，避免同一数据经派生后指纹变化；已遗失结构的旧文件不猜测补齐。
+- 自动评审补充：离开 `?source=` 时清除来源数据选择与恢复标记，保留普通快照选择；修复前真实浏览器复现普通回测错误携带来源实验。
+- 实验比较从原始资金金额改为按记录初始资金归一的净值，补充回撤、参照实验差值、13 项条件核对和来源记录。保留旧 API 字段；缺失记录显示未知，不制造可比性。
+- `source_run_id` 沿用原实验快照或已保存面板、完整费用/规则和策略条件，新实验保存父记录；支持局部费用修改，原记录不变。UI「沿用数据与参数」与「继续研究」已接通。
+- 修复月收益遗漏跨月首日、回撤忽略初始资金且二次复杂度、任务错误帧忽略终态、worker 关闭超时丢失线程及领取/关闭竞争。
+- 修复模拟账户保存重开丢失成本精度、不同起始日期组合权重漂移；切换账户停止本地播放并忽略旧请求返回。修复切换证券沿用旧报价、WS 断流后不再 HTTP 刷新。
+- 页面按需加载，共享运行时代码不再拖入 Monaco；工程规则改为按影响选择必要验证，不重复执行已经完成的建设阶段。
+- 已验证：Python **373 passed / 2 skipped**；ruff lint/format 与 mypy（106 源文件）通过；UI **19/19**；既有真实服务 E2E **18/18**；C++ 差分 **6/6**，300×965 合成规模引擎约 2.79ms、20 因子约 24ms。上述数字是本机检查，不代表全市场或实盘能力。
+- 本机 Node 26 的原生 Web Storage 与现有 jsdom 测试环境冲突，UI 测试使用 `NODE_OPTIONS=--no-experimental-webstorage`；依赖版本与哈希未更新。随后 GitHub Ubuntu 安装在清华镜像的 `httptools` Linux wheel 返回 403；已将锁内安装包地址改为 PyPI 官方文件源，保留镜像索引、依赖图、版本和全部哈希，消除区域镜像文件地址依赖。
+
 ## 当前状态
+- R5：研究条件可比性、数据复用/来源链、账户与行情身份、收益口径和 worker 生命周期优化已完成；具体增量证据见上节。
 - M0：完成。`make setup/test`、wheel、macOS/Ubuntu 全量 CI + Windows pure-Python smoke；C++ Windows 未支持。
 - M1：C++ types/calendar/tpool/.qpanel/内核/指标/零拷贝绑定；ctest 95/95；cross-sectional neutralize 已实现并绑定。
 - M2：Synthetic/LocalFile/Tushare(fixture+live API 代码路径)/AKShare/mootdx + **Sina 公开真实数据源**；摄取/质量/快照(内容寻址+PIT 元数据)/Parquet+DuckDB+SQLite；PIT 财务视图；**数据体检**(覆盖率/缺口/OHLC/量额/涨跌停/复权/跨源)；真实 Sina 3 只样本 import→snapshot→integrity=ok→C++ 回测已跑通；真实 Tushare Token 未验证。
@@ -118,6 +131,12 @@ make bench-scale
 - UI 实时链路：`lib/liveStream.ts` 共享 WebSocket（每代码集一个连接、退避重连、写 react-query 缓存），失败回退 15s 轮询；真实网络 + WS 帧已验证。
 - 前端工程：Vite dev proxy 重写 Origin（修复 dev 403）、manualChunks、`ui/scripts/ui-audit.mjs` 审计脚本；tsc/vitest/build 全绿。
 - 验证：pytest 352 passed/2 skipped、ctest 95/95、Playwright 18/18、vitest 10、ruff/mypy 105 files；真实联网行情 /api/live/status=live + WS 帧（浦发 10.14 / 平安 11.58 + 4 指数）。
+
+## 本地稳健性研究修正（2026-11-06 R6）
+- 当前阶段仅本地构建、测试与验收，不部署；C/C++ 为硬约束，生产回测保持 C++20 `qcore`。
+- 修正 PBO relative-rank 方向与并列平均秩、因子分组偏移，以及 Monte Carlo 首日相对初始资金的回撤。
+- 成本敏感性改为按费用情景展示的条形图与指标表；默认、小数及单点均通过真实 C++ 回测到界面的流程验证。
+- 本地 Python 383 passed/2 skipped、Vitest 20、Playwright 19/19；Ruff/mypy、UI build、C++ verify gate 通过。详细证据见验收报告 R6；本轮未推送或部署。
 
 ## 已知缺口
 1. M9：实时行情来自公开网页接口（未授权、约 3 秒轮询、无 L2），仅展示；UI 已用共享 WS 消费，但数据源本身仍非授权 feed；部分成交按「日成交量参与率上限」近似（无盘口/排队/滑点），公司行为未实现；不得声称可实盘。

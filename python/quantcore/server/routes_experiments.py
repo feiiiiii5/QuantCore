@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, Response
 from ..backtest.result import BacktestResult
 from ..errors import ExperimentError
 from ..experiments import ExperimentStore, replay_experiment
+from ..experiments.comparison import compare_experiments
 from ..report import render_html_report
 from .workspace import json_safe
 
@@ -42,6 +43,9 @@ def _result_payload(result: BacktestResult) -> dict[str, Any]:
             "engine_version": result.engine_version,
             "seed": result.seed,
             "benchmark": result.benchmark,
+            "config": result.config,
+            "snapshot": result.snapshot,
+            "synthetic": result.snapshot.get("synthetic"),
         }
     )
 
@@ -77,24 +81,12 @@ def register_experiment_routes(app: FastAPI, ctx: Any) -> None:
             raise HTTPException(status_code=400, detail="provide at least two run ids")
         if len(wanted) > 6:
             raise HTTPException(status_code=400, detail="compare at most six runs")
-        store = _store(ctx)
-        metrics: dict[str, Any] = {}
-        equity: list[dict[str, Any]] = []
-        for run_id in wanted:
-            try:
-                record = store.get(run_id)
-                result = store.load_result(run_id)
-            except ExperimentError as exc:
-                raise HTTPException(status_code=404, detail=str(exc)) from exc
-            metrics[run_id] = record.metadata.get("metrics", {})
-            equity.append(
-                {
-                    "run_id": run_id,
-                    "dates": result.dates.astype(int).tolist(),
-                    "equity": result.equity_yuan.tolist(),
-                }
-            )
-        return json_safe({"ids": wanted, "metrics": metrics, "equity": equity})
+        if len(set(wanted)) != len(wanted):
+            raise HTTPException(status_code=400, detail="provide distinct run ids")
+        try:
+            return json_safe(compare_experiments(_store(ctx), wanted))
+        except ExperimentError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.get("/api/experiments/{run_id}")
     def get_experiment(run_id: str) -> Any:

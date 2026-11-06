@@ -81,7 +81,8 @@ WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>` (jobs) and `/w
 - `GET /api/strategies/files` / `GET|PUT /api/strategies/files/{name}` (strategy.yaml + strategy.py; optional M6)
 
 ## Backtest / jobs
-- `POST /api/backtest` body `{template|strategy,snapshot?,params?,config?,snapshots_root?,experiments_root?}` → 202 `{job_id,status}`
+- `POST /api/backtest` body `{template|strategy|source_run_id,snapshot?,params?,config?,snapshots_root?,experiments_root?}` → 202 `{job_id,status}`
+  - `source_run_id` reuses the saved experiment's snapshot or persisted panel, strategy and configuration. It cannot be combined with `snapshot` or `synthetic`; missing source data fails rather than generating a replacement. Overrides to `costs`/`exec`/`rules`/`risk` merge with the recorded values. Each new run records `metadata.parent_run_id`; the source is unchanged. An explicit template selects new parameters while preserving the original universe for the same template. Both source validation and execution use the effective `experiments_root`.
 - `GET /api/jobs?status=&limit=` → `[JobView]`
 - `GET /api/jobs/{id}` → `JobView`
 - `POST /api/jobs/{id}/cancel` → `{job_id,cancelled:boolean,status}`
@@ -95,10 +96,14 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 - `GET /api/experiments?limit=&kind=` → `[{run_id,created_at,status,kind,strategy_name,template,snapshot_id,content_hash,metrics,tags,note}]`
 - `GET /api/experiments/{run_id}` → `{metadata,summary,metrics,result:{dates[],equity[],cash[],market_value[],trades[]}}`
 - `GET /api/experiments/{run_id}/result` → full `{dates[],equity[],cash[],market_value[],trades[],metrics,reasons}`
+  - Also returns the saved `config`, `snapshot` and `synthetic` provenance (`null` when not recorded), so changing the current workspace does not relabel an old result.
 - `POST /api/experiments/{run_id}/replay` → `{run_id,matched,equity_matched,trades_matched,metrics_matched,diffs[]}`
 - `GET /api/experiments/{run_id}/report` → HTML (text/html)
 - `GET /api/experiments/{run_id}/export` → zip download
 - `GET /api/experiments/compare?ids=a,b` → `{ids[],metrics:{...},equity:[{run_id,dates[],equity[]}]}`
+  - Existing raw curves remain unchanged. Each curve additionally returns `initial_cash`, `normalized_equity` (equity / recorded initial cash), fractional `drawdown`, `label` and `provenance` (data/strategy hashes, settings, source, engine, code revision, parent run).
+  - `comparison` contains `{status,dimensions[],warnings[]}`. Each dimension is `{key,label,status,values:{run_id:value}}`; statuses are `matched`, `different` or `unknown`. Actual trading dates (including interior gaps), data, capital, costs, execution, rules, corporate actions, risk, annualization, benchmark and engine are checked. Strategy differences are intentional and displayed separately. Matching conditions do not certify market data or strategy quality.
+  - Missing capital means `normalized_equity:null`, never first-observation rebasing. Drawdown includes starting capital when recorded; legacy records use the first observed equity. Dates are not interpolated or truncated; duplicate IDs are rejected and at most six distinct runs may be requested (UI: four).
 - `DELETE /api/experiments/{run_id}`
 
 ## Data
@@ -129,8 +134,8 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 
 ## Research robustness (M7 advanced)
 - `POST /api/research/overfitting` `{run_id,n_trials?}` → `{observations,periods_per_year,sharpe,deflated_sharpe,expected_max_sharpe,n_trials,skew,kurtosis,verdict}`
-- `POST /api/research/pbo` `{run_ids:[],n_splits?:8}` → `{run_ids,n_splits,combinations,pbo,median_oos_rank,logits[][]}`
-- `POST /api/research/cost_sensitivity` `{run_id,multipliers?:[0,0.5,1,2,3]}` → `{points:[{multiplier,total_return,annualized_return,sharpe,max_drawdown,total_fees}],breakeven_multiplier?}`; original experiment is never modified
+- `POST /api/research/pbo` `{run_ids:[],n_splits?:8}` → `{run_ids,n_splits,combinations,pbo,median_oos_rank,logits[][]}`。公开 OOS 排名 1 为最好；内部 logit 使用并列平均秩，较好表现对应正值。PBO 按 `logit <= 0` 统计未胜过 OOS 中位数的比例，中位并列计入；完全相同的实验不会被视为独立的稳健证据。
+- `POST /api/research/cost_sensitivity` `{run_id,multipliers?:[0,0.5,1,2,3]}` → `{run_id,points:[{multiplier,total_return,annualized_return,sharpe,max_drawdown,total_fees}],breakeven_multiplier?}`。费用倍数是情景标签，保留小数；收益和回撤为小数，`total_fees` 为 1e-4 元定点值，界面转为元。原实验不被修改。
 - `POST /api/research/monte_carlo` `{run_id,n_paths?:500,horizon?:250}` → `{terminal_return:{p05,p25,p50,p75,p95},max_drawdown:{p05,p50,p95},paths?}` (block=20, deterministic seed)
 - `POST /api/research/capacity` `{run_id,adv_participation?:0.1}` → `{capacity_cny,participation,avg_turnover,avg_adv_cny,limiting_sec,notes}`; approximate, 400 when data is missing
 

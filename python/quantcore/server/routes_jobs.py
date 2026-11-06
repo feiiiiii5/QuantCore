@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from ..errors import StrategyValidationError
+from ..errors import ExperimentError, StrategyValidationError
 from ..experiments import ExperimentStore
 from ..templates.registry import template_param_model
 from .schemas import BacktestRequest, JobAcceptedView, JobView, ReplayRequest
@@ -88,6 +88,13 @@ def register_job_routes(app: FastAPI, ctx: Workspace, security: ServerSecurity) 
     @app.post("/api/backtest", status_code=202, response_model=JobAcceptedView)
     def submit_backtest(payload: BacktestRequest) -> JobAcceptedView:
         _validate_backtest(payload)
+        if payload.source_run_id:
+            try:
+                ExperimentStore(payload.experiments_root or ctx.settings.experiments_root).get(
+                    payload.source_run_id
+                )
+            except ExperimentError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
         job_payload = payload.model_dump()
         job_payload["kind"] = "backtest"
         job_payload["snapshots_root"] = str(payload.snapshots_root or ctx.settings.snapshots_root)

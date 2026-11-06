@@ -184,11 +184,22 @@ def compute_pbo(store: ExperimentStore, run_ids: list[str], n_splits: int = 8) -
             [1 + int(np.sum(test_sharpe > value + 1e-12)) for value in test_sharpe],
             dtype=np.int64,
         )
-        omega = ranks / float(strategies + 1)
+        # Algorithm 2.3(f,g) uses higher relative ranks for better OOS performance:
+        # https://carmamaths.org/jon/backtest2.pdf
+        # Keep public 1 = best ranks, but use tie midranks for the internal logit.
+        tie_counts = np.asarray(
+            [
+                np.count_nonzero(np.isclose(test_sharpe, value, rtol=0, atol=1e-12))
+                for value in test_sharpe
+            ]
+        )
+        midranks = ranks + (tie_counts - 1) / 2.0
+        omega = (strategies + 1 - midranks) / float(strategies + 1)
         combo_logits = [float(math.log(float(value) / (1.0 - float(value)))) for value in omega]
         logits.append(combo_logits)
         selected_ranks.append(int(ranks[best]))
         selected_lambdas.append(combo_logits[best])
+    # Retain our <= 0 policy: an OOS median tie has not beaten the median.
     pbo = float(np.mean([1.0 if value <= 0.0 else 0.0 for value in selected_lambdas]))
     return {
         "run_ids": unique,
@@ -312,7 +323,8 @@ def compute_monte_carlo(
         sample = np.concatenate(pieces)[:days]
         wealth = np.cumprod(1.0 + sample)
         terminal[index] = float(wealth[-1] - 1.0)
-        peak = np.maximum.accumulate(wealth)
+        # The initial unit of capital is a peak before the first sampled return.
+        peak = np.maximum(1.0, np.maximum.accumulate(wealth))
         drawdowns[index] = float(np.max(1.0 - wealth / peak))
         if index < min(paths_count, 50):
             paths.append([0.0, *[float(value - 1.0) for value in wealth]])

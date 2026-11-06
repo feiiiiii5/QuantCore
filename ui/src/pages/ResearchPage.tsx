@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Grid3X3, Layers, PieChart, Play, ShieldCheck, Sigma } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { isApiError } from "../api/client";
 import { useAttribution, useExperiments, useFactor, useFactorCorrelation, useSweep, useWalkForward } from "../api/queries";
 import {
@@ -53,9 +54,11 @@ function BarList({ rows, valueFormatter }: { rows: Array<{ label: string; value:
 }
 
 export default function ResearchPage() {
+  const [searchParams] = useSearchParams();
+  const requestedRun = searchParams.get("run") || "";
   const palette = useChartPalette();
   const beginner = useBeginner();
-  const [tab, setTab] = useState<Tab>("factor");
+  const [tab, setTab] = useState<Tab>(requestedRun ? "robust" : "factor");
   const [formError, setFormError] = useState("");
 
   const [expression, setExpression] = useState("rank(ret(close,20))");
@@ -84,14 +87,23 @@ export default function ResearchPage() {
 
   const experimentsQuery = useExperiments();
   const experiments = experimentsQuery.data ?? [];
-  const [runId, setRunId] = useState("");
+  const [runId, setRunId] = useState(requestedRun);
   const attributionMutation = useAttribution();
+  const resetAttribution = attributionMutation.reset;
   const attribution = attributionMutation.data ?? null;
   const busy = factorMutation.isPending || correlationMutation.isPending || sweepMutation.isPending || walkMutation.isPending || attributionMutation.isPending;
   const activeError = tab === "factor" ? factorMutation.error || correlationMutation.error : tab === "sweep" ? sweepMutation.error : tab === "walk" ? walkMutation.error : attributionMutation.error;
   const unimplemented = isApiError(activeError) && activeError.status === 404;
   const errorText = formError || (activeError && !unimplemented ? activeError.message : "");
 
+  useEffect(() => {
+    resetAttribution();
+  }, [runId, resetAttribution]);
+  useEffect(() => {
+    if (!requestedRun) return;
+    setRunId(requestedRun);
+    setTab("robust");
+  }, [requestedRun]);
   useEffect(() => {
     if (tab !== "attribution" || runId || !experiments.length) return;
     setRunId(experiments[0].run_id);
@@ -350,7 +362,7 @@ export default function ResearchPage() {
         </div>
       ) : null}
 
-      {tab === "robust" ? <RobustnessPanel experiments={experiments} /> : null}
+      {tab === "robust" ? <RobustnessPanel experiments={experiments} initialRunId={requestedRun} /> : null}
 
       {tab === "attribution" ? (
         <div className="stack">

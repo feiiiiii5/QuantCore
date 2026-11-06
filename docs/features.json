@@ -1,7 +1,7 @@
 {
   "project": "QuantCore",
   "version": "0.1.0",
-  "generated": "2026-11-02",
+  "generated": "2026-11-06",
   "features": [
     {
       "id": "M0-001",
@@ -940,9 +940,86 @@
       "title": "zero-basis tutorial (docs/TUTORIAL.md)",
       "passes": true,
       "evidence": "docs/TUTORIAL.md: install -> start -> 今日 -> 4-step checklist -> market live/offline -> first backtest + how to read results -> data health/import -> paper trading -> FAQ; every section ends with 'you should see'; 163 lines"
+    },
+    {
+      "id": "R5-001",
+      "milestone": "R5",
+      "title": "recorded-assumption experiment comparison",
+      "passes": true,
+      "evidence": "tests/test_experiment_comparison.py: 9 passed; ui/src/lib/experimentComparison.test.ts: 3 passed; normalized equity, drawdown, assumption differences/unknowns, legacy handling"
+    },
+    {
+      "id": "R5-002",
+      "milestone": "R5",
+      "title": "reuse saved experiment data with parent lineage",
+      "passes": true,
+      "evidence": "tests/test_experiment_lineage.py: 7 passed; original snapshot/persisted panel and config retained, parameter overrides, custom store, original record unchanged; empty financial/corporate-action table schemas preserved across both save paths and source generations"
+    },
+    {
+      "id": "R5-003",
+      "milestone": "R5",
+      "title": "paper accounting survives restart and staggered allocations",
+      "passes": true,
+      "evidence": "tests/test_paper_accounting.py: 3 passed; original implementation failed cost basis and staggered 50/50 allocation cases"
+    },
+    {
+      "id": "R5-004",
+      "milestone": "R5",
+      "title": "selection-safe quotes and paper playback",
+      "passes": true,
+      "evidence": "ui/src/api/liveQuotes.test.tsx: 2 passed; ui/src/pages/PaperPage.test.tsx: 1 passed; code/account identity and late-response regressions reproduced before fixes"
+    },
+    {
+      "id": "R5-005",
+      "milestone": "R5",
+      "title": "owned worker shutdown and terminal job frames",
+      "passes": true,
+      "evidence": "tests/test_job_shutdown.py: 2 passed; ui/src/hooks/useJobProgress.test.tsx: 1 passed; worker retains ownership through shutdown and cancels claimed jobs"
+    },
+    {
+      "id": "R5-006",
+      "milestone": "R5",
+      "title": "correct monthly returns and capital-based drawdown",
+      "passes": true,
+      "evidence": "ui/src/lib/backtestAnalysis.test.ts: 2 passed; compounded month returns reconcile and drawdown includes initial capital"
+    },
+    {
+      "id": "R6-001",
+      "milestone": "R6",
+      "title": "PBO direction and tie-aware logits",
+      "passes": true,
+      "evidence": "tests/test_pbo_direction.py: 3 passed; persisted returns and HTTP direction regressions; public descending rank retained, internal tie midranks"
+    },
+    {
+      "id": "R6-002",
+      "milestone": "R6",
+      "title": "balanced stable factor buckets",
+      "passes": true,
+      "evidence": "tests/test_factor_buckets.py: 6 passed; 3 failed on original; five-name actual factor report covers each quantile"
+    },
+    {
+      "id": "R6-003",
+      "milestone": "R6",
+      "title": "initial-capital Monte Carlo drawdown",
+      "passes": true,
+      "evidence": "tests/test_monte_carlo_drawdown.py: 1 passed; persisted -1% one-day returns previously reported zero drawdown"
+    },
+    {
+      "id": "R6-004",
+      "milestone": "R6",
+      "title": "fractional cost scenarios retain native experiment context",
+      "passes": true,
+      "evidence": "RobustnessPanel.test.tsx: 1 passed; real C++ experiment to research E2E covers default, fractional and single scenarios; exact displayed values and fees, desktop/mobile no overflow"
     }
   ],
   "verified_at": "2026-11-02",
   "verified_by": "local gates: pytest (all green, see acceptance report); ctest 95/95; UI vitest 10; Playwright e2e 18/18 (redesigned UI); ruff/mypy; make verify-cpp; make doctor/demo; ui-audit 10 routes + mobile + dark (0 console errors, 0 overflow); real-data pipeline: Sina 3-name import + snapshot + qc data integrity (status ok) + cpp backtest; live quotes verified with QC_ALLOW_NETWORK=1 (REST + /ws/live frames)",
-  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display only, no L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope."
+  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display only, no L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope.",
+  "incremental_verification": {
+    "date": "2026-11-06",
+    "scope": "R5/R6 code with R6 local-only verification; historical M0-M10 external/platform evidence retains original date; no deployment or new push",
+    "python": "383 passed / 2 skipped",
+    "ui": "20 passed",
+    "checks": "ruff lint/format 164 files; mypy 106 files; C++ differential 6/6 and existing verify_cpp gate; UI build; isolated real-server E2E 19/19; cost workflow desktop/mobile zero page overflow and console errors"
+  }
 }

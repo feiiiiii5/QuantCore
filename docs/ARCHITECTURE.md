@@ -24,11 +24,18 @@
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## 语言与职责
+
+- C/C++ 是必须保留的核心技术约束，当前统一使用 C++20；面板读写、数值内核与生产回测引擎由 `qcore` 承担，后续重构保留这条原生执行路径。
+- Python 负责数据接入、策略编排与表达式求值、研究分析、实验、模拟账户与撮合服务、HTTP/WS API；TypeScript/React 负责界面。其余层可按实际需求选型。
+- CMake 构建 `qcore` 静态库，pybind11 将其链接进 `_qcore` 扩展；Python 调用原生引擎。扩展缺失时回测报错，不静默切换到 Python 参考实现。
+- 原生核心的构建、绑定及既有差分验证随系统一起维护；Python 参考引擎只用于 `tests/reference/`。
+
 ## 进程与边界
 - UI 与 API 同源：`qc serve` 托管 `ui/dist`（SPA fallback），开发时 Vite proxy `/api`、`/ws`、`/health` 到 127.0.0.1。
 - API 仅绑定 127.0.0.1；每次启动随机 Bearer token（可 `QC_SERVER_TOKEN` 固定）；校验 Host/Origin；无通配 CORS。
-- WebSocket `/ws/jobs/{id}?token=` 推送任务进度；HTTP 轮询有相同 JobView；当前 Backtest 页面以轮询为主，WS 后端已测试。
-- 任务执行在独立 worker 线程；C++ 崩溃/异常通过 job status + error 回传，不带走 API/UI；启动时恢复 running→failed（或取消）。
+- WebSocket `/ws/jobs/{id}?token=` 推送任务进度；HTTP 轮询有相同 JobView；Backtest 页面优先 WS，连接失败回退轮询，错误帧中的终态也会完成任务跟踪。
+- 任务执行在独立 worker 线程；普通异常通过 job status + error 回传，原生进程崩溃仍可能终止服务。启动时恢复 running→failed；关闭时协作取消当前任务，等待超时仍保留线程引用，防止重复 worker。
 - 策略/自定义脚本运行于受控 loader；自定义策略经子进程 worker（`strategy/worker.py` + `strategy/sandbox_worker.py`，POSIX 下 CPU/文件大小 rlimit）隔离；仍属本地信任模型，不是对抗恶意代码的强沙箱；默认无网络/写工作区外。
 
 ## 数据流
@@ -38,6 +45,7 @@
 4. 快照 `snap_<hash16>` 不可变、内容寻址、manifest 含来源/版本/质量/schema；`panel.qpanel` 由 C++ PanelWriter 生成。
 5. 引擎只读快照；策略由 Python 生成 `(n_time,n_sec)` 目标权重；C++ 引擎执行规则/费用/T+1/账本/trace/metrics。
 6. 实验目录保存 metadata/summary/result parquet/report.html/strategy.yaml；replay 逐位对比 equity/trades/metrics。
+7. `source_run_id` 从原实验加载已保存数据并保留隐藏的规则/费用设置，生成新实验与父记录链接；实验比较使用记录的初始资金归一化，明确列出不同或缺失的研究条件。
 
 ## 前端信息架构
 - 壳：八页导航（行情/选股/策略/回测/实验/研究/模拟/数据）+ 设置；顶部全局搜索（⌘K 聚焦）；底部状态栏；主题/密度/涨跌配色。
@@ -45,7 +53,7 @@
 - 选股：表达式/预设 → 结果表 → CSV 导出/localStorage 方案。
 - 策略：模板 + JSON Schema 表单 + Monaco + validate/运行。
 - 回测：表单 → job → 轮询/WS 进度/取消 → 指标/净值回撤/逐笔/费用/交易解释 → replay/报告。
-- 实验：列表/详情/对比/replay/报告/导出（删除仅在 API 层）。
+- 实验：列表/详情/归一化对比/假设差异/来源记录/replay/报告/导出/删除，支持沿用数据参数与继续稳健性研究。
 - 研究：因子分析/参数 sweep/滚动验证/归因/稳健性（DSR/PBO/成本敏感性/MC/容量）。
 - 模拟：虚拟账户/逐日回放/委托撤单/成交/信号 CSV/提醒/多策略只读组合/服务端模拟时钟（非实时行情、不接券商）。
 - 数据：源状态、更新、快照、质量、存储、onboarding。

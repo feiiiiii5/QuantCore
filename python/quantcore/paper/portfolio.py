@@ -1,9 +1,9 @@
 """Read-only multi-session paper portfolio aggregation (M9-004).
 
-Combines already-persisted paper sessions into one comparison view: each session's equity
-curve is normalised by its own starting cash, aligned on the strict intersection of trading
-dates, weighted and rebased to ``initial_cash``.  Nothing is written back, no order is placed
-and no network access happens.
+Combines already-persisted paper sessions into one comparison view: equity curves are
+aligned on the strict intersection of trading dates, each rebased at the first common
+date, then allocated by the requested weights to ``initial_cash``. Nothing is written back,
+no order is placed and no network access happens.
 """
 
 from __future__ import annotations
@@ -47,6 +47,7 @@ def build_portfolio(
         raise PaperValidationError(
             f"allocation weights must sum to 1.0 (got {float(weight_array.sum()):.8f})"
         )
+    weight_array /= weight_array.sum()  # Accepted rounding noise must not add starting capital.
 
     curves: list[dict[int, float]] = []
     for session in sessions:
@@ -79,11 +80,14 @@ def build_portfolio(
         [[curves[index][date] for date in common_dates] for index in range(len(sessions))],
         dtype=np.float64,
     )
-    weighted = weight_array @ normalized
-    base = float(weighted[0])
-    if base <= 0:
-        raise PaperValidationError("combined normalised equity at the first date is not positive")
-    equity_values = float(initial_cash) * weighted / base
+    if np.any(normalized[:, 0] <= 0):
+        raise PaperValidationError(
+            "each session's equity at the first common date must be positive"
+        )
+    # Allocate at the common start: earlier gains must not silently increase a
+    # strategy's effective weight or make the contribution ledger disagree with PnL.
+    normalized /= normalized[:, :1]
+    equity_values = float(initial_cash) * (weight_array @ normalized)
     normalized_equity = equity_values / float(initial_cash)
     metrics = _metrics(equity_values, PERIODS_PER_YEAR)
 
@@ -119,8 +123,8 @@ def build_portfolio(
         "metrics": metrics,
         "contributions": contributions,
         "note": (
-            "严格取各 paper session equity_curve 的交易日交集(不插值); 每个 session 按 "
-            "starting_cash 归一化后按权重加总, 并在首个共同交易日重基到 initial_cash; "
+            "严格取各 paper session equity_curve 的交易日交集(不插值); 每个 session 在 "
+            "首个共同交易日重基为 1, 再按配置权重分配 initial_cash; "
             "指标按 244 交易日/年. 只读聚合, 不写回账户、不产生委托."
         ),
     }

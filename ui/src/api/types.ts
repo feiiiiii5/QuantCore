@@ -317,6 +317,9 @@ export interface BacktestResultPayload {
   engine_backend: string;
   engine_version: string;
   seed: number;
+  config?: Record<string, unknown>;
+  snapshot?: ExperimentSnapshotMetadata;
+  synthetic?: boolean | null;
   benchmark?: {
     code: string;
     sec_id: string;
@@ -371,16 +374,75 @@ export interface Experiment {
 
 export interface ExperimentDetail {
   run_id: string;
-  metadata: Record<string, unknown>;
+  metadata: ExperimentMetadata;
   summary: Record<string, unknown>;
   metrics: Metrics;
   result?: BacktestResultPayload | null;
 }
 
+export interface ExperimentMetadata extends Record<string, unknown> {
+  parent_run_id?: string;
+  strategy_name?: string;
+  strategy_hash?: string;
+  strategy?: { template?: string; params?: Record<string, unknown> };
+  config?: Record<string, unknown>;
+  snapshot?: ExperimentSnapshotMetadata;
+  environment?: { git_commit?: string };
+  engine_backend?: string;
+  engine_version?: string;
+  synthetic?: boolean;
+}
+
+export interface ExperimentSnapshotMetadata extends Record<string, unknown> {
+  snapshot_id?: string | null;
+  content_hash?: string;
+  source?: string;
+  synthetic?: boolean;
+}
+
+export interface ExperimentProvenance {
+  parent_run_id?: string | null;
+  strategy_name: string | null;
+  template: string | null;
+  strategy_hash: string | null;
+  params: Record<string, unknown>;
+  snapshot_id: string | null;
+  content_hash: string | null;
+  source: string | null;
+  synthetic: boolean | null;
+  config: Record<string, unknown>;
+  engine_backend: string | null;
+  engine_version: string | null;
+  git_commit: string | null;
+}
+
+export type ComparisonStatus = "matched" | "different" | "unknown";
+
+export interface ComparisonDimension {
+  key: string;
+  label: string;
+  status: ComparisonStatus;
+  values: Record<string, unknown>;
+}
+
 export interface CompareResult {
   ids: string[];
   metrics: Record<string, Metrics>;
-  equity: Array<{ run_id: string; dates: number[]; equity: number[] }>;
+  equity: Array<{
+    run_id: string;
+    dates: number[];
+    equity: number[];
+    label: string;
+    initial_cash: number | null;
+    normalized_equity: number[] | null;
+    drawdown: number[];
+    provenance: ExperimentProvenance;
+  }>;
+  comparison: {
+    status: ComparisonStatus;
+    dimensions: ComparisonDimension[];
+    warnings: Array<{ code: string; message: string }>;
+  };
 }
 
 export interface ReplayResult {

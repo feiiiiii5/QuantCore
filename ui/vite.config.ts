@@ -31,12 +31,17 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          charts: ["lightweight-charts"],
-          motion: ["framer-motion"],
-          overlays: ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-popover", "@radix-ui/react-select", "@radix-ui/react-switch", "@radix-ui/react-tabs", "@radix-ui/react-toggle-group", "@radix-ui/react-tooltip", "sonner", "cmdk", "vaul"],
-          editor: ["monaco-editor", "@monaco-editor/react"],
+        // Shared runtime helpers must not pull the lazy Monaco bundle into every page.
+        manualChunks(id) {
+          if (id.includes("vite/preload-helper") || id.includes("commonjsHelpers")) return "runtime";
+          const groups: Record<string, string[]> = {
+            react: ["react", "react-dom", "react-router-dom"],
+            charts: ["lightweight-charts"],
+            motion: ["framer-motion"],
+            overlays: ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-popover", "@radix-ui/react-select", "@radix-ui/react-switch", "@radix-ui/react-tabs", "@radix-ui/react-toggle-group", "@radix-ui/react-tooltip", "sonner", "cmdk", "vaul"],
+            editor: ["monaco-editor", "@monaco-editor/react"],
+          };
+          return Object.entries(groups).find(([, packages]) => packages.some((name) => id.includes(`/node_modules/${name}/`)))?.[0];
         },
       },
     },

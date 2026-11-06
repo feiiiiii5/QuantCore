@@ -26,6 +26,7 @@ from ..ingest import ProviderIngestor
 from ..jobs.queue import JobContext
 from ..providers import create_provider
 from ..report import render_html_report
+from ..research.experiment_data import load_panel
 from ..snapshot.builder import build_snapshot_from_store
 from ..snapshot.reader import Snapshot, find_snapshot
 from ..strategy.spec import StrategySpec
@@ -83,10 +84,9 @@ def _save_panel(panel: PanelData, directory: Path) -> None:
     pd.DataFrame({"date": list(panel.calendar.dates)}).to_parquet(
         directory / "calendar.parquet", index=False
     )
-    if not panel.financials.empty:
-        panel.financials.to_parquet(directory / "financials.parquet", index=False)
-    if not panel.corporate_actions.empty:
-        panel.corporate_actions.to_parquet(directory / "corporate_actions.parquet", index=False)
+    # Empty table schemas are part of the panel's content hash too.
+    panel.financials.to_parquet(directory / "financials.parquet", index=False)
+    panel.corporate_actions.to_parquet(directory / "corporate_actions.parquet", index=False)
     (directory / "meta.json").write_text(
         json.dumps(panel.meta, ensure_ascii=False, default=str), encoding="utf-8"
     )
@@ -101,6 +101,7 @@ def _persist_backtest_experiment(
     panel: PanelData | None,
     config: BacktestConfig,
     plugin_name: str | None = None,
+    parent_run_id: str | None = None,
 ) -> Any:
     """Persist a backtest result in the experiment store (UI + replay compatible)."""
     reference = _snapshot_reference(snapshot, panel)
@@ -122,6 +123,8 @@ def _persist_backtest_experiment(
     }
     if plugin_name:
         metadata["plugin"] = str(plugin_name)
+    if parent_run_id:
+        metadata["parent_run_id"] = parent_run_id
     run_id = store.create("backtest", metadata, content_hash=spec.content_hash())
     store.save_text(run_id, "strategy.yaml", spec.to_yaml())
     if snapshot is None and panel is not None:
@@ -149,17 +152,34 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
         payload.get("experiments_root") or payload.get("default_experiments_root") or "experiments"
     )
     store = ExperimentStore(experiments_root)
-    config = BacktestConfig.model_validate(payload.get("config") or {})
+    source_run_id = payload.get("source_run_id")
+    source = store.get(str(source_run_id)) if source_run_id else None
+    config_data = dict(source.metadata.get("config") or {}) if source else {}
+    for key, value in (payload.get("config") or {}).items():
+        if key in {"costs", "exec", "rules", "risk"}:
+            config_data[key] = {**config_data.get(key, {}), **value}
+        else:
+            config_data[key] = value
+    config = BacktestConfig.model_validate(config_data)
     strategy_payload = payload.get("strategy")
     if strategy_payload is not None:
         spec = StrategySpec.model_validate(strategy_payload)
-    else:
+    elif payload.get("template"):
         template = payload.get("template")
         if not template:
             raise ValueError("backtest requires 'template' or 'strategy'")
         spec = StrategySpec(
             name=str(template), template=str(template), params=dict(payload.get("params") or {})
         )
+        if source and (source.metadata.get("strategy") or {}).get("template") == template:
+            strategy_data = {**source.metadata["strategy"], "params": spec.params}
+            if "rebalance" in spec.params:
+                strategy_data["rebalance"] = None
+            spec = StrategySpec.model_validate(strategy_data)
+    elif source:
+        spec = StrategySpec.model_validate(source.metadata["strategy"])
+    else:
+        raise ValueError("backtest requires 'template', 'strategy', or 'source_run_id'")
     snapshot_ref = payload.get("snapshot")
     snapshots_root = Path(
         payload.get("snapshots_root") or payload.get("default_snapshots_root") or "data/snapshots"
@@ -167,10 +187,13 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
     plugin_name = payload.get("plugin")
     snapshot: Snapshot | None = None
     panel: PanelData | None = None
-    if snapshot_ref:
+    if source:
+        panel, snapshot = load_panel(source, snapshots_root)
+        target: Any = snapshot if snapshot is not None else panel
+    elif snapshot_ref:
         snapshot = find_snapshot(snapshots_root, str(snapshot_ref))
         panel = snapshot.to_panel_data()
-        target: Any = snapshot
+        target = snapshot
     else:
         panel = generate_synthetic_panel(_panel_spec(payload))
         target = panel
@@ -204,6 +227,7 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
         panel=panel,
         config=config,
         plugin_name=str(plugin_name) if plugin_name else None,
+        parent_run_id=str(source_run_id) if source_run_id else None,
     )
     _progress(0.95, ctx)
     summary_path = record.directory / "summary.json"

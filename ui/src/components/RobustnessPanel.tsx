@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Gauge, Play, ShieldCheck } from "lucide-react";
 import type { Experiment } from "../api/types";
+import { fixedToYuan, money as formatMoney, num } from "../lib/format";
 import {
   useCapacity,
   useCostSensitivity,
@@ -28,8 +29,8 @@ function verdictLabel(verdict: string): string {
   return verdict;
 }
 
-export default function RobustnessPanel({ experiments }: { experiments: Experiment[] }) {
-  const [runId, setRunId] = useState("");
+export default function RobustnessPanel({ experiments, initialRunId = "" }: { experiments: Experiment[]; initialRunId?: string }) {
+  const [runId, setRunId] = useState(initialRunId);
   const [nTrials, setNTrials] = useState("10");
   const [pboIds, setPboIds] = useState<string[]>([]);
   const [nSplits, setNSplits] = useState("8");
@@ -47,6 +48,13 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
   const busy = overfitting.isPending || pbo.isPending || cost.isPending || monteCarlo.isPending || capacity.isPending;
   const error = formError || [overfitting.error, pbo.error, cost.error, monteCarlo.error, capacity.error].find(Boolean)?.message || "";
 
+  useEffect(() => {
+    if (initialRunId) setRunId(initialRunId);
+  }, [initialRunId]);
+  const resetOverfitting = overfitting.reset, resetCost = cost.reset, resetMonteCarlo = monteCarlo.reset, resetCapacity = capacity.reset;
+  useEffect(() => {
+    resetOverfitting(); resetCost(); resetMonteCarlo(); resetCapacity(); setFormError("");
+  }, [runId, resetOverfitting, resetCost, resetMonteCarlo, resetCapacity]);
   useEffect(() => {
     if (!runId && experiments.length) setRunId(experiments[0].run_id);
   }, [runId, experiments]);
@@ -83,26 +91,12 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
   };
 
   const overResult = overfitting.data;
-  const experimentOptions = experiments.map((item) => ({
+  const experimentOptions = [...(runId && !experiments.some((item) => item.run_id === runId) ? [{ value: runId, label: `历史实验 · ${runId}` }] : []), ...experiments.map((item) => ({
     value: item.run_id,
     label: `${item.strategy_name || item.template} · ${item.run_id.slice(-8)}`,
-  }));
+  }))];
 
-  const costSeries: ChartSeries[] = cost.data?.points.length
-    ? [
-        {
-          kind: "histogram",
-          title: "总收益 %",
-          data: cost.data.points.map((point) => ({ time: point.multiplier, value: point.total_return * 100 })),
-        },
-        {
-          kind: "line",
-          title: "Sharpe",
-          data: cost.data.points.map((point) => ({ time: point.multiplier, value: point.sharpe })),
-          pane: 1,
-        },
-      ]
-    : [];
+  const costReturnScale = Math.max(...(cost.data?.points.map((point) => Math.abs(point.total_return)) ?? []), 0);
   const mcSeries: ChartSeries[] = monteCarlo.data?.paths.length
     ? [
         ...monteCarlo.data.paths.slice(0, 12).map((path, index): ChartSeries => ({
@@ -150,8 +144,8 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
             <Field label="试验次数" hint="Deflated Sharpe 的试验数">
               <Input value={nTrials} onChange={(event) => setNTrials(event.target.value)} inputMode="numeric" />
             </Field>
-            <Field label="成本倍数" hint="逗号分隔，如 0, 0.5, 1, 2, 3">
-              <Input value={multipliers} onChange={(event) => setMultipliers(event.target.value)} />
+            <Field label="成本倍数" htmlFor="cost-multipliers" hint="逗号分隔，如 0, 0.5, 1, 2, 3">
+              <Input id="cost-multipliers" value={multipliers} onChange={(event) => setMultipliers(event.target.value)} />
             </Field>
             <Field label="MC 路径数">
               <Input value={nPaths} onChange={(event) => setNPaths(event.target.value)} inputMode="numeric" />
@@ -207,6 +201,37 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
               参与率 {pct(capacity.data.participation)} · 日均换手 {pct(capacity.data.avg_turnover)} · 限制证券 {capacity.data.limiting_sec}。{capacity.data.notes}
             </Callout>
           ) : null}
+          {cost.data?.points.length ? (
+            <section className="cost-sensitivity-result stack stack-tight" aria-label="成本敏感性结果">
+              <div className="split">
+                <strong className="headline">成本敏感性</strong>
+                {cost.data.breakeven_multiplier != null ? <span className="badge badge-info">盈亏平衡 {num(cost.data.breakeven_multiplier)}×</span> : null}
+              </div>
+              <p className="caption text-3">实验 {cost.data.run_id} · 每行对应一个费用情景；0× 为零费用，1× 为原实验费用设置。</p>
+              <figure className="cost-sensitivity-figure" aria-label="费用倍数与总收益">
+                <figcaption className="caption text-3">总收益 · 中线为 0%，向左为亏损，向右为盈利</figcaption>
+                <ol className="cost-sensitivity-bars">
+                  {cost.data.points.map((point, index) => {
+                    const width = costReturnScale > 0 ? Math.abs(point.total_return) / costReturnScale * 50 : 0;
+                    return (
+                      <li className="cost-sensitivity-bar-row" key={`${point.multiplier}-${index}`}>
+                        <span className="cost-sensitivity-multiplier">{point.multiplier}×</span>
+                        <span className="cost-sensitivity-track" aria-hidden="true"><span className={`cost-sensitivity-bar ${point.total_return >= 0 ? "up-bg" : "down-bg"}`} style={{ left: `${point.total_return >= 0 ? 50 : 50 - width}%`, width: `${width}%` }} /></span>
+                        <span className="cost-sensitivity-value">{pct(point.total_return)}</span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </figure>
+              <div className="cost-sensitivity-table table-wrap" tabIndex={0} aria-label="成本情景指标，可横向滚动">
+                <table aria-label="成本情景指标">
+                  <caption className="sr-only">成本敏感性指标</caption>
+                  <thead><tr><th scope="col">费用倍数</th><th scope="col" className="num">总收益</th><th scope="col" className="num">年化收益</th><th scope="col" className="num">Sharpe</th><th scope="col" className="num">最大回撤</th><th scope="col" className="num">总费用（元）</th></tr></thead>
+                  <tbody>{cost.data.points.map((point, index) => <tr key={`${point.multiplier}-${index}`}><th scope="row">{point.multiplier}×</th><td className="num">{pct(point.total_return)}</td><td className="num">{pct(point.annualized_return)}</td><td className="num">{num(point.sharpe)}</td><td className="num">{pct(point.max_drawdown)}</td><td className="num">{formatMoney(fixedToYuan(point.total_fees))}</td></tr>)}</tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
         </div>
       </Panel>
 
@@ -240,15 +265,6 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
               </div>
               <p className="caption text-3">PBO 越低越好；CSCV 为近似，样本区间重叠时会高估稳定性。</p>
             </>
-          ) : null}
-          {costSeries.length ? (
-            <div className="stack stack-tight">
-              <div className="split">
-                <strong className="headline">成本敏感性</strong>
-                {cost.data?.breakeven_multiplier != null ? <span className="badge badge-info">盈亏平衡 {cost.data.breakeven_multiplier.toFixed(2)}×</span> : null}
-              </div>
-              <Chart series={costSeries} height={240} />
-            </div>
           ) : null}
           {mcSeries.length ? (
             <div className="stack stack-tight">
