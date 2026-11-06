@@ -13,8 +13,8 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     env:
-      UV_DEFAULT_INDEX: https://pypi.tuna.tsinghua.edu.cn/simple
-      PIP_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      PIP_INDEX_URL: https://pypi.org/simple
       PYTHONPATH: python
     steps:
       - uses: actions/checkout@v4
@@ -24,17 +24,17 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - name: Install
         run: |
-          uv sync --all-extras --python 3.12
+          uv sync --frozen --all-extras --python 3.12
           cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DQC_BUILD_PYTHON=OFF -DQC_BUILD_TESTS=ON -DQC_BUILD_BENCH=ON
           cmake --build build/cmake -j 4
       - name: Lint
         run: |
-          uv run ruff check python tests
-          uv run ruff format --check python tests
-          uv run mypy python/quantcore
+          uv run --no-sync ruff check python tests
+          uv run --no-sync ruff format --check python tests
+          uv run --no-sync mypy python/quantcore
       - name: Stage extension in source tree
         run: |
-          uv run python - <<'PY'
+          uv run --no-sync python - <<'PY'
           import pathlib, shutil, site
           target = pathlib.Path("python/quantcore")
           for sp in site.getsitepackages():
@@ -44,10 +44,10 @@ jobs:
           PY
       - name: Test
         run: |
-          uv run pytest -q
+          uv run --no-sync pytest -q
           ctest --test-dir build/cmake --output-on-failure
       - name: Verify C++ backend
-        run: uv run python scripts/verify_cpp.py
+        run: uv run --no-sync python scripts/verify_cpp.py
 
   desktop-windows-package:
     # Unsigned client shell package; backend is launched separately/not bundled.
@@ -78,8 +78,8 @@ jobs:
     # (providers, strategy DSL/templates, synthetic panel) covered in the CI matrix.
     runs-on: windows-latest
     env:
-      UV_DEFAULT_INDEX: https://pypi.tuna.tsinghua.edu.cn/simple
-      PIP_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      PIP_INDEX_URL: https://pypi.org/simple
       PYTHONPATH: python
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +88,7 @@ jobs:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v4
       - name: Install pure-Python dependencies
-        run: uv sync --all-extras --no-install-project --python 3.12
+        run: uv sync --frozen --all-extras --no-install-project --python 3.12
       - name: Pure-Python contract tests
         run: uv run --no-sync pytest -q tests/test_strategy.py tests/test_synthetic_data.py tests/test_providers.py
 

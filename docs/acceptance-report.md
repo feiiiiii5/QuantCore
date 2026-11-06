@@ -19,6 +19,8 @@
 - 最终本地全套：Python **450 passed / 2 skipped**（42.37s），C++ **100/100**，Vitest **29 passed / 15 files**，真实服务 Playwright **19/19**；Ruff lint/format **174 文件**、mypy **109 源文件**、TypeScript/Vite 构建通过。Python 仅有既有 Starlette/httpx 弃用提示；两项跳过不计为通过。
 - 原生扩展 **0.1.1** 重新构建，C++/参考差分 **6/6** 与既有 `scripts/verify_cpp.py` 通过。相同合成输入的选股 API 五次采样中位数 **627.68ms → 36.37ms**（约 17.26 倍），响应逐项一致；原生小集测量与方法见 [PERFORMANCE.md](PERFORMANCE.md)。
 
+首次云端检查：macOS、UI、Windows smoke 与未签名客户端打包通过；Ubuntu 在安装构建依赖时连接清华镜像超时，未进入编译/测试。云端安装改用官方 PyPI、`--frozen` 锁文件及后续 `--no-sync`，新提交结果以实际 CI 为准，不将首次 Ubuntu 失败计为通过。
+
 未重新验证真实 Tushare Token、全市场历史导入、5500×20 年/10000 组规模门禁或生产部署。模拟账户仍有独立 Python 撮合与公司行为限制；本轮回测修复不表示模拟账户获得相同能力。
 
 ## 2026-11-06 产品文档与首次运行验收
