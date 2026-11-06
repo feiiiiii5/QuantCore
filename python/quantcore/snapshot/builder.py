@@ -147,6 +147,26 @@ def _ensure_native_sidecar(
         manifest_tmp.unlink(missing_ok=True)
 
 
+def _record_publication(
+    manifest: SnapshotManifest, directory: Path, state: SQLiteState | None
+) -> None:
+    """Publish selection separately from the snapshot's immutable creation time."""
+    if state is not None:
+        state.record_snapshot(
+            manifest.snapshot_id, str(directory), manifest.content_hash, manifest.synthetic
+        )
+    temporary = directory.parent / f".tmp-latest-{uuid.uuid4().hex}.json"
+    try:
+        temporary.write_text(
+            json.dumps({"snapshot_id": manifest.snapshot_id, "content_hash": manifest.content_hash})
+            + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, directory.parent / "latest.json")
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def build_snapshot(
     panel: PanelData,
     root: str | Path,
@@ -179,8 +199,7 @@ def build_snapshot(
             )
         if require_qpanel:
             manifest = _ensure_native_sidecar(panel, final, manifest)
-        if state is not None:
-            state.record_snapshot(snapshot_id, str(final), content_hash, manifest.synthetic)
+        _record_publication(manifest, final, state)
         return manifest
 
     temporary = root_path / f".tmp-{snapshot_id}-{uuid.uuid4().hex[:8]}"
@@ -239,8 +258,7 @@ def build_snapshot(
     except BaseException:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
-    if state is not None:
-        state.record_snapshot(snapshot_id, str(final), content_hash, manifest.synthetic)
+    _record_publication(manifest, final, state)
     return manifest
 
 

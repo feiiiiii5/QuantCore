@@ -185,7 +185,7 @@ def load_snapshot(root: str | Path, snapshot_id: str) -> Snapshot:
 
 
 def list_snapshots(root: str | Path) -> list[SnapshotManifest]:
-    """List snapshot manifests under ``root``, newest first."""
+    """List the last published snapshot first, with creation-time legacy fallback."""
     root_path = Path(root)
     if not root_path.exists():
         return []
@@ -199,6 +199,17 @@ def list_snapshots(root: str | Path) -> list[SnapshotManifest]:
         except (json.JSONDecodeError, KeyError):
             continue
     manifests.sort(key=lambda item: (item.created_at, item.snapshot_id), reverse=True)
+    try:
+        published = json.loads((root_path / "latest.json").read_text(encoding="utf-8"))
+        if isinstance(published, dict):
+            for index, manifest in enumerate(manifests):
+                if manifest.snapshot_id == published.get(
+                    "snapshot_id"
+                ) and manifest.content_hash == published.get("content_hash"):
+                    manifests.insert(0, manifests.pop(index))
+                    break
+    except (OSError, ValueError):
+        pass  # Older/copied roots have no publication record; retain file ordering.
     return manifests
 
 

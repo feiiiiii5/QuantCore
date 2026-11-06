@@ -124,6 +124,7 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
   - When `require_qpanel=true`, rebuilding the same snapshot can add or repair its derived `panel.qpanel`. Immutable datasets are verified first; corrupted datasets, unsafe sidecar filenames or missing native writer fail rather than return success. Data files, snapshot ID and content hash remain unchanged.
   - Sidecar and manifest are published by separate atomic replacements, not one filesystem transaction. Manifest publication failure is an error; retry verifies/regenerates the derived cache. Temporary files are cleaned. SHA-256 file reads stream through `file_digest`, avoiding an extra whole-file allocation; this is not a whole-pipeline memory claim.
 - `GET /api/data/snapshots` → snapshot list
+  - The first/default/`latest` snapshot is the most recently successful publication, including reuse of existing content. An atomic root-level `latest.json` selects it without changing immutable creation time or data. CLI and API use the same choice across restarts. Missing/stale/invalid publication records fall back to manifest creation order; explicit snapshot IDs remain stable. Failed construction, native-cache repair or publication does not replace the prior selection.
 - `GET /api/data/quality?snapshot=` → quality report
 - `POST /api/onboarding/bootstrap` body `{n_sec?,start?,end?,seed?}` → `{snapshot,snapshot_dir,run_id,report,message}` (synchronous)
 

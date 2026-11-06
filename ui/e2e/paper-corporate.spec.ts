@@ -40,7 +40,7 @@ test("historical account explains cash, share and pending-order adjustments", as
   const detail = await adjusted.json();
   expect(detail.corporate_events[0]).toMatchObject({ cash: 250, qty_before: 500, qty_after: 1000 });
   await page.goto("/paper");
-  await page.getByRole("button", { name: /^公司行为验收/ }).click();
+  await page.getByRole("button", { name: /^公司行为验收/ }).filter({ hasText: id }).click();
   const events = page.getByRole("list", { name: "公司行为调整记录" });
   await expect(events).toContainText("现金变化 +¥250.00");
   await expect(events).toContainText("股数 500 → 1,000");
