@@ -41,7 +41,7 @@ For example, investigate whether stocks with strong recent performance continue 
 |---|---|
 | Market and screening | Indices, watchlists, price charts and expression screening; optional public live quotes with explicit data status |
 | Data | Import, coverage and gap checks, price consistency checks, snapshots and data fingerprints |
-| Strategies and backtests | Templates, expressions and local plugins; C++ daily-bar backtests with costs, T+1, lot and execution rules |
+| Strategies and backtests | Templates, expressions and local plugins; C++ daily-bar backtests with costs, T+1, lots, cash dividends and splits |
 | Experiments | Saved parameters and data, parent lineage, normalized comparison, assumption differences, replay checks and reports |
 | Research | Factor IC, groups and decay; parameter sweeps; fixed-parameter time splits; industry attribution; PBO, cost sensitivity and Monte Carlo |
 | Paper accounts | Historical daily replay, orders and holdings, T+1, partial fills, signal CSV export and multi-strategy portfolios |
@@ -91,7 +91,7 @@ Production backtests require the native engine and report an error if the extens
 
 ### Inspectable validation
 
-Local validation on 2026-11-06: **383 Python tests passed / 2 skipped**, **20 frontend tests passed**, **19/19 real-server browser tests**, **6/6 C++/reference differential tests**, and the existing C++ verification, type and build checks.
+Local validation on 2026-11-06: **450 Python tests passed / 2 skipped**, **100/100 C++ tests**, **29 frontend tests passed**, **19/19 real-server browser tests**, **6/6 C++/reference differential tests**, and the existing C++ verification, type and build checks. With identical 100-security synthetic input, median screening API time fell from **628ms to 36ms** with identical responses; see the [performance record](docs/PERFORMANCE.md) for scope and method.
 The [validation report](docs/acceptance-report.md) records scope, reproduced failures and unverified areas. The badge above links to the current CI state.
 
 ## Data and current scope

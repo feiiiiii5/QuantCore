@@ -29,7 +29,14 @@ from typing import Any
 import pandas as pd
 
 from ..calendar import TradingCalendar
-from .panel import PanelData, normalize_bars, normalize_securities
+from .metadata import legacy_warehouse_metadata
+from .panel import (
+    PanelData,
+    normalize_bars,
+    normalize_corporate_actions,
+    normalize_financials,
+    normalize_securities,
+)
 from .state import SQLiteState
 
 DATASET_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -124,6 +131,7 @@ class WarehouseManifest:
     created_at: str = ""
     updated_at: str = ""
     datasets: dict[str, DatasetStats] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -131,6 +139,7 @@ class WarehouseManifest:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "datasets": {name: stats.to_dict() for name, stats in sorted(self.datasets.items())},
+            "metadata": self.metadata,
         }
 
     def to_json(self) -> str:
@@ -155,6 +164,7 @@ class WarehouseManifest:
                 name: DatasetStats.from_dict(item)
                 for name, item in payload.get("datasets", {}).items()
             },
+            metadata=payload.get("metadata", {}),
         )
 
 
@@ -167,6 +177,11 @@ class ParquetStore:
         self.manifest_path = self.root / "warehouse_manifest.json"
         self.state = state or SQLiteState(self.root / "state.sqlite")
         self._manifest = self._load_manifest()
+        self._legacy_metadata = legacy_warehouse_metadata(
+            self.root,
+            {name: stats.content_hash for name, stats in self._manifest.datasets.items()},
+            self.state.path,
+        )
 
     # -- manifest ---------------------------------------------------------
     def _load_manifest(self) -> WarehouseManifest:
@@ -186,6 +201,17 @@ class ParquetStore:
 
     def manifest_hash(self) -> str:
         return self.manifest.content_hash()
+
+    def get_metadata(self, key: str, default: Any = None) -> Any:
+        """Warehouse metadata is shared across CLI/API, regardless of the jobs database."""
+        if key in self._manifest.metadata:
+            return self._manifest.metadata[key]
+        return self._legacy_metadata.get(key, default)
+
+    def set_metadata(self, key: str, value: Any) -> None:
+        self._manifest.metadata[key] = value
+        self._save_manifest(self._manifest)
+        self.state.set_meta(key, value)  # Keep old readers working during migration.
 
     # -- write path -------------------------------------------------------
     @staticmethod
@@ -212,7 +238,7 @@ class ParquetStore:
         partition_column: str | None,
         date_column: str = "date",
     ) -> list[tuple[str | None, pd.DataFrame]]:
-        if partition_column is None:
+        if partition_column is None or frame.empty:
             return [(None, frame)]
         if partition_column == "year":
             if date_column not in frame.columns:
@@ -280,15 +306,17 @@ class ParquetStore:
             "securities", normalize_securities(panel.securities), partition_column=None
         )
         stats["bars"] = self.write_dataset("bars", normalize_bars(panel.bars), "year")
-        if not panel.financials.empty:
-            stats["financials"] = self.write_dataset(
-                "financials", panel.financials, "year", date_column="end_date"
-            )
-        if not panel.corporate_actions.empty:
-            stats["corporate_actions"] = self.write_dataset(
-                "corporate_actions", panel.corporate_actions, "year", date_column="ex_date"
-            )
-        self.state.set_meta("panel_meta", panel.meta)
+        stats["financials"] = self.write_dataset(
+            "financials", normalize_financials(panel.financials), "year", date_column="end_date"
+        )
+        stats["corporate_actions"] = self.write_dataset(
+            "corporate_actions",
+            normalize_corporate_actions(panel.corporate_actions),
+            "year",
+            date_column="ex_date",
+        )
+        self._manifest.metadata.update(ingest_identity=None, last_ingest=None)
+        self.set_metadata("panel_meta", panel.meta)
         return stats
 
     # -- read path --------------------------------------------------------
@@ -323,13 +351,25 @@ class ParquetStore:
             if "corporate_actions" in self.list_datasets()
             else pd.DataFrame()
         )
+        bars = self.read_dataset("bars")
+        metadata = self.get_metadata("panel_meta", {}) or {}
+        if "SYNTHETIC" in set(bars["source"]):
+            metadata = {
+                **metadata,
+                "provider": metadata.get("provider", "synthetic"),
+                "source": "SYNTHETIC",
+                "synthetic": True,
+                "disclaimer": metadata.get("disclaimer")
+                if metadata.get("synthetic") and metadata.get("disclaimer")
+                else "SYNTHETIC data: every value is fabricated and not a real market result",
+            }
         return PanelData(
             calendar=calendar,
             securities=self.read_dataset("securities"),
-            bars=self.read_dataset("bars"),
+            bars=bars,
             financials=financials,
             corporate_actions=actions,
-            meta=self.state.get_meta("panel_meta", {}) or {},
+            meta=metadata,
         )
 
     def query(self, sql: str) -> pd.DataFrame:
@@ -404,3 +444,4 @@ class ParquetStore:
         if self.manifest_path.exists():
             self.manifest_path.unlink()
         self._manifest = WarehouseManifest(created_at=_now(), updated_at=_now())
+        self._legacy_metadata.clear()

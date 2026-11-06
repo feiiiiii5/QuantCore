@@ -271,6 +271,10 @@ export interface ValidationResult {
 }
 
 export interface Metrics {
+  benchmark_return?: number;
+  excess_return?: number | null;
+  tracking_error?: number | null;
+  information_ratio?: number | null;
   total_return: number;
   annualized_return: number;
   volatility?: number;
@@ -327,7 +331,10 @@ export interface BacktestResultPayload {
     dates: number[];
     equity: Array<number | null>;
     total_return: number;
-    metrics: Record<string, number>;
+    daily_observations?: number;
+    complete_window?: boolean;
+    definition?: string;
+    metrics: Record<string, number | null>;
   } | null;
 }
 

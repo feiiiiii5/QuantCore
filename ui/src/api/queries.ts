@@ -8,7 +8,7 @@ export const qk = {
   meta: ["meta"] as const,
   doctor: ["doctor"] as const,
   overview: (snapshot?: string) => ["market", "overview", snapshot ?? "latest"] as const,
-  securities: (query: string) => ["market", "securities", query] as const,
+  securities: (query: string, limit: number, codes?: string[]) => ["market", "securities", query, limit, codes?.join(",") ?? "all"] as const,
   securityProfile: (code: string) => ["market", "profile", code] as const,
   financials: (code: string) => ["market", "financials", code] as const,
   bars: (code: string | null, snapshot?: string) => ["market", "bars", code ?? "", snapshot ?? "latest"] as const,
@@ -46,8 +46,8 @@ export function useDoctor() {
 export function useOverview(snapshot?: string) {
   return useQuery({ queryKey: qk.overview(snapshot), queryFn: () => api.overview(snapshot), staleTime: 15_000 });
 }
-export function useSecurities(query = "", limit = 300) {
-  return useQuery({ queryKey: qk.securities(`${query}:${limit}`), queryFn: () => api.securities(query, limit), staleTime: 15_000 });
+export function useSecurities(query = "", limit = 300, codes?: string[], enabled = true) {
+  return useQuery({ queryKey: qk.securities(query, limit, codes), queryFn: () => api.securities(query, limit, codes), staleTime: 15_000, enabled });
 }
 export function useBars(code: string | null, snapshot?: string) {
   return useQuery({ queryKey: qk.bars(code, snapshot), queryFn: () => api.bars(code ?? "", snapshot), enabled: Boolean(code) });

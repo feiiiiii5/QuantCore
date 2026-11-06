@@ -1,6 +1,8 @@
 // Corporate actions, ST limit switch and delisting/forced liquidation cases.
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
+#include <limits>
 #include <vector>
 
 #include "fixture.h"
@@ -20,6 +22,25 @@ BacktestResult run(Panel& panel, BacktestConfig cfg, std::vector<std::vector<dou
 }
 
 }  // namespace
+
+TEST_CASE("corporate actions reject non-finite cash and splits", "[engine][corporate]") {
+  SynthPanel sp({20260105, 20260106}, {synth_security("600000", 0)});
+  Panel panel = sp.build();
+  for (double invalid_value :
+       {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()}) {
+    BacktestConfig cfg = base_config();
+    CorporateAction action;
+    action.sec = 0;
+    action.ex_date = 20260106;
+    action.cash_per_share = invalid_value;
+    cfg.corporate_actions = {action};
+    REQUIRE_THROWS_AS(Engine(panel, cfg), std::invalid_argument);
+    action.cash_per_share = 0;
+    action.split_ratio = invalid_value;
+    cfg.corporate_actions = {action};
+    REQUIRE_THROWS_AS(Engine(panel, cfg), std::invalid_argument);
+  }
+}
 
 TEST_CASE("corporate actions are applied on the ex-date", "[engine][corporate]") {
   SECTION("2-for-1 split doubles shares and preserves net value") {
@@ -97,6 +118,50 @@ TEST_CASE("ST price limit switches from 5% to 10% on 2026-07-06", "[engine][rule
   }
 }
 
+TEST_CASE("split-adjusted closed fills use the ledger cost basis", "[engine][corporate][metrics]") {
+  bool delisted = false;
+  SECTION("target exits the remaining shares") {}
+  SECTION("delisting liquidates the remaining shares") {
+    delisted = true;
+  }
+  SynthPanel sp({20260105, 20260106, 20260107, 20260108},
+                {synth_security("600000", 0, 20000101, delisted ? 20260108 : 0)});
+  sp.bar(0, 0, 10.0, 10.2, 9.8, 10.0);
+  sp.bar(0, 1, 10.0, 10.2, 9.8, 10.0);
+  sp.bar(0, 2, 5.2, 5.4, 5.0, 5.2);
+  sp.bar(0, 3, 5.2, 5.4, 5.0, 5.2);
+  Panel panel = sp.build();
+  auto weights = nan_weights(4, 1);
+  weights[0] = {0.1};    // buy 100 @ 10
+  weights[1] = {0.052};  // after 2:1 split, sell 100 @ 5.2
+  weights[2] = {0.0};    // sell the remaining 100 @ 5.2
+  BacktestConfig cfg = base_config();
+  cfg.initial_cash = to_money(10000.0);
+  cfg.costs.commission_rate = 0;
+  cfg.costs.min_commission = 0;
+  cfg.costs.stamp_duty_rate = 0;
+  cfg.costs.transfer_fee_rate = 0;
+  cfg.costs.exchange_fee_rate = 0;
+  cfg.costs.reg_fee_rate = 0;
+  CorporateAction ca;
+  ca.sec = 0;
+  ca.ex_date = 20260107;
+  ca.split_ratio = 2.0;
+  cfg.corporate_actions.push_back(ca);
+  const BacktestResult result = run(panel, cfg, weights);
+  std::vector<Money> pnls;
+  for (const Trade& trade : result.trades) {
+    if (trade.side == Side::Sell && trade.qty > 0) {
+      REQUIRE(trade.realized_pnl.has_value());
+      pnls.push_back(*trade.realized_pnl);
+    }
+  }
+  REQUIRE((pnls == std::vector<Money>{to_money(20.0), to_money(20.0)}));
+  CHECK(result.equity.back() == to_money(10040.0));
+  CHECK(result.metrics.win_rate == 1.0);
+  CHECK(std::isinf(result.metrics.profit_factor));
+}
+
 TEST_CASE("delisted positions are force-liquidated at the last mark", "[engine][delist]") {
   SynthPanel sp({20260105, 20260106, 20260107}, {synth_security("600000", 0, 20200101, 20260107)});
   sp.bar(0, 0, 10.0, 10.2, 9.8, 10.0);
@@ -135,4 +200,57 @@ TEST_CASE("suspension keeps the last valid mark for valuation", "[engine][corpor
   CHECK(r.final_position_qty[0] == 50000);
   // No day-3 mark: valuation keeps the last valid close of 10.00.
   CHECK(r.equity[2] == to_money(999839.0));
+}
+
+TEST_CASE("a suspended ex-date rebases the last mark", "[engine][corporate]") {
+  double cash = 0.0;
+  double split = 2.0;
+  SECTION("split") {}
+  SECTION("cash dividend") {
+    cash = 0.5;
+    split = 1.0;
+  }
+  SECTION("cash and split") {
+    cash = 0.5;
+  }
+  SynthPanel sp({20260105, 20260106, 20260107}, {synth_security("600000", 0)});
+  sp.bar(0, 0, 10.0, 10.2, 9.8, 10.0);
+  sp.bar(0, 1, 10.0, 10.2, 9.8, 10.0);
+  sp.set("suspended", 0, 2, 1.0);
+  Panel panel = sp.build();
+  auto weights = nan_weights(3, 1);
+  weights[0] = {0.5};
+  BacktestConfig cfg = base_config();
+  CorporateAction ca;
+  ca.sec = 0;
+  ca.ex_date = 20260107;
+  ca.cash_per_share = cash;
+  ca.split_ratio = split;
+  cfg.corporate_actions.push_back(ca);
+  const BacktestResult result = run(panel, cfg, weights);
+  CHECK(result.equity[2] == result.equity[1]);
+  CHECK(result.final_position_qty[0] == static_cast<Qty>(50000 * split));
+}
+
+TEST_CASE("consecutive suspended ex-dates compound reference adjustments", "[engine][corporate]") {
+  SynthPanel sp({20260105, 20260106, 20260107, 20260108}, {synth_security("600000", 0)});
+  sp.bar(0, 0, 10.0, 10.2, 9.8, 10.0);
+  sp.bar(0, 1, 10.0, 10.2, 9.8, 10.0);
+  sp.set("suspended", 0, 2, 1.0);
+  sp.set("suspended", 0, 3, 1.0);
+  Panel panel = sp.build();
+  auto weights = nan_weights(4, 1);
+  weights[0] = {0.5};
+  BacktestConfig cfg = base_config();
+  CorporateAction ca;
+  ca.sec = 0;
+  ca.ex_date = 20260107;
+  ca.split_ratio = 2.0;
+  cfg.corporate_actions.push_back(ca);
+  ca.ex_date = 20260108;
+  cfg.corporate_actions.push_back(ca);
+  const BacktestResult result = run(panel, cfg, weights);
+  CHECK(result.equity[2] == result.equity[1]);
+  CHECK(result.equity[3] == result.equity[1]);
+  CHECK(result.final_position_qty[0] == 200000);
 }

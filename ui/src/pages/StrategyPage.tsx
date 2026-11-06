@@ -72,9 +72,10 @@ export default function StrategyPage() {
       runPlugin.mutate({ name: selectedPlugin.name, payload: { params: parsed } }, { onSuccess: (accepted) => setPluginJobId(accepted.job_id) });
     } catch (error) { setJsonError(error instanceof Error ? error.message : "插件参数 JSON 无效"); }
   };
-  const updateParams = (next: Record<string, unknown>) => { setParams(next); setJsonText(JSON.stringify(next, null, 2)); setJsonError(""); };
+  const updateParams = (next: Record<string, unknown>) => { setParams(next); setJsonText(JSON.stringify(next, null, 2)); setJsonError(""); validate.reset(); };
   const updateJson = (text: string) => {
     setJsonText(text);
+    validate.reset();
     try {
       const parsed: unknown = JSON.parse(text);
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("参数必须是 JSON 对象");
@@ -110,7 +111,7 @@ export default function StrategyPage() {
         subtitle="从白话模板开始，理解风险与适合人群；校验参数后直接回测。"
         actions={(
           <>
-            <Button variant="secondary" icon={ShieldCheck} loading={validate.isPending} disabled={!selected} onClick={onValidate}>{validate.isPending ? "校验中…" : "校验参数"}</Button>
+            <Button variant="secondary" icon={ShieldCheck} loading={validate.isPending} disabled={!selected || Boolean(jsonError)} onClick={onValidate}>{validate.isPending ? "校验中…" : "校验参数"}</Button>
             <Button variant="primary" icon={Play} disabled={!selected} onClick={run}>运行回测</Button>
           </>
         )}

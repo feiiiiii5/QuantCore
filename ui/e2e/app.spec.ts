@@ -173,6 +173,21 @@ test("data page shows integrity first and keeps import/snapshot entry points", a
   await expect(page.getByText("导入真实数据").first()).toBeVisible();
   await expect(page.getByText(/新浪财经/).first()).toBeVisible();
   await expect(page.locator(".provider-row, .list-row").first()).toBeVisible();
+  await page.getByLabel("更新方式", { exact: true }).selectOption("replace");
+  await page.getByLabel("证券数（synthetic）", { exact: true }).fill("12");
+  const updateResponse = page.waitForResponse((response) => response.url().endsWith("/api/data/update") && response.request().method() === "POST");
+  const snapshotResponse = page.waitForResponse((response) => response.url().endsWith("/api/data/snapshot") && response.request().method() === "POST");
+  await page.getByRole("button", { name: "更新并构建快照", exact: true }).click();
+  const imported = await updateResponse;
+  expect(imported.request().postDataJSON().incremental).toBe(false);
+  expect(imported.status()).toBe(202);
+  const snapshot = await snapshotResponse;
+  expect(snapshot.status()).toBe(202);
+  await expect(page.getByText("快照构建完成", { exact: true })).toBeVisible({ timeout: 60_000 });
+  const job = await request.get(`/api/jobs/${(await snapshot.json()).job_id}`, { headers: AUTH });
+  expect((await job.json()).status).toBe("done");
+  const overview = await request.get("/api/market/overview", { headers: AUTH });
+  expect((await overview.json()).snapshot.n_sec).toBe(12);
   await page.screenshot({ path: "/tmp/qc-data.png", fullPage: true });
   expect(errors).toEqual([]);
 });
@@ -207,7 +222,7 @@ test("strategy and settings pages render, connect and pass self-check", async ({
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "设置", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: /测试连接/ }).click();
-  await expect(page.getByText(/已连接/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/^已连接：cpp/)).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: /运行自检/ }).click();
   await expect(page.getByText(/自检|通过|警告/).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("switch", { name: "新手模式" }).first()).toBeVisible();
@@ -303,13 +318,22 @@ test("initial UI load meets the local performance budget", async ({ page, reques
   expect(errors).toEqual([]);
 });
 
-test("command palette opens with Ctrl+K and navigates", async ({ page }) => {
+test("global search and command palette find securities and navigate", async ({ page, request }) => {
   const errors = await prepare(page);
+  await bootstrap(request);
+  const securities = await request.get("/api/market/securities?limit=100", { headers: AUTH });
+  const target = (await securities.json()).at(-1);
   await page.goto("/today");
   await expect(page.getByRole("heading", { name: "今日", level: 1 })).toBeVisible();
-  await page.keyboard.press("Control+k");
+  await page.getByRole("button", { name: "打开命令面板" }).click();
   const palette = page.getByRole("combobox", { name: "命令面板" });
   await expect(palette).toBeFocused();
+  await palette.fill(target.code);
+  await page.locator("[cmdk-item]").filter({ hasText: target.code }).click();
+  await expect(page).toHaveURL(`/market?code=${target.code}`);
+  await expect(page.locator(".kline-canvas canvas").first()).toBeVisible();
+  await expect(palette).not.toBeVisible();
+  await page.keyboard.press("Control+k");
   await palette.fill("回测");
   await expect(page.locator("[cmdk-item]").first()).toBeVisible({ timeout: 10_000 });
   await page.locator("[cmdk-item]").first().click();

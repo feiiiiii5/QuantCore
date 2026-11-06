@@ -8,7 +8,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from quantcore.data.panel import PanelData
+from quantcore.data.panel import (
+    CORPORATE_ACTION_COLUMNS,
+    FINANCIAL_COLUMNS,
+    PanelData,
+)
 from quantcore.data.state import MIGRATIONS, SQLiteState
 from quantcore.data.store import ParquetStore
 from quantcore.ingest import ProviderIngestor
@@ -61,6 +65,31 @@ def test_store_reset(warehouse: ParquetStore) -> None:
     assert warehouse.list_datasets() == []
     with pytest.raises(FileNotFoundError):
         warehouse.read_dataset("bars")
+
+
+def test_replacing_panel_clears_optional_datasets(
+    warehouse: ParquetStore, small_panel: PanelData
+) -> None:
+    warehouse.write_panel(small_panel)
+    assert not warehouse.load_panel().financials.empty
+    assert not warehouse.load_panel().corporate_actions.empty
+    replacement = PanelData(
+        calendar=small_panel.calendar,
+        securities=small_panel.securities,
+        bars=small_panel.bars,
+        meta=small_panel.meta,
+    )
+    warehouse.write_panel(replacement)
+
+    reopened = ParquetStore(warehouse.root)
+    restored = reopened.load_panel()
+    assert restored.financials.empty
+    assert restored.corporate_actions.empty
+    assert list(restored.financials.columns) == list(FINANCIAL_COLUMNS)
+    assert list(restored.corporate_actions.columns) == list(CORPORATE_ACTION_COLUMNS)
+    assert reopened.state.dataset_rows()["financials"] == 0
+    assert reopened.state.dataset_rows()["corporate_actions"] == 0
+    assert reopened.verify() == []
 
 
 def test_sqlite_migrations_idempotent(tmp_path: Path) -> None:

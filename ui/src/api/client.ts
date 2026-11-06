@@ -119,7 +119,7 @@ export const api = {
 
   overview: (snapshot?: string) => request<MarketOverview>(`/api/market/overview${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),
   bars: (code: string, snapshot?: string) => request<Bars>(`/api/market/bars?code=${encodeURIComponent(code)}${snapshot ? `&snapshot=${encodeURIComponent(snapshot)}` : ""}`),
-  securities: (query = "", limit = 300) => request<SecurityRow[]>(`/api/market/securities?query=${encodeURIComponent(query)}&limit=${limit}`),
+  securities: (query = "", limit = 300, codes?: string[]) => request<SecurityRow[]>(`/api/market/securities?query=${encodeURIComponent(query)}&limit=${limit}${codes ? `&codes=${encodeURIComponent(codes.join(","))}` : ""}`),
   minuteBars: (code: string, date?: string) => request<MinuteBars>(`/api/market/minute-bars?code=${encodeURIComponent(code)}${date ? `&date=${encodeURIComponent(date)}` : ""}`),
   financials: (code: string, asOf?: string) => request<FinancialsResult>(`/api/market/financials/${encodeURIComponent(code)}${asOf ? `?as_of=${encodeURIComponent(asOf)}` : ""}`),
   securityProfile: (code: string, snapshot?: string) => request<SecurityProfile>(`/api/market/securities/${encodeURIComponent(code)}${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),

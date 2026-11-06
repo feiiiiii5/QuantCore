@@ -110,11 +110,13 @@ export default function DataPage() {
   const beginner = useBeginner();
   const openOnboarding = useUIStore((state) => state.openOnboarding);
   const [job, setJob] = useState<DataJob | null>(null);
+  const [progressHidden, setProgressHidden] = useState(false);
   const [qualitySnapshot, setQualitySnapshot] = useState<string | null>(null);
   const qualityQuery = useQuality(qualitySnapshot);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [provider, setProvider] = useState("synthetic");
+  const [updateMode, setUpdateMode] = useState("incremental");
   const [start, setStart] = useState("2022-01-04");
   const [end, setEnd] = useState("2024-12-31");
   const [nSec, setNSec] = useState("40");
@@ -137,7 +139,7 @@ export default function DataPage() {
   }, [integrity.data]);
 
   useEffect(() => {
-    if (!progress.job || !job || handled.current === `${job.id}:${progress.job.status}`) return;
+    if (!progress.job || !job || progress.job.id !== job.id || handled.current === `${job.id}:${progress.job.status}`) return;
     handled.current = `${job.id}:${progress.job.status}`;
     if (progress.job.status === "done") {
       if (job.kind === "data_update" && chainSnapshot.current) {
@@ -163,8 +165,8 @@ export default function DataPage() {
     catch { setNotice(`${label}：${text}（浏览器拒绝剪贴板，可手动复制）`); }
   };
   const startUpdate = (providerId = provider) => {
-    setError(""); setNotice(""); chainSnapshot.current = true;
-    const payload: Record<string, unknown> = { provider: providerId, start, end, incremental: true };
+    setError(""); setNotice(""); setProgressHidden(false); chainSnapshot.current = true;
+    const payload: Record<string, unknown> = { provider: providerId, start, end, incremental: updateMode === "incremental" };
     if (providerId === "synthetic") {
       payload.n_sec = Number(nSec) || 40;
       payload.seed = 42;
@@ -180,7 +182,7 @@ export default function DataPage() {
     });
   };
   const startSnapshot = () => {
-    setError(""); setNotice("");
+    setError(""); setNotice(""); setProgressHidden(false);
     snapshot.mutate(undefined, {
       onSuccess: (response) => setJob({ id: response.job_id, kind: "snapshot_build" }),
       onError: (reason) => { setError(reason.message); setJob(null); },
@@ -283,6 +285,12 @@ export default function DataPage() {
               </List>
 
               <div className="grid grid-3">
+                <Field label="更新方式" hint={updateMode === "incremental" ? "沿用同一数据来源、证券范围和生成参数，追加或更新日期。" : "取数与质量检查通过后替换当前数据仓库；已保存的快照与实验保留。"}>
+                  <Select value={updateMode} onChange={(event) => setUpdateMode(event.target.value)} aria-label="更新方式" options={[
+                    { value: "incremental", label: "增量更新（同一来源与范围）" },
+                    { value: "replace", label: "替换数据（重新导入）" },
+                  ]} />
+                </Field>
                 <Field label="开始日期"><Input value={start} onChange={(event) => setStart(event.target.value)} placeholder="YYYY-MM-DD" aria-label="开始日期" /></Field>
                 <Field label="结束日期"><Input value={end} onChange={(event) => setEnd(event.target.value)} placeholder="YYYY-MM-DD" aria-label="结束日期" /></Field>
                 <Field label="本地目录" hint="仅「本地文件」导入使用"><Input value={localDir} onChange={(event) => setLocalDir(event.target.value)} placeholder="/path/to/data" aria-label="本地数据目录" /></Field>
@@ -298,12 +306,13 @@ export default function DataPage() {
                 <span className="page-note-sm">provider 需已配置 Token/本地目录；失败会显示 job 错误，不阻塞其他页面。填了代码就按代码导入，否则用数量上限（默认 20 只）。</span>
               </div>
 
-              {job ? (
+              {job && !progressHidden ? (
                 <div className="stack-tight">
                   <ProgressBar value={Math.round((progress.job?.progress ?? 0) * 100)} label={`${job.kind === "data_update" ? "数据更新" : "快照构建"} · ${progress.job?.status ?? "排队"} · ${progress.transport ?? "等待"}`} />
-                  <div><Button variant="ghost" size="sm" onClick={() => { setJob(null); setNotice("已隐藏任务进度，后台任务仍可继续。"); }}>隐藏</Button></div>
+                  <div><Button variant="ghost" size="sm" onClick={() => setProgressHidden(true)}>隐藏</Button></div>
                 </div>
               ) : null}
+              {job && progressHidden ? <p className="page-note-sm">{job.kind === "data_update" ? "数据导入继续运行，完成后会自动构建快照。" : "快照继续构建。"}<Button variant="ghost" size="sm" onClick={() => setProgressHidden(false)}>显示进度</Button></p> : null}
               {error ? <Callout tone="danger" title={error} /> : null}
               {notice ? <Callout tone="success" title={notice} /> : null}
             </div>

@@ -16,6 +16,7 @@ import {
   marketReadings, updatedAtLabel,
 } from "../lib/live";
 import { notify } from "../lib/notify";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useChartPalette } from "../theme";
 import { useWorkspace } from "../store/workspace";
 import { zhCN as t } from "../i18n/zh-CN";
@@ -27,8 +28,6 @@ export default function MarketPage() {
   const palette = useChartPalette();
   const [searchParams, setSearchParams] = useSearchParams();
   const overview = useOverview();
-  const securitiesQuery = useSecurities("", 1000);
-  const rows = securitiesQuery.data ?? [];
   const [picked, setPicked] = useState(() => useWorkspace.getState().marketCode);
   const [query, setQuery] = useState(() => useWorkspace.getState().marketQuery);
   const [listMode, setListMode] = useState<"all" | "watch">("all");
@@ -45,6 +44,9 @@ export default function MarketPage() {
   const watchlist = useWatchlist();
   const saveWatchlist = useSaveWatchlist();
   const codes = watchlist.data?.codes ?? [];
+  const search = useDebouncedValue(query.trim());
+  const securitiesQuery = useSecurities(search, 1000, listMode === "watch" ? codes : undefined, listMode !== "watch" || codes.length > 0);
+  const rows = securitiesQuery.data ?? [];
 
   const code = searchParams.get("code") || picked || rows[0]?.code || "";
   const bars = useBars(code || null);
@@ -69,12 +71,7 @@ export default function MarketPage() {
     setSearchParams({ code: row.code }, { replace: true });
   }, [setMarketCode, setSearchParams]);
 
-  const filtered = useMemo(() => {
-    const base = listMode === "watch" ? rows.filter((row) => codes.includes(row.code)) : rows;
-    const needle = query.trim().toLowerCase();
-    if (!needle) return base;
-    return base.filter((row) => `${row.code}${row.name}${row.industry}${row.board}`.toLowerCase().includes(needle));
-  }, [codes, listMode, query, rows]);
+  const filtered = search === query.trim() && (listMode !== "watch" || codes.length > 0) ? rows : [];
   const selected = rows.find((row) => row.code === code) ?? null;
   const views = useMemo(() => indexViews(liveIndices.data?.quotes, overview.data?.indices), [liveIndices.data, overview.data]);
   const readings = useMemo(
@@ -161,7 +158,7 @@ export default function MarketPage() {
             <div className="stack">
               <Panel
                 title={t.market.listTitle}
-                subtitle={`${filtered.length} / ${rows.length} · ${listMode === "watch" ? t.market.listWatch : t.market.listAll}`}
+                subtitle={`${filtered.length} 只 · ${listMode === "watch" ? t.market.listWatch : "全快照搜索"}${rows.length === 1000 ? " · 展示前 1000 只，请搜索缩小范围" : ""}`}
                 actions={(
                   <div className="row">
                     <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.market.searchPlaceholder} aria-label={t.market.searchPlaceholder} size="sm" style={{ width: 200 }} />
@@ -179,8 +176,8 @@ export default function MarketPage() {
               </Panel>
 
               <Panel
-                title={selected ? `${selected.code} ${selected.name}` : t.market.chart}
-                subtitle={selected ? `${selected.board} · ${selected.industry}` : undefined}
+                title={selected ? `${selected.code} ${selected.name}` : profile.data ? `${profile.data.code} ${profile.data.name}` : t.market.chart}
+                subtitle={selected ? `${selected.board} · ${selected.industry}` : profile.data ? `${profile.data.board} · ${profile.data.industry}` : undefined}
                 actions={(
                   <div className="chart-tools" aria-label={t.market.indicators}>
                     <button className={`chip ${showMA5 ? "active" : ""}`} onClick={() => setShowMA5((value) => !value)} aria-pressed={showMA5}>{t.market.ma5}</button>

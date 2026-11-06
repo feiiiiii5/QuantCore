@@ -41,7 +41,7 @@ WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>` (jobs) and `/w
   `{snapshot:{id,content_hash,n_sec,n_time,start,end,synthetic,source,fields[]}, indices:[{name,close,change_pct,spark[]}], breadth:{up,down,flat,limit_up,limit_down,suspended}, sectors:[{name,count,avg_change,up,down}], updated_at}`
 - `GET /api/market/bars?snapshot=&code=&start=&end=&limit=600` →
   `{code,name,board,dates[],open[],high[],low[],close[],volume[],amount[],turnover[],ma5[],ma20[],limit_up[],limit_down[],suspended[]}`
-- `GET /api/market/securities?snapshot=&query=&limit=200` →
+- `GET /api/market/securities?snapshot=&query=&codes=&limit=200` (limit ≤1000; codes is an exact comma-separated code filter; query is literal, case-insensitive text over code/name/sec_id/industry/board) →
   `[{sec_id,code,name,board,industry,last,change_pct,turnover,mktcap,float_mktcap,suspended,st}]`
 
 ## Live market quotes (read-only, network opt-in)
@@ -109,7 +109,7 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 ## Data
 - `GET /api/data/status` → `{data_root,warehouse:{exists,datasets,rows,bytes,manifest_hash},snapshots:[{id,content_hash,created_at,synthetic,n_sec,n_time,fields,quality}],storage:{warehouse_bytes,snapshot_bytes,experiments_bytes,free_bytes},providers:[...]}`
 - `GET /api/data/providers` → `[{id,name,requires_token,requires_network,available,capabilities}]`
-- `POST /api/data/update` body `{provider,start?,end?,n_sec?,seed?,local_dir?,fixture_dir?,incremental?,reset?}` → 202 `{job_id}`
+- `POST /api/data/update` body `{provider,start?,end?,n_sec?,seed?,local_dir?,fixture_dir?,codes?,limit?,incremental?,reset?}` → 202 `{job_id}`. Incremental imports require the same source identity and code scope; changing them requires explicit replacement. Reset fetches and validates before clearing old datasets. Warehouse identity lives in `warehouse_manifest.json`, shared by CLI and API regardless of the jobs database.
 - `POST /api/data/snapshot` body `{data_root?,snapshots_root?,require_qpanel?}` → 202 `{job_id}`
 - `GET /api/data/snapshots` → snapshot list
 - `GET /api/data/quality?snapshot=` → quality report
@@ -150,8 +150,8 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 - Policy: local trusted plugins only, static audit is not a hard security boundary; no network, no real orders. `params` are recorded in the experiment spec but the current loader does not pass them into the plugin body.
 
 ## Benchmark comparison (M3)
-- `POST /api/config` / backtest `config.benchmark_code` (optional security code) → buy-and-hold benchmark over the same result dates.
-- Result payloads include `benchmark:{code,sec_id,name,dates,equity,total_return,metrics}` and metrics `benchmark_return/excess_return/tracking_error/information_ratio`; persisted as `result/benchmark.json` and included in job/experiment result payloads.
+- Backtest `config.benchmark_code` (optional local security code) → fractional buy-and-hold benchmark, using effective cash/split events, retaining dividends as cash, with no costs or tax. Panel events default on via `use_panel_corporate_actions`; explicit events override the same security/ex-date.
+- Result payloads include `benchmark:{code,sec_id,name,dates,equity,total_return,daily_observations,complete_window,definition,metrics}` and metrics `benchmark_return/excess_return/tracking_error/information_ratio`; persisted as `result/benchmark.json`. Gaps remain null; daily tracking metrics use only adjacent valid prices and return null with insufficient observations. Missing endpoint prices set `complete_window=false` and `excess_return=null`.
 
 ## Risk limits (M3)
 - Backtest `config.risk` accepts `{max_positions?: int, max_weight?: float (0,1], long_only?: bool=true}`.

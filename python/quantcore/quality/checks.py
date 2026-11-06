@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from ..data.panel import PanelData
+from .corporate import check_corporate_actions as _check_corporate_actions
 from .report import ERROR, WARNING, CheckIssue, QualityReport, QuarantineResult
 
 TOLERANCE = 0.011  # half a cent of rounding slack
@@ -382,31 +383,6 @@ def _check_pit(panel: PanelData, report: QualityReport) -> None:
                     len(unknown),
                 )
             )
-
-
-def _check_corporate_actions(panel: PanelData, report: QualityReport) -> None:
-    frame = panel.corporate_actions
-    if frame.empty:
-        return
-    bad = (
-        (frame["ex_date"] < frame["ann_date"])
-        | (frame["split_ratio"] <= 0)
-        | (frame["cash_per_share"] < 0)
-    )
-    if bad.any():
-        report.add(
-            CheckIssue(
-                "corporate_actions",
-                ERROR,
-                f"{int(bad.sum())} invalid corporate-action rows",
-                int(bad.sum()),
-                tuple(
-                    frame.loc[bad, ["sec_id", "ex_date", "split_ratio", "cash_per_share"]]
-                    .head(5)
-                    .to_dict("records")
-                ),
-            )
-        )
 
 
 def _check_labeling(panel: PanelData, report: QualityReport) -> None:

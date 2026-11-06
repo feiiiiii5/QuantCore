@@ -259,6 +259,7 @@ def register_market_routes(app: FastAPI, ctx: Workspace) -> None:
     def securities(
         snapshot: str | None = Query(default=None),
         query: str = Query(default=""),
+        codes: str | None = Query(default=None),
         limit: int = Query(default=200, ge=1, le=1000),
     ) -> Any:
         panel, _ = _latest_panel(ctx, snapshot)
@@ -266,13 +267,16 @@ def register_market_routes(app: FastAPI, ctx: Workspace) -> None:
         latest = bars.groupby("sec_id", as_index=False).tail(1)
         meta = panel.securities.rename(columns={"sec_id": "sec_id"})
         frame = latest.merge(meta, on="sec_id", how="left", suffixes=("", "_meta"))
-        if query:
-            text = query.strip().lower()
-            frame = frame[
-                frame["code"].astype(str).str.lower().str.contains(text)
-                | frame["name"].astype(str).str.lower().str.contains(text)
-                | frame["sec_id"].astype(str).str.lower().str.contains(text)
-            ]
+        if codes is not None:
+            selected_codes = {code.strip() for code in codes.split(",") if code.strip()}
+            frame = frame[frame["code"].astype(str).isin(selected_codes)]
+        text = query.strip().lower()
+        if text:
+            matches = pd.Series(False, index=frame.index)
+            for field in ("code", "name", "sec_id", "industry", "board"):
+                if field in frame:
+                    matches |= frame[field].astype(str).str.lower().str.contains(text, regex=False)
+            frame = frame[matches]
         frame = frame.sort_values("code").head(limit)
         rows = []
         for row in frame.to_dict(orient="records"):

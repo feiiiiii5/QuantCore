@@ -241,7 +241,7 @@ def replay_experiment(store: ExperimentStore, run_id: str) -> ReplayResult:
         snapshot = None
         panel_dir = snapshot_info.get("panel_dir", "panel")
         panel_data = _load_panel_data(record.directory / str(panel_dir))
-    config = BacktestConfig.from_dict(metadata.get("config", {}))
+    config = BacktestConfig.from_dict(metadata.get("config", {}), legacy=True)
     strategy = spec.load()
     weights = strategy.generate_targets(panel_data)
     fresh = run_backtest(

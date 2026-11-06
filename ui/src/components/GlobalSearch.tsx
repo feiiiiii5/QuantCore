@@ -1,25 +1,24 @@
-import { forwardRef, useMemo, useState, type KeyboardEvent } from "react";
+import { forwardRef, useState, type KeyboardEvent } from "react";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSecurities } from "../api/queries";
 import type { SecurityRow } from "../api/types";
 import { signedPct } from "../lib/format";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 const GlobalSearch = forwardRef<HTMLInputElement>(function GlobalSearch(_props, ref) {
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const [open, setOpen] = useState(false);
-  const { data: securities = [], isFetching, error } = useSecurities("", 1000);
+  const search = useDebouncedValue(query.trim());
+  const { data: securities = [], isFetching, error } = useSecurities(search, 8, undefined, Boolean(search));
   const navigate = useNavigate();
-  const hits = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return [] as SecurityRow[];
-    return securities.filter((row) => `${row.code}${row.name}${row.industry}${row.board}`.toLowerCase().includes(needle)).slice(0, 8);
-  }, [query, securities]);
+  const settling = search !== query.trim();
+  const hits = settling ? [] : securities;
 
   const choose = (row: SecurityRow) => {
     setQuery(""); setOpen(false); setCursor(0);
-    navigate(`/?code=${encodeURIComponent(row.code)}`);
+    navigate(`/market?code=${encodeURIComponent(row.code)}`);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") { setOpen(false); event.currentTarget.blur(); return; }
@@ -63,7 +62,7 @@ const GlobalSearch = forwardRef<HTMLInputElement>(function GlobalSearch(_props, 
               <span className={hit.change_pct >= 0 ? "up" : "down"}>{signedPct(hit.change_pct / 100)}</span>
             </button>
           ))}
-          {!hits.length ? <div className="search-empty">{isFetching ? "加载证券…" : error ? "本地服务未连接" : "无匹配证券"}</div> : null}
+          {!hits.length ? <div className="search-empty">{settling || isFetching ? "加载证券…" : error ? "本地服务未连接" : "无匹配证券"}</div> : null}
         </div>
       ) : null}
     </div>

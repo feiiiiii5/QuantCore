@@ -43,7 +43,7 @@ def load_bundle(store: ExperimentStore, run_id: str) -> ExperimentBundle:
     except ExperimentError as exc:
         raise ResearchDataError(f"experiment not found or has no result: {run_id}") from exc
     try:
-        config = BacktestConfig.model_validate(dict(record.metadata.get("config") or {}))
+        config = BacktestConfig.from_dict(dict(record.metadata.get("config") or {}), legacy=True)
     except Exception as exc:  # pydantic ValidationError → actionable 400
         raise ResearchDataError(f"experiment {run_id} has an invalid config: {exc}") from exc
     spec_payload = record.metadata.get("strategy")

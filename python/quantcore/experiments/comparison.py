@@ -95,7 +95,16 @@ def _assumptions(series: dict[str, Any]) -> dict[str, Any]:
         "costs": config.get("costs"),
         "execution": config.get("exec"),
         "rules": config.get("rules"),
-        "corporate_actions": config.get("corporate_actions"),
+        "corporate_actions": (
+            {
+                "panel": config.get("use_panel_corporate_actions", False),
+                "explicit": config.get("corporate_actions", [])
+                if "use_panel_corporate_actions" in config
+                else [],
+            }
+            if "corporate_actions" in config
+            else None
+        ),
         "risk": config.get("risk"),
         "annual_days": config.get("annual_days"),
         # A recorded null benchmark means no benchmark; an absent key is unknown.

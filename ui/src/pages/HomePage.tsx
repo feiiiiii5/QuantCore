@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, CheckCircle2, FlaskConical, Plus, ShieldCheck, Sparkles, X } from "lucide-react";
-import { api } from "../api/client";
 import {
-  qk, useBootstrap, useCompleteOnboardingStep, useDataIntegrity, useExperiments,
+  useBootstrap, useCompleteOnboardingStep, useDataIntegrity, useExperiments, useSecurities,
   useLiveIndices, useLiveQuotes, useLiveStatus, useOnboarding, useOverview, useSaveWatchlist, useWatchlist,
 } from "../api/queries";
 import type { OnboardingStep } from "../api/types";
@@ -44,13 +43,7 @@ export default function HomePage() {
   const watchlist = useWatchlist();
   const codes = watchlist.data?.codes ?? [];
   const liveQuotes = useLiveQuotes(codes, liveEnabled);
-  const securities = useQuery({
-    queryKey: qk.securities("home-watch:1000"),
-    queryFn: () => api.securities("", 1000),
-    enabled: codes.length > 0,
-    staleTime: 60_000,
-    retry: false,
-  });
+  const securities = useSecurities("", 1000, codes, codes.length > 0);
   const onboarding = useOnboarding();
   const completeStep = useCompleteOnboardingStep();
   const bootstrap = useBootstrap();

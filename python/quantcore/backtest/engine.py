@@ -14,11 +14,12 @@ import shutil
 import tempfile
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
 from .. import engine_available, require_engine
+from ..calendar import to_date_int
 from ..data.panel import PanelData
 from ..errors import BacktestError, CppUnavailableError
 from ..snapshot.reader import Snapshot
@@ -57,8 +58,15 @@ def _cached_qpanel_path(panel_data: PanelData) -> Path:
     return path
 
 
-def _cpp_config(module: Any, config: BacktestConfig, calendar: Any) -> Any:
+def _cpp_config(
+    module: Any,
+    config: BacktestConfig,
+    calendar: Any,
+    corporate_actions: list[dict[str, Any]] | None = None,
+) -> Any:
     kwargs = config.cpp_kwargs(calendar)
+    if corporate_actions is not None:
+        kwargs["corporate_actions"] = corporate_actions
     if not hasattr(module, "BacktestConfig"):
         raise CppUnavailableError("_qcore.BacktestConfig is not bound; rebuild the extension")
     try:
@@ -68,6 +76,52 @@ def _cpp_config(module: Any, config: BacktestConfig, calendar: Any) -> Any:
             f"could not construct _qcore.BacktestConfig from Python config: {exc}; "
             "the bindings and BacktestConfig.cpp_kwargs() are out of sync"
         ) from exc
+
+
+def _corporate_actions(
+    panel: PanelData | Snapshot, config: BacktestConfig, sec_ids: list[str]
+) -> list[dict[str, Any]]:
+    """Map local ex-date events to this panel's security order.
+
+    Events affect the ledger only when the engine reaches their ex-date; future
+    events do not change earlier holdings. Explicit settings replace a panel
+    event with the same security/date, so one dividend is never paid twice.
+    """
+    indices = {sec_id: index for index, sec_id in enumerate(sec_ids)}
+    calendar = panel.calendar() if isinstance(panel, Snapshot) else panel.calendar
+    start, end = config.resolve_dates(calendar)
+    events: dict[tuple[int, int], dict[str, Any]] = {}
+    if config.use_panel_corporate_actions:
+        frame = (
+            panel.corporate_actions() if isinstance(panel, Snapshot) else panel.corporate_actions
+        )
+        for row in frame.to_dict(orient="records"):
+            sec = indices.get(str(row["sec_id"]))
+            if sec is None or not row.get("ex_date"):
+                continue
+            day = to_date_int(int(row["ex_date"]))
+            events[sec, day] = {
+                "sec": sec,
+                "ex_date": day,
+                "cash_per_share": float(row["cash_per_share"]),
+                "split_ratio": float(row["split_ratio"]),
+                "rights_ratio": float(row.get("rights_ratio", 0.0)),
+            }
+    for explicit in config.corporate_actions:
+        event = dict(explicit)
+        if "sec_id" in event:
+            sec_id = str(event.pop("sec_id"))
+            if sec_id not in indices:
+                raise BacktestError(f"corporate action security not found in panel: {sec_id}")
+            event["sec"] = indices[sec_id]
+        sec = int(event.get("sec", -1))
+        day = to_date_int(event["ex_date"])
+        event.update(sec=sec, ex_date=day)
+        events[sec, day] = event
+    for (_, day), event in events.items():
+        if start <= day <= end and float(event.get("rights_ratio", 0.0)) > 0:
+            raise BacktestError("rights subscriptions are not supported by the backtest engine")
+    return [events[key] for key in sorted(events, key=lambda key: (key[1], key[0]))]
 
 
 class _PanelHandle:
@@ -148,7 +202,12 @@ def run_backtest(
         )
     matrix = _apply_risk_limits(matrix, cfg)
     with _PanelHandle(panel) as panel_object:
-        cpp_config = _cpp_config(module, cfg, calendar)
+        cpp_config = _cpp_config(
+            module,
+            cfg,
+            calendar,
+            _corporate_actions(cast(PanelData | Snapshot, panel), cfg, sec_ids),
+        )
         engine = module.Engine(panel_object, cpp_config)
         try:
             raw_result = engine.run(matrix)
@@ -242,7 +301,7 @@ def run_backtest_batch(
         matrices.append(_apply_risk_limits(matrix, cfg))
     batch = np.stack(matrices, axis=0)
     with _PanelHandle(panel) as panel_object:
-        cpp_config = _cpp_config(module, cfg, calendar)
+        cpp_config = _cpp_config(module, cfg, calendar, _corporate_actions(panel, cfg, sec_ids))
         engine = module.Engine(panel_object, cpp_config)
         try:
             raw_results = engine.run_batch(batch, int(threads or 0))
@@ -269,7 +328,7 @@ def run_backtest_batch(
 def _attach_benchmark(
     result: BacktestResult, panel: PanelData | Snapshot | str | Path, config: BacktestConfig
 ) -> None:
-    """Attach a buy-and-hold benchmark curve and comparison metrics to ``result``."""
+    """Attach a frictionless buy-and-hold benchmark, retaining dividends as cash."""
     code = str(config.benchmark_code or "").strip()
     if not code:
         return
@@ -294,18 +353,31 @@ def _attach_benchmark(
     close_by_date = {
         int(day): float(value)
         for day, value in zip(series["date"], series["close"], strict=False)
-        if float(value) > 0
+        if np.isfinite(float(value)) and float(value) > 0
     }
     base = 0.0
+    shares = 1.0
+    cash = 0.0
+    sec_ids = [str(value) for value in securities["sec_id"].tolist()]
+    sec = sec_ids.index(sec_id)
+    actions = {
+        int(event["ex_date"]): event
+        for event in _corporate_actions(panel, config, sec_ids)
+        if event["sec"] == sec
+    }
     equity: list[float | None] = []
     for day in result.dates.tolist():
+        event = actions.get(int(day))
+        if base > 0 and event is not None:
+            cash += shares * float(event.get("cash_per_share", 0.0))
+            shares *= float(event.get("split_ratio", 1.0))
         close = close_by_date.get(int(day))
         if close is None:
             equity.append(None)
             continue
         if base <= 0.0:
             base = close
-        equity.append(round(float(result.equity_yuan[0]) * close / base, 4))
+        equity.append(round(float(result.equity_yuan[0]) * (shares * close + cash) / base, 4))
     valid = [(idx, value) for idx, value in enumerate(equity) if value is not None]
     if len(valid) < 2:
         raise BacktestError(f"benchmark series is too short: {code}")
@@ -313,31 +385,42 @@ def _attach_benchmark(
     first = benchmark_values[0]
     last = benchmark_values[-1]
     benchmark_return = last / first - 1.0 if first else 0.0
+    complete_window = valid[0][0] == 0 and valid[-1][0] == len(equity) - 1
+    # A quote after a gap spans several trading days. It cannot be paired with
+    # the strategy's single-day return or annualized as a daily observation.
+    daily_indices = [
+        i for i in range(1, len(equity)) if equity[i] is not None and equity[i - 1] is not None
+    ]
     benchmark_returns = np.asarray(
         [
-            benchmark_values[index] / benchmark_values[index - 1] - 1.0
-            for index in range(1, len(benchmark_values))
+            float(cast(float, equity[i])) / float(cast(float, equity[i - 1])) - 1.0
+            for i in daily_indices
         ],
         dtype=np.float64,
     )
-    strategy_returns = np.asarray(
-        [float(result.returns[i]) for i, _ in valid[1:]], dtype=np.float64
-    )
+    strategy_returns = result.returns[daily_indices]
     excess = strategy_returns - benchmark_returns
-    tracking_error = (
-        float(np.std(excess, ddof=1) * np.sqrt(config.annual_days)) if excess.size > 1 else 0.0
-    )
-    information_ratio = (
-        float(np.mean(excess) / np.std(excess, ddof=1) * np.sqrt(config.annual_days))
-        if excess.size > 1 and np.std(excess, ddof=1) > 0
-        else 0.0
-    )
+    tracking_error: float | None = None
+    information_ratio: float | None = None
+    if excess.size > 1:
+        stddev = float(np.std(excess, ddof=1))
+        # Identical curves may differ by one floating-point rounding unit.
+        if stddev <= np.finfo(np.float64).eps * 8:
+            stddev = 0.0
+        tracking_error = round(stddev * float(np.sqrt(config.annual_days)), 8)
+        information_ratio = (
+            round(float(np.mean(excess)) / stddev * float(np.sqrt(config.annual_days)), 8)
+            if stddev > 0
+            else 0.0
+        )
     result.metrics["benchmark_return"] = round(float(benchmark_return), 8)
-    result.metrics["excess_return"] = round(
-        float(result.metrics.get("total_return", 0.0)) - benchmark_return, 8
+    result.metrics["excess_return"] = (
+        round(float(result.metrics.get("total_return", 0.0)) - benchmark_return, 8)
+        if complete_window
+        else None
     )
-    result.metrics["tracking_error"] = round(tracking_error, 8)
-    result.metrics["information_ratio"] = round(information_ratio, 8)
+    result.metrics["tracking_error"] = tracking_error
+    result.metrics["information_ratio"] = information_ratio
     result.benchmark = {
         "code": str(row.get("code", code)),
         "sec_id": sec_id,
@@ -345,11 +428,14 @@ def _attach_benchmark(
         "dates": [int(day) for day in result.dates.tolist()],
         "equity": equity,
         "total_return": round(float(benchmark_return), 8),
+        "daily_observations": len(daily_indices),
+        "complete_window": complete_window,
+        "definition": "buy_and_hold_dividends_as_cash_no_costs_or_tax",
         "metrics": {
             "benchmark_return": round(float(benchmark_return), 8),
-            "excess_return": round(float(result.metrics["excess_return"]), 8),
-            "tracking_error": round(tracking_error, 8),
-            "information_ratio": round(information_ratio, 8),
+            "excess_return": result.metrics["excess_return"],
+            "tracking_error": tracking_error,
+            "information_ratio": information_ratio,
         },
     }
 

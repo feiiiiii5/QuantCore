@@ -5,10 +5,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include "qcore/panel.h"
 #include "qcore/types.h"
+#include "qcore/version.h"
 
 namespace qc {
 enum class ExecType : uint32_t { NextOpen = 0, NextClose = 1, NextVwap = 2, AfterHoursFixed = 3 };
@@ -144,6 +146,9 @@ struct Trade {
   Money other_fee = 0;
   Money fee_total = 0;
   RejectReason reason = RejectReason::None;
+  // Engine sell fills carry the ledger's fee-inclusive FIFO P&L. Keeping this
+  // optional also supports metrics over caller-constructed trade histories.
+  std::optional<Money> realized_pnl;
 };
 
 struct Metrics {
@@ -177,7 +182,7 @@ struct BacktestResult {
   std::vector<ReasonCount> reasons;
   std::vector<int32_t> final_position_secs;
   std::vector<Qty> final_position_qty;
-  std::string engine_version = "0.1.0";
+  std::string engine_version = version();
   uint64_t seed = 0;
 };
 

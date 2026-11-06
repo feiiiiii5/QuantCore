@@ -92,6 +92,25 @@ TEST_CASE("metrics profit factor is infinite with no losing round trips", "[metr
   CHECK(m.win_rate == Approx(1.0));
 }
 
+TEST_CASE("metrics use ledger realized P&L after a split", "[metrics]") {
+  Ledger ledger(to_money(10000.0), true, 1);
+  std::vector<Trade> trades;
+  trades.push_back(fill(20260106, 0, Side::Buy, 10.0, 100, 5.0));
+  ledger.add_buy(0, 20260106, 100, to_money(1000.0), to_money(5.0));
+  ledger.apply_split(0, 2.0);
+  trades.push_back(fill(20260107, 0, Side::Sell, 6.0, 100, 10.0));
+  trades.back().realized_pnl = ledger.add_sell(0, 20260107, 100, to_money(600.0), to_money(10.0));
+  trades.push_back(fill(20260108, 0, Side::Sell, 4.0, 100, 10.0));
+  trades.back().realized_pnl = ledger.add_sell(0, 20260108, 100, to_money(400.0), to_money(10.0));
+  // Each 100-share split-adjusted lot costs 502.5 (including the original buy fee).
+  CHECK(*trades[1].realized_pnl == to_money(87.5));
+  CHECK(*trades[2].realized_pnl == to_money(-112.5));
+  const Metrics m = compute_metrics({to_money(9975.0)}, to_money(10000.0), trades, 244);
+  CHECK(m.win_rate == Approx(0.5));
+  CHECK(m.profit_factor == Approx(87.5 / 112.5));
+  CHECK(m.total_fees == to_money(25.0));
+}
+
 TEST_CASE("metrics flat equity has no risk", "[metrics]") {
   const std::vector<Money> equity = {to_money(100.0), to_money(100.0), to_money(100.0)};
   const Metrics m = compute_metrics(equity, to_money(100.0), {}, 244);

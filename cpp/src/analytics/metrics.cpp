@@ -134,6 +134,7 @@ Metrics compute_metrics(const std::vector<Money>& equity, Money initial_cash,
   int128 gross_profit = 0;
   int128 gross_loss = 0;
   size_t max_sec = 0;
+  bool needs_fifo = false;
   for (const Trade& t : trades) {
     if (t.reason != RejectReason::None || t.qty <= 0)
       continue;
@@ -143,20 +144,24 @@ Metrics compute_metrics(const std::vector<Money>& equity, Money initial_cash,
     if (t.sec < 0)
       continue;
     max_sec = std::max(max_sec, static_cast<size_t>(t.sec));
+    if (t.side == Side::Sell && !t.realized_pnl.has_value())
+      needs_fifo = true;
   }
-  lots.resize(max_sec + 1);
+  if (needs_fifo)
+    lots.resize(max_sec + 1);
   for (const Trade& t : trades) {
     if (t.reason != RejectReason::None || t.qty <= 0 || t.sec < 0)
       continue;
-    std::vector<FifoLot>& book = lots[static_cast<size_t>(t.sec)];
     if (t.side == Side::Buy) {
-      book.push_back(FifoLot{t.qty, t.amount + t.fee_total});
+      if (needs_fifo)
+        lots[static_cast<size_t>(t.sec)].push_back(FifoLot{t.qty, t.amount + t.fee_total});
     } else {
       Qty need = t.qty;
       Money removed = 0;
-      take_cost(book, need, removed);
+      if (needs_fifo)
+        take_cost(lots[static_cast<size_t>(t.sec)], need, removed);
       const Money proceeds = t.amount - t.fee_total;
-      const Money pnl = proceeds - removed;
+      const Money pnl = t.realized_pnl.value_or(proceeds - removed);
       ++sells;
       if (pnl > 0) {
         ++wins;

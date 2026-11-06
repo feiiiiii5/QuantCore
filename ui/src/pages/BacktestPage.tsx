@@ -199,7 +199,7 @@ export default function BacktestPage() {
       : { tone: "neutral" as const, text: "数据体检：加载中" };
   const conclusionTone = result && result.metrics.total_return >= 0 ? "tone-ok" : "tone-danger";
   const benchmarkDiff = useMemo(() => {
-    if (!result?.benchmark) return null;
+    if (!result?.benchmark || result.benchmark.complete_window === false) return null;
     const total = result.benchmark.total_return;
     if (Number.isFinite(total)) return result.metrics.total_return - total;
     const equity = (result.benchmark.equity ?? []).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
@@ -298,7 +298,7 @@ export default function BacktestPage() {
                 <Field label="最小调仓额（元）"><Input value={draft.minRebalanceValue} onChange={(event) => update("minRebalanceValue", event.target.value)} inputMode="decimal" /></Field>
                 <Field label="trace"><Select value={draft.trace} onChange={(event) => update("trace", event.target.value)} options={[{ value: "off", label: "off" }, { value: "summary", label: "summary" }, { value: "full", label: "full" }]} /></Field>
                 <Field label="seed"><Input value={draft.seed} onChange={(event) => update("seed", event.target.value)} inputMode="numeric" /></Field>
-                <Field label="基准代码" hint="后端未支持时不生效"><Input value={draft.benchmarkCode} onChange={(event) => update("benchmarkCode", event.target.value)} placeholder="如 000300" /></Field>
+                <Field label="基准代码" hint="本地证券买入持有，分红留存现金，不计费用与税"><Input value={draft.benchmarkCode} onChange={(event) => update("benchmarkCode", event.target.value)} placeholder="如 600000" /></Field>
                 <Field label="最大持仓数"><Input value={draft.maxPositions} onChange={(event) => update("maxPositions", event.target.value)} inputMode="numeric" placeholder="不限" /></Field>
                 <Field label="单票最大权重"><Input value={draft.maxWeight} onChange={(event) => update("maxWeight", event.target.value)} inputMode="decimal" placeholder="0-1，如 0.1" /></Field>
               </div>
@@ -341,7 +341,7 @@ export default function BacktestPage() {
         <>
           <div className={`conclusion ${conclusionTone}`}>
             <div className="conclusion-head"><h2 className="conclusion-title">结论：{result.metrics.total_return >= 0 ? "本次回测取得正收益" : "本次回测亏损"}，最大回撤 {pct(result.metrics.max_drawdown)}</h2></div>
-            <p className="conclusion-text">总收益 <strong>{pct(result.metrics.total_return)}</strong>（年化 {pct(result.metrics.annualized_return)}），Sharpe <strong>{num(result.metrics.sharpe)}</strong>，交易 <strong>{result.trades.length}</strong> 笔，已扣成本 <strong>{money(fixedToYuan(result.metrics.total_fees))}</strong>。{benchmarkDiff == null ? "未设置基准。" : benchmarkDiff >= 0 ? `跑赢基准 ${pct(benchmarkDiff)}。` : `跑输基准 ${pct(Math.abs(benchmarkDiff))}。`}</p>
+            <p className="conclusion-text">总收益 <strong>{pct(result.metrics.total_return)}</strong>（年化 {pct(result.metrics.annualized_return)}），Sharpe <strong>{num(result.metrics.sharpe)}</strong>，交易 <strong>{result.trades.length}</strong> 笔，已扣成本 <strong>{money(fixedToYuan(result.metrics.total_fees))}</strong>。{benchmarkDiff == null ? result.benchmark ? "基准区间报价不完整，暂不比较超额收益。" : "未设置基准。" : benchmarkDiff >= 0 ? `跑赢基准 ${pct(benchmarkDiff)}。` : `跑输基准 ${pct(Math.abs(benchmarkDiff))}。`}</p>
             <div className="row">
               <Badge tone={result.synthetic ? "info" : "neutral"}>{result.synthetic ? "SYNTHETIC · 仅演示" : result.snapshot?.source ? `来源 ${String(result.snapshot.source)}` : "来源未记录"}</Badge>
               <Badge tone="ok">成本后口径 · 已扣费用</Badge>

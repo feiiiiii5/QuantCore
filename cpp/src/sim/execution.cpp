@@ -290,10 +290,11 @@ void Executor::execute_one(const Intent& intent, Date date, size_t time,
   }
   const Money amount = notional(fill_px, qty);
   const CostBreakdown costs = compute_costs(cfg_.costs, intent.side, amount, context(sec, time));
+  std::optional<Money> realized_pnl;
   if (intent.side == kBuy) {
     ledger_.add_buy(intent.sec, date, qty, amount, costs.total);
   } else {
-    ledger_.add_sell(intent.sec, date, qty, amount, costs.total);
+    realized_pnl = ledger_.add_sell(intent.sec, date, qty, amount, costs.total);
   }
   Trade tr;
   tr.date = date;
@@ -308,6 +309,7 @@ void Executor::execute_one(const Intent& intent, Date date, size_t time,
   tr.other_fee = costs.other_fee;
   tr.fee_total = costs.total;
   tr.reason = RejectReason::None;
+  tr.realized_pnl = realized_pnl;
   trades.push_back(tr);
   out.fills += 1;
   out.fees += costs.total;

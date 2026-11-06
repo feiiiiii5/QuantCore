@@ -154,7 +154,11 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
     store = ExperimentStore(experiments_root)
     source_run_id = payload.get("source_run_id")
     source = store.get(str(source_run_id)) if source_run_id else None
-    config_data = dict(source.metadata.get("config") or {}) if source else {}
+    config_data = (
+        BacktestConfig.from_dict(dict(source.metadata.get("config") or {}), legacy=True).to_dict()
+        if source
+        else {}
+    )
     for key, value in (payload.get("config") or {}).items():
         if key in {"costs", "exec", "rules", "risk"}:
             config_data[key] = {**config_data.get(key, {}), **value}
@@ -264,9 +268,7 @@ def run_data_update_job(payload: dict[str, Any], ctx: JobContext | None = None) 
     data_root = Path(payload.get("data_root") or "data")
     state = SQLiteState(Path(payload.get("state_path") or data_root / "state.sqlite"))
     store = ParquetStore(data_root / "warehouse", state=state)
-    if bool(payload.get("reset")):
-        store.reset()
-    name = str(payload.get("provider") or "synthetic")
+    name = str(payload.get("provider") or "synthetic").strip().lower()
     kwargs: dict[str, Any] = {}
     if name == "synthetic":
         kwargs["config"] = _panel_spec(payload)
@@ -284,13 +286,21 @@ def run_data_update_job(payload: dict[str, Any], ctx: JobContext | None = None) 
             kwargs["codes"] = list(payload["codes"])
         if payload.get("limit") is not None:
             kwargs["limit"] = int(payload["limit"])
+    if name == "tushare":
+        kwargs["allow_network"] = os.environ.get("QC_ALLOW_NETWORK") == "1"
     _progress(0.2, ctx)
     _check(ctx)
     provider = create_provider(name, **kwargs)
     ingestor = ProviderIngestor(provider, store)
     start = str(payload.get("start") or "2020-01-02")
     end = str(payload.get("end") or "2024-12-31")
-    result = ingestor.update(start, end, incremental=bool(payload.get("incremental", True)))
+    result = ingestor.update(
+        start,
+        end,
+        incremental=bool(payload.get("incremental", True)),
+        reset=bool(payload.get("reset")),
+        codes=payload.get("codes"),
+    )
     _progress(0.8, ctx)
     _check(ctx)
     payload_out = {"kind": "data_update", **result.to_dict()}
