@@ -291,17 +291,10 @@ class PanelData:
     # -- matrix export ----------------------------------------------------
     def matrix(self, field_name: str, fill: float = np.nan) -> np.ndarray:
         """Return a ``(n_time, n_sec)`` matrix of *field_name* (engine layout)."""
-        if field_name not in self.bars.columns:
-            raise KeyError(f"unknown field: {field_name}")
-        frame = self.bars[["date", "sec_id", field_name]]
-        pivoted = frame.pivot_table(
-            index="date", columns="sec_id", values=field_name, aggfunc="last"
-        )
-        pivoted = pivoted.reindex(index=list(self.calendar.dates), columns=self.sec_ids)
-        values = pivoted.to_numpy(dtype=np.float64)
-        if not np.isnan(fill):
-            values = np.where(np.isnan(values), fill, values)
-        return values
+        from .matrices import MatrixLayout
+
+        # PanelData is mutable: coordinates must reflect its current tables.
+        return MatrixLayout(self.bars, self.dates, self.sec_ids).matrix(field_name, fill)
 
     def security_meta(self) -> dict[str, Any]:
         """Metadata embedded into ``.qpanel`` (all values JSON-serialisable)."""

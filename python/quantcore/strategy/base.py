@@ -27,6 +27,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from ..data.matrices import MatrixLayout
 from ..data.panel import PanelData
 
 MAX_ABS_WEIGHT_SUM = 1.0 + 1e-9
@@ -132,6 +133,7 @@ class PanelView:
     panel: PanelData
     cut: int | None = None
     _cache: dict[str, np.ndarray] = field(default_factory=dict, repr=False)
+    _layout: MatrixLayout | None = field(default=None, init=False, repr=False)
 
     @property
     def n_time(self) -> int:
@@ -160,7 +162,9 @@ class PanelView:
     def field(self, name: str) -> np.ndarray:
         """Return the ``(visible_time, n_sec)`` matrix for a bar field."""
         if name not in self._cache:
-            matrix = self.panel.matrix(name)
+            if self._layout is None:
+                self._layout = MatrixLayout(self.panel.bars, self.panel.dates, self.panel.sec_ids)
+            matrix = self._layout.matrix(name)
             self._cache[name] = matrix[: self.n_time]
         return self._cache[name]
 

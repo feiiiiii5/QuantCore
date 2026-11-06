@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+from quantcore.data.matrices import MatrixLayout
 from quantcore.data.panel import PanelData
 from quantcore.server import create_app
 
@@ -25,13 +26,13 @@ def test_screener_limits_rows_after_stable_ranking_without_repeated_pivots(
     app = create_app(data_root=tmp_path, start_worker=False, token="test-token")
     app.state.workspace._synthetic = small_panel
     calls: Counter[str] = Counter()
-    original = PanelData.matrix
+    original = MatrixLayout.matrix
 
     def counted(self, field_name, *args, **kwargs):
         calls[field_name] += 1
         return original(self, field_name, *args, **kwargs)
 
-    monkeypatch.setattr(PanelData, "matrix", counted)
+    monkeypatch.setattr(MatrixLayout, "matrix", counted)
     with TestClient(app, base_url="http://127.0.0.1:8000") as client:
         response = client.post(
             "/api/screener/run",

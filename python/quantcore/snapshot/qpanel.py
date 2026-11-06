@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 from .. import panel_available, require_panel
 from ..data.panel import BOARD_CODES, PANEL_FIELDS, PanelData
@@ -55,9 +56,20 @@ def write_qpanel(panel: PanelData, path: str | Path) -> dict[str, Any]:
         [int(date) for date in panel.calendar.dates],
         _securities_payload(panel),
     )
+    # Resolve the long-table coordinates once for all 17 fields. Repeating a
+    # pivot for each field redoes the same grouping and sorting on every export.
+    bars = panel.bars
+    if bars.duplicated(["date", "sec_id"]).any():
+        # Match pivot_table(..., aggfunc="last"): each field independently takes
+        # its last non-null value, including when the final duplicate is missing.
+        bars = bars.groupby(["date", "sec_id"], sort=False)[list(PANEL_FIELDS)].last().reset_index()
+    time_indices = pd.Index(panel.calendar.dates).get_indexer(pd.Index(bars["date"]))
+    sec_indices = pd.Index(panel.sec_ids).get_indexer(pd.Index(bars["sec_id"]))
+    included = (time_indices >= 0) & (sec_indices >= 0)
+    coordinates = (time_indices[included], sec_indices[included])
     for field_name in PANEL_FIELDS:
-        matrix = panel.matrix(field_name)
-        data = np.ascontiguousarray(matrix, dtype=np.float64)
+        data = np.full((panel.n_time, panel.n_sec), np.nan, dtype=np.float64)
+        data[coordinates] = bars[field_name].to_numpy(dtype=np.float64)[included]
         writer.add_field(field_name, QPANEL_LAYOUT, data)
     metadata = panel.security_meta()
     metadata["qpanel_schema_version"] = QPANEL_SCHEMA_VERSION
