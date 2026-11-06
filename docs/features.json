@@ -1051,7 +1051,7 @@
       "milestone": "R8",
       "title": "fresh per-security quotes and independent daily candles",
       "passes": true,
-      "evidence": "test_live_quotes.py, test_live_history.py and MarketPage.test.tsx; true source timestamps, stale states, per-code fallback, history independent of snapshots and live candle updates; public 600000 history/quote probe after close"
+      "evidence": "test_live_quotes.py, test_live_quote_freshness.py, test_live_history.py and MarketPage.test.tsx; true source timestamps, stale states, per-code fallback, history independent of snapshots and live candle updates; public 600000 history/quote probe after close"
     },
     {
       "id": "R8-002",
@@ -1105,7 +1105,7 @@
     "python": "579 passed / 2 skipped",
     "cpp": "native version 0.1.1; current differential 6/6 and verify_cpp passed; sources unchanged, R7 ctest 101/101",
     "ui": "39 passed / 18 files",
-    "checks": "ruff lint/format python, tests and new scripts (195 files); mypy 114 files; TypeScript/Vite build; isolated real-server E2E 20/20; actual candidate study generic replay 24/24",
+    "checks": "ruff lint/format python, tests and new scripts (197 files); mypy 114 files; TypeScript/Vite build; isolated real-server E2E 20/20; actual candidate study generic replay 24/24",
     "unverified": "authenticated browser Sites-to-loopback full flow; real Tushare token; full market scale; signed installers; real brokerage"
   }
 }

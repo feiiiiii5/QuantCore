@@ -8,14 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
-import json
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from quantcore.realtime.clock import (
-    SHANGHAI_TZ,
     is_trading_day,
     last_trade_date,
     market_clock,
@@ -31,54 +29,11 @@ from quantcore.realtime.quotes import (
 )
 from quantcore.realtime.service import LiveConfig, LiveQuoteService
 from quantcore.server import create_app
+from tests.live_quote_fixtures import FakeHttp, _at, _eastmoney_payload, _sina_text
 
-FIXTURES = Path(__file__).parent / "fixtures" / "live"
 TOKEN = "test-token"
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 BASE_URL = "http://127.0.0.1:8000"
-
-
-def _eastmoney_payload() -> dict:
-    return json.loads((FIXTURES / "eastmoney_ulist.json").read_text(encoding="utf-8"))
-
-
-def _sina_text() -> str:
-    return (FIXTURES / "sina_quotes.txt").read_text(encoding="utf-8")
-
-
-def _at(text: str) -> dt.datetime:
-    return dt.datetime.fromisoformat(text).replace(tzinfo=SHANGHAI_TZ)
-
-
-class FakeHttp:
-    """Request-aware fake transport backed by the recorded fixtures."""
-
-    def __init__(self, *, fail_json: bool = False) -> None:
-        self.fail_json = fail_json
-        self.json_calls = 0
-        self.text_calls = 0
-        self.index_rows = [_eastmoney_payload()["data"]["diff"][2]]
-        self.stock_rows = _eastmoney_payload()["data"]["diff"][:2]
-        for row in self.index_rows + self.stock_rows:
-            row["f124"] = int(_at("2026-11-02T10:15:30").timestamp())
-
-    async def get_json(self, url: str, *, headers: dict[str, str] | None = None):
-        self.json_calls += 1
-        if self.fail_json:
-            raise ConnectionError("eastmoney blocked (simulated)")
-        rows = (
-            list(self.index_rows)
-            if ("1.000001" in url or "0.399001" in url)
-            else list(self.stock_rows)
-        )
-        return {"data": {"total": len(rows), "diff": rows}}
-
-    async def get_text(self, url: str, *, headers: dict[str, str] | None = None) -> str:
-        self.text_calls += 1
-        lines = _sina_text().splitlines()
-        if "sh000001" in url or "sz399001" in url:
-            return lines[2]
-        return "\n".join(lines[:2])
 
 
 # ------------------------------------------------------------------ parsers
@@ -277,70 +232,6 @@ def test_stale_cached_quote_is_refreshed_even_when_not_in_watchlist() -> None:
     fresh = asyncio.run(service.quotes(["600000"]))
     assert fresh["quotes"][0]["code"] == "600000"
     assert http.json_calls > calls_after_first  # refreshed, not silently stale
-
-
-def test_index_refresh_does_not_keep_an_unwatched_stock_fresh() -> None:
-    http = FakeHttp()
-    now = [_at("2026-11-02T10:15:30")]
-    service = LiveQuoteService(http=http, config=LiveConfig(enabled=True), clock=lambda: now[0])
-    asyncio.run(service.quotes(["600000"]))
-    now[0] += dt.timedelta(seconds=30)
-    asyncio.run(service.refresh())  # the background poller only requests indices
-    http.stock_rows[0]["f2"] = "11.00"
-    http.stock_rows[0]["f124"] = int(now[0].timestamp())
-    calls = http.json_calls
-    payload = asyncio.run(service.quotes(["600000"]))
-    assert payload["quotes"][0]["price"] == 11.0
-    assert http.json_calls > calls
-
-
-def test_partial_primary_response_falls_back_for_missing_stock() -> None:
-    http = FakeHttp()
-    http.stock_rows = []
-    service = LiveQuoteService(
-        http=http, config=LiveConfig(enabled=True), clock=lambda: _at("2026-11-02T10:15:30")
-    )
-    payload = asyncio.run(service.quotes(["600000"]))
-    assert payload["quotes"][0]["code"] == "600000"
-    assert payload["quotes"][0]["source"] == "sina"
-    assert http.text_calls > 0
-
-
-def test_source_timestamp_is_not_replaced_by_receive_time() -> None:
-    now = _at("2026-11-02T10:15:30")
-    raw = _eastmoney_payload()
-    assert parse_eastmoney_payload(raw, now=now)[0].timestamp is None
-    raw["data"]["diff"][0]["f124"] = int(_at("2026-11-02T10:14:00").timestamp())
-    assert parse_eastmoney_payload(raw, now=now)[0].timestamp == "2026-11-02T10:14:00+08:00"
-    assert parse_sina_payload(_sina_text(), now=now)[0].timestamp == "2026-11-02T10:15:30+08:00"
-
-
-def test_old_source_data_stays_stale_even_when_just_fetched() -> None:
-    http = FakeHttp()
-    service = LiveQuoteService(
-        http=http, config=LiveConfig(enabled=True), clock=lambda: _at("2026-11-02T10:30:00")
-    )
-    payload = asyncio.run(service.quotes(["600000"]))
-    assert payload["stale"] is True
-    assert payload["quotes"][0]["timestamp"] == "2026-11-02T10:15:30+08:00"
-    assert asyncio.run(service.status())["state"] == "idle"
-
-
-def test_index_failure_does_not_discard_a_healthy_primary_stock_quote() -> None:
-    class IndexFailure(FakeHttp):
-        async def get_json(self, url, *, headers=None):
-            if "1.000001" in url:
-                raise ConnectionError("index endpoint unavailable")
-            return await super().get_json(url, headers=headers)
-
-    http = IndexFailure()
-    http.stock_rows[0]["f2"] = "11.00"
-    service = LiveQuoteService(
-        http=http, config=LiveConfig(enabled=True), clock=lambda: _at("2026-11-02T10:15:30")
-    )
-    payload = asyncio.run(service.quotes(["600000"]))
-    assert payload["quotes"][0]["source"] == "eastmoney"
-    assert payload["quotes"][0]["price"] == 11.0
 
 
 # ------------------------------------------------------- real XSHG calendar
