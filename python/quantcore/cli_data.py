@@ -1,8 +1,8 @@
 """qc data commands: provider update, warehouse status and the data-health audit.
 
 Extracted from cli.py to keep files below the 500-line project limit; registered on the
-qc data Typer app by quantcore.cli. Research/simulation only - no network unless a
-public-web provider is used with QC_ALLOW_NETWORK=1 (or --allow-network).
+qc data Typer app by quantcore.cli. Research/simulation only - network access requires
+QC_ALLOW_NETWORK=1 (or --allow-network).
 """
 
 # ruff: noqa: B008 -- typer's documented API uses function calls in argument defaults
@@ -36,10 +36,10 @@ def data_update(
     seed: int = typer.Option(42),
     local_dir: Path | None = typer.Option(None, help="local provider data directory"),
     fixture_dir: Path | None = typer.Option(None, help="tushare fixture directory"),
-    codes: str | None = typer.Option(None, help="comma-separated codes for sina/eastmoney"),
+    codes: str | None = typer.Option(None, help="comma-separated codes for sina/eastmoney/tushare"),
     limit: int | None = typer.Option(None, min=1, help="cap securities for sina/eastmoney"),
     allow_network: bool = typer.Option(
-        False, help="explicitly allow network access for public-web providers"
+        False, envvar="QC_ALLOW_NETWORK", help="explicitly allow network access for data providers"
     ),
     derive_actions: bool = typer.Option(
         True,
@@ -56,8 +56,7 @@ def data_update(
     from quantcore.providers import create_provider
 
     store = ParquetStore(data_root / "warehouse")
-    if reset:
-        store.reset()
+    provider = provider.strip().lower()
     kwargs: dict[str, Any] = {}
     if provider == "synthetic":
         from quantcore.data.synthetic import SyntheticConfig
@@ -69,6 +68,8 @@ def data_update(
         kwargs["data_dir"] = local_dir
     elif provider == "tushare" and fixture_dir is not None:
         kwargs["fixture_dir"] = fixture_dir
+    if provider == "tushare":
+        kwargs["allow_network"] = allow_network
     code_list = [part.strip() for part in codes.split(",") if part.strip()] if codes else None
     if provider in {"sina", "eastmoney"}:
         kwargs["allow_network"] = allow_network
@@ -78,11 +79,13 @@ def data_update(
             kwargs["limit"] = limit
         if provider == "sina":
             kwargs["derive_actions"] = derive_actions
-    elif code_list or limit is not None:
-        raise typer.BadParameter("--codes/--limit are only supported by sina/eastmoney")
+    elif limit is not None or (code_list and provider != "tushare"):
+        raise typer.BadParameter(
+            "--codes requires sina/eastmoney/tushare; --limit requires sina/eastmoney"
+        )
     prov = create_provider(provider, **kwargs)
     ingestor = ProviderIngestor(prov, store)
-    result = ingestor.update(start, end, codes=code_list, incremental=incremental)
+    result = ingestor.update(start, end, codes=code_list, incremental=incremental, reset=reset)
     payload = result.to_dict()
     payload["manifest_hash"] = store.manifest_hash()
     _emit(payload, json_output)
@@ -141,5 +144,5 @@ def data_status(
 
     store = ParquetStore(data_root / "warehouse")
     payload = store.describe()
-    payload["last_ingest"] = store.state.get_meta("last_ingest")
+    payload["last_ingest"] = store.get_metadata("last_ingest")
     _emit(payload, json_output)

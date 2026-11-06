@@ -29,7 +29,7 @@ export function isApiError(error: unknown): error is ApiError {
 
 /** Same-origin by default; set a base in Settings for a split dev/preview origin. */
 export function getApiBase(): string {
-  return (localStorage.getItem(API_KEY) || "").replace(/\/+$/, "");
+  return (localStorage.getItem(API_KEY) ?? import.meta.env.VITE_QC_DEFAULT_API_BASE ?? "").replace(/\/+$/, "");
 }
 export function getToken(): string { return localStorage.getItem(TOKEN_KEY) || ""; }
 
@@ -38,8 +38,7 @@ export function configure(base: string, token: string): void {
   localStorage.setItem(TOKEN_KEY, token.trim());
 }
 
-export function authHeaders(): HeadersInit {
-  const token = getToken();
+export function authHeaders(token = getToken()): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -73,14 +72,15 @@ function detailMessage(detail: unknown, fallback: string): string {
   return fallback;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, connection?: { base: string; token: string }): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Accept", "application/json");
-  for (const [key, value] of Object.entries(authHeaders())) headers.set(key, value);
+  for (const [key, value] of Object.entries(authHeaders(connection?.token.trim()))) headers.set(key, value);
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   let response: Response;
   try {
-    response = await fetch(`${getApiBase()}${path}`, { ...init, headers });
+    const base = connection ? connection.base.trim().replace(/\/+$/, "") : getApiBase();
+    response = await fetch(`${base}${path}`, { ...init, headers });
   } catch (error) {
     throw new ApiError(0, `无法连接本地服务：${error instanceof Error ? error.message : "network error"}`);
   }
@@ -92,6 +92,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+/** Verify a form draft against protected metadata without saving connection settings. */
+export async function probeConnection(base: string, token: string): Promise<{ health: Health; meta: Meta }> {
+  const connection = { base, token };
+  const [health, meta] = await Promise.all([
+    request<Health>("/health", undefined, connection),
+    request<Meta>("/api/meta", undefined, connection),
+  ]);
+  return { health, meta };
 }
 
 export async function downloadWithAuth(path: string, filename: string): Promise<void> {
@@ -119,7 +129,7 @@ export const api = {
 
   overview: (snapshot?: string) => request<MarketOverview>(`/api/market/overview${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),
   bars: (code: string, snapshot?: string) => request<Bars>(`/api/market/bars?code=${encodeURIComponent(code)}${snapshot ? `&snapshot=${encodeURIComponent(snapshot)}` : ""}`),
-  securities: (query = "", limit = 300) => request<SecurityRow[]>(`/api/market/securities?query=${encodeURIComponent(query)}&limit=${limit}`),
+  securities: (query = "", limit = 300, codes?: string[]) => request<SecurityRow[]>(`/api/market/securities?query=${encodeURIComponent(query)}&limit=${limit}${codes ? `&codes=${encodeURIComponent(codes.join(","))}` : ""}`),
   minuteBars: (code: string, date?: string) => request<MinuteBars>(`/api/market/minute-bars?code=${encodeURIComponent(code)}${date ? `&date=${encodeURIComponent(date)}` : ""}`),
   financials: (code: string, asOf?: string) => request<FinancialsResult>(`/api/market/financials/${encodeURIComponent(code)}${asOf ? `?as_of=${encodeURIComponent(asOf)}` : ""}`),
   securityProfile: (code: string, snapshot?: string) => request<SecurityProfile>(`/api/market/securities/${encodeURIComponent(code)}${snapshot ? `?snapshot=${encodeURIComponent(snapshot)}` : ""}`),
@@ -173,6 +183,8 @@ export const api = {
   createPaperSession: (payload: Record<string, unknown>) =>
     request<PaperSessionSummary>("/api/paper/sessions", { method: "POST", body: JSON.stringify(payload) }),
   paperSession: (id: string) => request<PaperSessionDetail>(`/api/paper/sessions/${id}`),
+  refreshPaper: (id: string) =>
+    request<PaperSessionDetail>(`/api/paper/sessions/${id}/refresh`, { method: "POST" }),
   stepPaper: (id: string, days = 1) =>
     request<PaperSessionDetail>(`/api/paper/sessions/${id}/step`, { method: "POST", body: JSON.stringify({ days }) }),
   resetPaper: (id: string) =>
@@ -199,6 +211,8 @@ export const api = {
   liveIndices: () => request<LiveQuotesPayload>("/api/live/indices"),
   liveQuotes: (codes: string[]) =>
     request<LiveQuotesPayload>(`/api/live/quotes?codes=${codes.map(encodeURIComponent).join(",")}`),
+  liveBars: (code: string, limit = 600) =>
+    request<Bars>(`/api/live/bars?code=${encodeURIComponent(code)}&limit=${limit}`),
   watchlist: () => request<WatchlistPayload>("/api/watchlist"),
   saveWatchlist: (codes: string[]) =>
     request<WatchlistPayload>("/api/watchlist", { method: "PUT", body: JSON.stringify({ codes }) }),

@@ -3,7 +3,7 @@
 ## 证券主数据
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| sec_id | int32 | 稳定内部 ID |
+| sec_id | str | 稳定证券 ID；C++ 引擎另以当前面板顺序映射为 int32 索引 |
 | code | str | 当前代码（6 位） |
 | exchange | str | SH/SZ/BJ |
 | name | str | 当前名称 |
@@ -28,6 +28,8 @@ open/high/low/close: Px；volume: Qty（股）；amount: Money（元）；adj_fa
 
 ## 快照清单
 snap_<hash>/manifest.json：来源、版本、摄取时间、质量摘要、schema 版本、.qpanel 哈希。
+
+可变仓库的 `warehouse_manifest.json` 另保存 `panel_meta`、`ingest_identity`、`last_ingest`，供 CLI/API 共享数据身份。旧 SQLite 元数据仅在目录及数据哈希均匹配时回读；任务状态仍留在各自 SQLite 中。空财务/公司行动表保留规范 schema，替换时不会沿用上一来源的旧记录。
 
 ## 数据源口径（provider → canonical，含实测校验）
 

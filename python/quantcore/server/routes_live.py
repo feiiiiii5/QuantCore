@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 
-from ..realtime.quotes import normalize_code
+from ..realtime.quotes import QuoteSourceError, normalize_code
 from ..realtime.service import LiveQuoteService
 from .security import ServerSecurity
 
@@ -48,6 +48,23 @@ def register_live_routes(app: FastAPI, service: LiveQuoteService, security: Serv
     @app.get("/api/live/quotes")
     async def live_quotes(codes: str | None = Query(default=None)) -> Any:
         return await service.quotes(_parse_codes(codes))
+
+    @app.get("/api/live/bars")
+    async def live_bars(
+        code: str = Query(...), limit: int = Query(default=600, ge=10, le=2000)
+    ) -> Any:
+        try:
+            normalized = normalize_code(code)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not service.config.enabled:
+            raise HTTPException(
+                status_code=409, detail="live daily candles require QC_ALLOW_NETWORK=1"
+            )
+        try:
+            return await service.bars(normalized, limit)
+        except QuoteSourceError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @app.websocket("/ws/live")
     async def live_socket(websocket: WebSocket, codes: str | None = Query(default=None)) -> None:

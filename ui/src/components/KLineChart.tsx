@@ -27,6 +27,7 @@ export default function KLineChart({ bars, palette: paletteProp, height = 430, s
   const ma5Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const fittedCode = useRef<string | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -59,15 +60,11 @@ export default function KLineChart({ bars, palette: paletteProp, height = 430, s
     ma5Ref.current = ma5;
     ma20Ref.current = ma20;
     volumeRef.current = volume;
-    let frame = 0;
     const resize = new ResizeObserver(() => {
       chart.applyOptions({ width: Math.max(container.clientWidth, 320), height: Math.max(container.clientHeight, 240) });
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => chart.timeScale().fitContent());
     });
     resize.observe(container);
     return () => {
-      window.cancelAnimationFrame(frame);
       resize.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -95,8 +92,10 @@ export default function KLineChart({ bars, palette: paletteProp, height = 430, s
     candle.setData(candles);
     ma5.setData(line(bars.ma5));
     ma20.setData(line(bars.ma20));
-    chartRef.current?.timeScale().fitContent();
-    window.requestAnimationFrame(() => chartRef.current?.timeScale().fitContent());
+    if (fittedCode.current !== bars.code) {
+      chartRef.current?.timeScale().fitContent();
+      fittedCode.current = bars.code;
+    }
   }, [bars]);
 
   useEffect(() => {

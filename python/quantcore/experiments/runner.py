@@ -220,6 +220,10 @@ class ReplayResult:
 def replay_experiment(store: ExperimentStore, run_id: str) -> ReplayResult:
     """Re-run a stored experiment and compare equity/trades/metrics bit-for-bit."""
     record = store.get(run_id)
+    if record.kind == "candidate_study":
+        from ..research.candidates import replay_candidate_run
+
+        return replay_candidate_run(store, run_id)
     metadata = record.metadata
     stored = store.load_result(run_id)
     strategy_payload = metadata.get("strategy")
@@ -241,7 +245,7 @@ def replay_experiment(store: ExperimentStore, run_id: str) -> ReplayResult:
         snapshot = None
         panel_dir = snapshot_info.get("panel_dir", "panel")
         panel_data = _load_panel_data(record.directory / str(panel_dir))
-    config = BacktestConfig.from_dict(metadata.get("config", {}))
+    config = BacktestConfig.from_dict(metadata.get("config", {}), legacy=True)
     strategy = spec.load()
     weights = strategy.generate_targets(panel_data)
     fresh = run_backtest(

@@ -359,11 +359,27 @@ class SinaProvider(DataProvider):
             if raw.empty:
                 actions = empty_corporate_actions()
             else:
-                _, actions = derive_adjustment(
-                    raw, self._qfq_for_raw(code, raw, start, end), source="SINA_APPROX"
-                )
+                _, _, actions = self._verified_adjustment(code, raw, start, end)
         self._action_cache[key] = actions
         return actions
+
+    def _verified_adjustment(
+        self, code: str, raw: pd.DataFrame, start: int, end: int
+    ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+        qfq = self._qfq_for_raw(code, raw, start, end)
+        requested = raw[(raw["date"] >= start) & (raw["date"] <= end)]
+        missing = sorted(set(requested["date"]) - set(qfq["date"]))
+        if missing:
+            first = int(qfq["date"].min()) if not qfq.empty else "none"
+            raise ProviderError(
+                f"qfq coverage starts {first}; requested date {missing[0]} is not covered"
+            )
+        if qfq.empty or requested.empty:
+            raw = requested
+        else:
+            raw = raw[(raw["date"] >= int(qfq["date"].min())) & (raw["date"] <= end)].copy()
+        factor, actions = derive_adjustment(raw, qfq, source="SINA_APPROX")
+        return raw, factor, actions
 
     def _bars_for_code(self, code: str, start: int, end: int) -> pd.DataFrame:
         raw = self._raw_daily(code, start, end)
@@ -373,9 +389,7 @@ class SinaProvider(DataProvider):
             )
             return empty_public_bars()
         if self.derive_actions:
-            factor, actions = derive_adjustment(
-                raw, self._qfq_for_raw(code, raw, start, end), source="SINA_APPROX"
-            )
+            raw, factor, actions = self._verified_adjustment(code, raw, start, end)
         else:
             factor = pd.Series(1.0, index=raw.index, dtype="float64")
             actions = empty_corporate_actions()
@@ -387,6 +401,7 @@ class SinaProvider(DataProvider):
             board=infer_board(code),
             st=self._st_by_sec.get(sec_id, False),
             source="SINA",
+            actions=actions,
         )
         return bars[(bars["date"] >= start) & (bars["date"] <= end)].reset_index(drop=True)
 

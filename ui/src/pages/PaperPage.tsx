@@ -7,6 +7,7 @@ import {
   StatTile, Tabs, type ChartSeries,
 } from "../components";
 import PaperPortfolioPanel from "../components/PaperPortfolioPanel";
+import PaperCorporateEvents from "../components/PaperCorporateEvents";
 import { notify } from "../lib/notify";
 import { dateInt, money, pct } from "../lib/format";
 import { zhCN as t } from "../i18n/zh-CN";
@@ -32,6 +33,7 @@ export default function PaperPage() {
   const [name, setName] = useState("");
   const [cash, setCash] = useState("1000000");
   const [snapshot, setSnapshot] = useState("");
+  const [mode, setMode] = useState<"historical" | "live">("historical");
   const [code, setCode] = useState("");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [qty, setQty] = useState("100");
@@ -48,6 +50,7 @@ export default function PaperPage() {
   const playTimer = useRef<number | null>(null);
   const selectedRef = useRef("");
   const stepInFlight = useRef(false);
+  const liveInFlight = useRef(false);
 
   const stopPlay = useCallback(() => {
     if (playTimer.current !== null) {
@@ -80,8 +83,22 @@ export default function PaperPage() {
       const next = await api.paperSession(sessionId);
       if (selectedRef.current !== sessionId) return;
       setDetail(next);
+      setSessions((list) => list.map((item) => item.id === sessionId ? next.session : item));
       setError("");
     } catch (e) { if (selectedRef.current === sessionId) setError(`${e}`); }
+  }, []);
+  const refreshLive = useCallback(async (sessionId: string) => {
+    if (!sessionId || liveInFlight.current) return;
+    liveInFlight.current = true;
+    try {
+      const next = await api.refreshPaper(sessionId);
+      if (selectedRef.current !== sessionId) return;
+      setDetail(next);
+      setSessions((list) => list.map((item) => item.id === sessionId ? next.session : item));
+      setError("");
+      if (next.fills?.length) notify({ title: "实时模拟成交", body: `${next.fills.length} 笔虚拟成交`, kind: "success" });
+    } catch (e) { if (selectedRef.current === sessionId) setError(`${e}`); }
+    finally { liveInFlight.current = false; }
   }, []);
   useEffect(() => {
     void loadSessions();
@@ -95,6 +112,12 @@ export default function PaperPage() {
       if (selectedRef.current === selected) setAutoRunning(status.running);
     }).catch(() => undefined);
   }, [selected, loadDetail]);
+  useEffect(() => {
+    if (!selected || detail?.session.mode !== "live") return;
+    void refreshLive(selected);
+    const timer = window.setInterval(() => { void refreshLive(selected); }, 3000);
+    return () => window.clearInterval(timer);
+  }, [selected, detail?.session.mode, refreshLive]);
   useEffect(() => {
     if (!autoRunning || !selected) return;
     const timer = window.setInterval(() => {
@@ -128,7 +151,7 @@ export default function PaperPage() {
   const createSession = async () => {
     setBusy(true); setError("");
     try {
-      const created = await api.createPaperSession({ snapshot: snapshot || null, initial_cash: Number(cash), name: name || undefined });
+      const created = await api.createPaperSession({ mode, snapshot: mode === "historical" ? snapshot || null : null, initial_cash: Number(cash), name: name || undefined });
       selectSession(created.id);
       await loadSessions();
       await loadDetail(created.id);
@@ -208,15 +231,16 @@ export default function PaperPage() {
   };
 
   const account = detail?.account;
+  const isLive = detail?.session.mode === "live";
   const equitySeries = useMemo<ChartSeries[]>(() => {
     if (!detail?.equity_curve || detail.equity_curve.length < 2) return [];
     return [{ kind: "area", title: "权益", data: detail.equity_curve.map((point) => ({ time: point.date, value: point.equity })) }];
   }, [detail]);
   const filteredSecurities = useMemo(() => {
-    if (!code.trim()) return [];
+    if (isLive || !code.trim()) return [];
     const text = code.trim().toLowerCase();
     return securities.filter((row) => `${row.code}${row.name}`.toLowerCase().includes(text)).slice(0, 6);
-  }, [code, securities]);
+  }, [code, securities, isLive]);
   const pendingOrders = detail?.orders.filter((order) => order.status === "pending" || order.status === "partial").length ?? 0;
   const totalPnl = account?.pnl ?? 0;
 
@@ -224,13 +248,15 @@ export default function PaperPage() {
     <div className="page">
       <PageHeader
         title="模拟交易"
-        subtitle="本地虚拟账户，历史快照逐日推进；不连接券商、不产生真实委托。"
+        subtitle="选择历史回放或实时行情模拟；资金、委托和成交均留在本地虚拟账户。"
         actions={(
           <>
             <Button variant="ghost" icon={Download} onClick={() => void downloadSignals()} disabled={!selected}>信号 CSV</Button>
-            <Button variant="primary" icon={SkipForward} onClick={() => void step()} disabled={!selected || playing || stepping || autoRunning}>下一交易日</Button>
-            <Button variant="secondary" icon={playing ? Pause : Play} onClick={togglePlay} disabled={!selected || autoRunning || (stepping && !playing)}>{playing ? "暂停" : "自动推进"}</Button>
-            <Button variant={autoRunning ? "danger" : "secondary"} icon={autoRunning ? Square : Play} onClick={() => void toggleAuto()} disabled={!selected || playing || stepping}>{autoRunning ? "停止持续模拟" : "持续模拟"}</Button>
+            {isLive ? <Button variant="primary" icon={RefreshCw} onClick={() => void refreshLive(selected)}>刷新实时账户</Button> : <>
+              <Button variant="primary" icon={SkipForward} onClick={() => void step()} disabled={!selected || playing || stepping || autoRunning}>下一交易日</Button>
+              <Button variant="secondary" icon={playing ? Pause : Play} onClick={togglePlay} disabled={!selected || autoRunning || (stepping && !playing)}>{playing ? "暂停" : "自动推进"}</Button>
+              <Button variant={autoRunning ? "danger" : "secondary"} icon={autoRunning ? Square : Play} onClick={() => void toggleAuto()} disabled={!selected || playing || stepping}>{autoRunning ? "停止持续模拟" : "持续模拟"}</Button>
+            </>}
             <Button variant="secondary" icon={RefreshCw} onClick={() => void reset()} disabled={!selected || stepping || autoRunning}>重置</Button>
             <Button variant="danger" icon={Trash2} onClick={() => void remove()} disabled={!selected || stepping || autoRunning}>删除</Button>
           </>
@@ -240,15 +266,16 @@ export default function PaperPage() {
 
       <div className="grid grid-1-2">
         <div className="stack">
-          <Panel title="新建模拟会话" subtitle="快照决定用哪份历史数据；初始资金只影响虚拟账户">
+          <Panel title="新建模拟会话" subtitle="历史模式使用快照；实时模式使用已开启的公开行情">
             <div className="stack">
+              <Field label="行情模式"><Select aria-label="行情模式" value={mode} onChange={(event) => setMode(event.target.value as "historical" | "live")} options={[{ value: "historical", label: "历史快照回放" }, { value: "live", label: "实时行情模拟" }]} /></Field>
               <Field label="会话名称"><Input placeholder="会话名称（可选）" value={name} onChange={(event) => setName(event.target.value)} aria-label="会话名称" /></Field>
-              <Field label="快照">
+              {mode === "historical" ? <Field label="快照">
                 <Select value={snapshot} onChange={(event) => setSnapshot(event.target.value)} options={[{ value: "", label: "最新可用快照" }, ...snapshots.map((item) => ({ value: item.id || "", label: `${item.id?.slice(0, 18) || "snapshot"} · ${item.n_sec} 券` }))]} />
-              </Field>
+              </Field> : <p className="page-note-sm">实时模拟无需历史快照。启用实时行情后，页面每 3 秒请求更新；休市、停牌、缺时间戳或陈旧报价均不会模拟成交。</p>}
               <Field label="初始资金（元）"><Input value={cash} onChange={(event) => setCash(event.target.value)} inputMode="decimal" aria-label="初始资金（元）" /></Field>
-              <div><Button variant="primary" icon={Plus} onClick={() => void createSession()} disabled={busy || !snapshots.length}>创建会话</Button></div>
-              {!snapshots.length ? <p className="page-note-sm">还没有快照。先去「数据」页或首页「一键示例」构建 SYNTHETIC 快照。</p> : null}
+              <div><Button variant="primary" icon={Plus} onClick={() => void createSession()} disabled={busy || (mode === "historical" && !snapshots.length)}>创建会话</Button></div>
+              {mode === "historical" && !snapshots.length ? <p className="page-note-sm">还没有快照。先去「数据」页或首页「一键示例」构建 SYNTHETIC 快照。</p> : null}
             </div>
           </Panel>
           <Panel title="模拟会话" subtitle={`${sessions.length} 个 · 权益 / 收益 / 持仓 / 待成交`}>
@@ -259,7 +286,7 @@ export default function PaperPage() {
                   return (
                     <button key={session.id} type="button" className={`session-card ${selected === session.id ? "selected" : ""}`} onClick={() => selectSession(session.id)} aria-pressed={selected === session.id}>
                       <span className="session-card-name" title={session.name}>{session.name}</span>
-                      <span className="session-card-sub">{session.id.slice(0, 14)} · {dateText(session.current_date)} · {session.status}</span>
+                      <span className="session-card-sub">{session.id.slice(0, 14)} · {dateText(session.current_date)} · {session.mode === "live" ? "实时模拟" : "历史回放"}</span>
                       <div className="session-stats">
                         <div className="session-stat"><span>权益</span><b>{money(session.equity)}</b></div>
                         <div className="session-stat"><span>收益</span><b className={sessionPnl > 0 ? "up" : sessionPnl < 0 ? "down" : "flat"}>{pct(session.starting_cash ? sessionPnl / session.starting_cash : 0)}</b></div>
@@ -279,21 +306,24 @@ export default function PaperPage() {
             <>
               <Panel
                 title={detail.session.name}
-                subtitle={`${dateText(detail.session.current_date)} / ${dateText(detail.session.end_date)} · 快照 ${detail.session.snapshot || "—"} · ${detail.session.synthetic ? "SYNTHETIC" : "本地数据"}`}
+                subtitle={isLive ? `${dateText(detail.session.current_date)} · 实时行情驱动的本地虚拟账户` : `${dateText(detail.session.current_date)} / ${dateText(detail.session.end_date)} · 快照 ${detail.session.snapshot || "—"} · ${detail.session.synthetic ? "SYNTHETIC" : "本地数据"}`}
                 actions={autoRunning ? <Badge tone="ok" dot>持续模拟中</Badge> : <Badge tone="neutral">{detail.session.status}</Badge>}
               >
                 <div className="stack">
+                  {isLive ? <div role="status"><p className="page-note-sm">{detail.live?.notice || "等待有效行情；首次刷新建立成交量基线。"}</p>{detail.live?.quotes.map((quote) => <p className="page-note-sm" key={quote.code}>{quote.code} · {quote.timestamp || "无行情时间"} · {quote.reason || "有效报价"}</p>)}</div> : null}
                   <div className="grid grid-2">
                     <StatTile label="总权益" value={money(account?.equity ?? 0)} trend={totalPnl > 0 ? "up" : totalPnl < 0 ? "down" : "flat"} tone={totalPnl > 0 ? "up" : totalPnl < 0 ? "down" : "neutral"} hint={`初始 ${money(detail.session.starting_cash)}`} />
                     <StatTile label="收益" value={`${money(account?.pnl ?? 0)}（${pct(account?.pnl_pct ?? 0)}）`} tone={totalPnl > 0 ? "up" : totalPnl < 0 ? "down" : "neutral"} hint="含费用，仅虚拟账户" />
                     <StatTile label="持仓市值" value={money(account?.market_value ?? 0)} hint={`现金 ${money(account?.cash ?? 0)}`} />
                     <StatTile label="待成交" value={pendingOrders} hint={`委托 ${detail.orders.length} · 成交 ${detail.trades.length}`} />
                   </div>
-                  <ChartCard title="权益曲线" subtitle="历史快照回放，非实时行情" height={240}>
+                  <ChartCard title="权益曲线" subtitle={isLive ? "每日权益随有效行情更新；陈旧时沿用最后有效估值" : "历史快照回放，非实时行情"} height={240}>
                     {equitySeries.length ? <Chart series={equitySeries} height={240} ariaLabel="模拟账户权益曲线" valueFormatter={(value) => value.toFixed(0)} /> : <EmptyState compact title="还没有权益曲线" hint="推进一个交易日后显示。" />}
                   </ChartCard>
                 </div>
               </Panel>
+
+              <PaperCorporateEvents events={detail.corporate_events ?? []} live={isLive} />
 
               <Panel title="账户明细" subtitle="持仓 / 委托 / 成交；部分成交会显示 成交/委托 数量">
                 <Tabs items={TAB_ITEMS.map((item) => item.id === "orders" ? { ...item, badge: pendingOrders || undefined } : item)} value={tab} onChange={setTab} ariaLabel="模拟账户明细" />
@@ -301,7 +331,7 @@ export default function PaperPage() {
                   <div className="table-wrap">
                     <table>
                       <thead><tr><th>代码</th><th>名称</th><th className="num">数量</th><th className="num">可卖</th><th className="num">成本</th><th className="num">现价</th><th className="num">盈亏</th></tr></thead>
-                      <tbody>{detail.positions.map((pos) => <tr key={pos.sec_id}><td className="mono">{pos.code}</td><td>{pos.name}</td><td className="num">{pos.qty}</td><td className="num">{pos.available}</td><td className="num">{pos.avg_cost.toFixed(2)}</td><td className="num">{pos.last.toFixed(2)}</td><td className={`num ${pos.pnl >= 0 ? "up" : "down"}`}>{money(pos.pnl)}</td></tr>)}</tbody>
+                      <tbody>{detail.positions.map((pos) => <tr key={pos.sec_id}><td className="mono">{pos.code}</td><td>{pos.name}</td><td className="num">{pos.qty}</td><td className="num">{pos.available}</td><td className="num">{pos.avg_cost.toFixed(2)}</td><td className="num" title={pos.quote_timestamp || undefined}>{pos.last.toFixed(2)}{isLive ? <div className="page-note-sm">{pos.quote_timestamp || "待更新"}</div> : null}</td><td className={`num ${pos.pnl >= 0 ? "up" : "down"}`}>{money(pos.pnl)}</td></tr>)}</tbody>
                     </table>
                     {!detail.positions.length ? <EmptyState compact title="暂无持仓" hint="提交买入委托并推进交易日后显示。" /> : null}
                   </div>
@@ -342,18 +372,18 @@ export default function PaperPage() {
                 ) : null}
               </Panel>
 
-              <Panel title="提交模拟委托" subtitle="市价委托在下一交易日开盘撮合；限价委托在价格触及时撮合">
+              <Panel title="提交模拟委托" subtitle={isLive ? "以委托之后的新鲜报价模拟撮合，新增成交量限制可成交数量" : "市价委托在下一交易日开盘撮合；限价委托在价格触及时撮合"}>
                 <div className="stack">
                   <div className="grid grid-3">
                     <Field label="代码"><Input value={code} onChange={(event) => setCode(event.target.value)} list="paper-codes" placeholder="600000" aria-label="代码" /></Field>
                     <Field label="方向"><Select value={side} onChange={(event) => setSide(event.target.value as "buy" | "sell")} options={[{ value: "buy", label: "买入" }, { value: "sell", label: "卖出" }]} /></Field>
                     <Field label="数量"><Input value={qty} onChange={(event) => setQty(event.target.value)} inputMode="numeric" aria-label="数量" /></Field>
-                    <Field label="类型"><Select value={orderType} onChange={(event) => setOrderType(event.target.value as "market" | "limit")} options={[{ value: "market", label: "市价（次日开盘）" }, { value: "limit", label: "限价" }]} /></Field>
+                    <Field label="类型"><Select value={orderType} onChange={(event) => setOrderType(event.target.value as "market" | "limit")} options={[{ value: "market", label: isLive ? "市价（后续有效行情）" : "市价（次日开盘）" }, { value: "limit", label: "限价" }]} /></Field>
                     {orderType === "limit" ? <Field label="限价"><Input value={limitPrice} onChange={(event) => setLimitPrice(event.target.value)} inputMode="decimal" aria-label="限价" /></Field> : null}
                   </div>
                   <datalist id="paper-codes">{filteredSecurities.map((row) => <option key={row.sec_id} value={row.code}>{row.name}</option>)}</datalist>
                   <div><Button variant="primary" icon={Plus} onClick={() => void submitOrder()} disabled={!code.trim() || !qty}>提交委托</Button></div>
-                  <p className="page-note-sm">新手提示：市价单会在下一交易日按开盘价撮合；A 股 T+1，当日买入次日才能卖。规则复用回测费用/手数/T+1/涨跌停，仅本地模拟。</p>
+                  <p className="page-note-sm">{isLive ? "首次报价只建立基线；后续新增成交量的 10% 用作虚拟撮合上限，限价只看下单后的最新价格。A 股 T+1，不模拟盘口排队、公司行为或真实成交保证。" : "新手提示：市价单会在下一交易日按开盘价撮合；A 股 T+1，当日买入次日才能卖。规则复用回测费用/手数/T+1/涨跌停，仅本地模拟。"}</p>
                 </div>
               </Panel>
 

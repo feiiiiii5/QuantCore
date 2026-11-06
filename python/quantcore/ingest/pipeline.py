@@ -8,12 +8,13 @@ quality report with every ingest run.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from datetime import timedelta
 from typing import Any
 
 import pandas as pd
 
-from ..calendar import TradingCalendar, to_date_int
+from ..calendar import TradingCalendar, from_date_int, to_date_int
 from ..data.panel import (
     PanelData,
     normalize_bars,
@@ -24,6 +25,7 @@ from ..data.store import ParquetStore
 from ..errors import ProviderError
 from ..providers.base import DataProvider, RetryPolicy, retry_call
 from ..quality import QualityReport, quarantine_bad_rows, run_quality_checks
+from .identity import check_incremental_identity, source_identity
 
 
 @dataclass
@@ -86,31 +88,48 @@ class ProviderIngestor:
         end: int | str,
         codes: Iterable[str] | None = None,
         incremental: bool = True,
+        *,
+        reset: bool = False,
     ) -> IngestResult:
+        """Replace on reset only after fetching and passing the quality gate."""
+        if reset:
+            incremental = False
         start_i, end_i = to_date_int(start), to_date_int(end)
         if start_i > end_i:
             raise ValueError("start date must not be after end date")
         self.provider.require("daily_bars")
+        self.provider.require("calendar")
+        self.provider.require("security_master")
         self.provider.ensure_available()
+
+        codes = tuple(codes) if codes is not None else None
+        identity = source_identity(self.provider, codes)
 
         existing_bars = self._existing("bars") if incremental else None
         effective_start = start_i
         if existing_bars is not None and not existing_bars.empty:
+            check_incremental_identity(self.store, identity, existing_bars)
             watermark = int(existing_bars["date"].max())
-            effective_start = max(start_i, watermark + 1)
+            effective_start = max(
+                start_i, to_date_int(from_date_int(watermark) + timedelta(days=1))
+            )
             if effective_start > end_i:
                 result = IngestResult(
                     provider=self.provider.name,
                     start=start_i,
                     end=end_i,
-                    synthetic=self.provider.name == "synthetic",
-                    datasets=self.store.state.dataset_rows(),
+                    synthetic=self.provider.name == "synthetic"
+                    or "SYNTHETIC" in set(existing_bars["source"]),
+                    datasets={
+                        name: stats.rows for name, stats in self.store.manifest.datasets.items()
+                    },
                     quality={"passed": True, "note": "no new trading days"},
                     quality_passed=True,
                     manifest_hash=self.store.manifest_hash(),
                     incremental=True,
                 )
-                self.store.state.set_meta("last_ingest", result.to_dict())
+                self.store.set_metadata("ingest_identity", identity)
+                self.store.set_metadata("last_ingest", result.to_dict())
                 return result
 
         calendar = self._call(lambda: self.provider.fetch_calendar(effective_start, end_i))
@@ -185,40 +204,48 @@ class ProviderIngestor:
                 else pd.DataFrame()
             )
 
-        synthetic = self.provider.name == "synthetic"
+        synthetic = self.provider.name == "synthetic" or "SYNTHETIC" in set(bars["source"])
+        metadata: dict[str, Any] = {
+            "provider": self.provider.name,
+            "source": "SYNTHETIC" if synthetic else self.provider.name.upper(),
+            "synthetic": synthetic,
+            "provider_info": self.provider.quota_info(),
+            "disclaimer": (
+                "SYNTHETIC data: every value is fabricated and not a real market result"
+                if synthetic
+                else ""
+            ),
+        }
+        if self.provider.name == "synthetic":
+            config = self.provider.config  # type: ignore[attr-defined]
+            metadata.update(seed=config.seed, config=asdict(config))
         panel = PanelData(
             calendar=full_calendar,
             securities=securities,
             bars=bars,
             financials=financials,
             corporate_actions=corporate_actions,
-            meta={
-                "provider": self.provider.name,
-                "source": "SYNTHETIC" if synthetic else self.provider.name.upper(),
-                "synthetic": synthetic,
-                "provider_info": self.provider.quota_info(),
-                "disclaimer": (
-                    "SYNTHETIC data: every value is fabricated and not a real market result"
-                    if synthetic
-                    else ""
-                ),
-            },
+            meta=metadata,
         )
 
         report: QualityReport = run_quality_checks(panel)
         quarantined = 0
+        bad: pd.DataFrame | None = None
         if self.quarantine:
             quarantined_result = quarantine_bad_rows(panel)
             if quarantined_result.dropped:
                 bad = quarantined_result.bad_rows.copy()
                 bad["quarantined_at"] = pd.Timestamp.now(tz="UTC").isoformat()
-                self.store.write_dataset("quarantine", bad, partition_column="year")
                 panel = quarantined_result.clean
                 report = quarantined_result.report
                 quarantined = quarantined_result.dropped
         if self.enforce_quality:
             report.raise_if_failed()
 
+        if reset:
+            self.store.reset()
+        if bad is not None:
+            self.store.write_dataset("quarantine", bad, partition_column="year")
         datasets = self.store.write_panel(panel)
         quality = report.to_dict()
         quality["report_path"] = str(
@@ -237,7 +264,8 @@ class ProviderIngestor:
             manifest_hash=self.store.manifest_hash(),
             incremental=incremental,
         )
-        self.store.state.set_meta("last_ingest", ingest_result.to_dict())
+        self.store.set_metadata("ingest_identity", identity)
+        self.store.set_metadata("last_ingest", ingest_result.to_dict())
         return ingest_result
 
 

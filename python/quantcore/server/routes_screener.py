@@ -138,11 +138,18 @@ def register_screener_routes(app: FastAPI, ctx: Workspace) -> None:
         finite = np.isfinite(latest)
         boolean_like = np.all((~finite) | (latest == 0.0) | (latest == 1.0))
         matched = eligible & finite & (latest > 0.5) if boolean_like else eligible & finite
+        indices = np.flatnonzero(matched)
+        matched_count = len(indices)
+        if not boolean_like:
+            indices = indices[np.argsort(-latest[indices], kind="stable")]
+        indices = indices[: payload.limit]
         rows: list[dict[str, Any]] = []
         meta_frame = panel.securities.reset_index(drop=True)
-        close = panel.matrix("close")[-1]
-        pre_close = panel.matrix("pre_close")[-1] if "pre_close" in panel.bars.columns else close
-        for idx in np.flatnonzero(matched):
+        close = view.field("close")[-1]
+        pre_close = view.field("pre_close")[-1] if "pre_close" in panel.bars.columns else close
+        turnover = view.field("turnover")[-1]
+        mktcap = view.field("mktcap")[-1]
+        for idx in indices:
             record = meta_frame.iloc[int(idx)].to_dict() if int(idx) < len(meta_frame) else {}
             score = float(latest[int(idx)])
             rows.append(
@@ -158,15 +165,11 @@ def register_screener_routes(app: FastAPI, ctx: Workspace) -> None:
                     )
                     if np.isfinite(pre_close[int(idx)]) and pre_close[int(idx)]
                     else 0.0,
-                    "turnover": round(float(panel.matrix("turnover")[-1][int(idx)]) * 100.0, 4),
-                    "mktcap": float(panel.matrix("mktcap")[-1][int(idx)]),
+                    "turnover": round(float(turnover[int(idx)]) * 100.0, 4),
+                    "mktcap": float(mktcap[int(idx)]),
                     "score": score,
                 }
             )
-        if not boolean_like:
-            rows.sort(key=lambda row: row["score"], reverse=True)
-        matched_count = len(rows)
-        rows = rows[: payload.limit]
         return json_safe(
             {
                 "as_of": int(panel.calendar.dates[-1]),

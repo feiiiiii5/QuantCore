@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowRight, RefreshCw, ShieldCheck, SlidersHorizontal, Star, StarOff } from "lucide-react";
 import {
-  useBars, useDataIntegrity, useFinancials, useLiveIndices, useLiveQuotes, useLiveStatus,
+  useBars, useDataIntegrity, useFinancials, useLiveBars, useLiveIndices, useLiveQuotes, useLiveStatus,
   useMinuteBars, useOverview, useSaveWatchlist, useSecurities, useSecurityProfile, useWatchlist,
 } from "../api/queries";
 import type { SecurityRow } from "../api/types";
@@ -13,9 +13,10 @@ import {
 import { compact, dateInt, num, signedPct } from "../lib/format";
 import {
   changeTone, indexViews, integrityLabel, integrityTone, liveSummary, liveTone,
-  marketReadings, updatedAtLabel,
+  marketReadings, updatedAtLabel, withLiveCandle,
 } from "../lib/live";
 import { notify } from "../lib/notify";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useChartPalette } from "../theme";
 import { useWorkspace } from "../store/workspace";
 import { zhCN as t } from "../i18n/zh-CN";
@@ -27,8 +28,6 @@ export default function MarketPage() {
   const palette = useChartPalette();
   const [searchParams, setSearchParams] = useSearchParams();
   const overview = useOverview();
-  const securitiesQuery = useSecurities("", 1000);
-  const rows = securitiesQuery.data ?? [];
   const [picked, setPicked] = useState(() => useWorkspace.getState().marketCode);
   const [query, setQuery] = useState(() => useWorkspace.getState().marketQuery);
   const [listMode, setListMode] = useState<"all" | "watch">("all");
@@ -45,9 +44,13 @@ export default function MarketPage() {
   const watchlist = useWatchlist();
   const saveWatchlist = useSaveWatchlist();
   const codes = watchlist.data?.codes ?? [];
+  const search = useDebouncedValue(query.trim());
+  const securitiesQuery = useSecurities(search, 1000, listMode === "watch" ? codes : undefined, listMode !== "watch" || codes.length > 0);
+  const rows = securitiesQuery.data ?? [];
 
   const code = searchParams.get("code") || picked || rows[0]?.code || "";
   const bars = useBars(code || null);
+  const publicBars = useLiveBars(code || null, liveEnabled);
   const profile = useSecurityProfile(code || null);
   const financials = useFinancials(code || null);
   const minuteBars = useMinuteBars(code || null, minuteMode);
@@ -63,23 +66,24 @@ export default function MarketPage() {
   }, [code, rows, setMarketCode]);
   useEffect(() => { setMarketQuery(query); }, [query, setMarketQuery]);
 
-  const select = useCallback((row: SecurityRow) => {
-    setPicked(row.code);
-    setMarketCode(row.code);
-    setSearchParams({ code: row.code }, { replace: true });
+  const openCode = useCallback((value: string) => {
+    setPicked(value);
+    setMarketCode(value);
+    setSearchParams({ code: value }, { replace: true });
   }, [setMarketCode, setSearchParams]);
+  const select = useCallback((row: SecurityRow) => openCode(row.code), [openCode]);
 
-  const filtered = useMemo(() => {
-    const base = listMode === "watch" ? rows.filter((row) => codes.includes(row.code)) : rows;
-    const needle = query.trim().toLowerCase();
-    if (!needle) return base;
-    return base.filter((row) => `${row.code}${row.name}${row.industry}${row.board}`.toLowerCase().includes(needle));
-  }, [codes, listMode, query, rows]);
+  const filtered = search === query.trim() && (listMode !== "watch" || codes.length > 0) ? rows : [];
   const selected = rows.find((row) => row.code === code) ?? null;
-  const views = useMemo(() => indexViews(liveIndices.data?.quotes, overview.data?.indices), [liveIndices.data, overview.data]);
+  const views = useMemo(() => indexViews(liveEnabled ? liveIndices.data?.quotes : null, overview.data?.indices), [liveEnabled, liveIndices.data, overview.data]);
+  const quote = liveEnabled ? liveQuotes.data?.quotes.find((row) => row.code === code) ?? null : null;
+  const displayedBars = useMemo(() => {
+    if (liveEnabled && publicBars.data) return withLiveCandle(publicBars.data, liveQuotes.data?.stale ? null : quote);
+    return bars.data;
+  }, [liveEnabled, publicBars.data, liveQuotes.data?.stale, quote, bars.data]);
   const readings = useMemo(
-    () => marketReadings({ quote: liveQuotes.data?.quotes[0] ?? null, bars: bars.data, profile: profile.data }),
-    [liveQuotes.data, bars.data, profile.data],
+    () => marketReadings({ quote, bars: displayedBars, profile: profile.data }),
+    [quote, displayedBars, profile.data],
   );
   const tone = liveTone(liveStatus.data);
   const inWatchlist = Boolean(code) && codes.includes(code);
@@ -88,6 +92,7 @@ export default function MarketPage() {
     void overview.refetch();
     void securitiesQuery.refetch();
     void bars.refetch();
+    if (liveEnabled) void publicBars.refetch();
     void profile.refetch();
     void integrity.refetch();
     void liveStatus.refetch();
@@ -152,7 +157,7 @@ export default function MarketPage() {
                 </div>
                 <div className="kpi-value">{view.close == null ? "—" : num(view.close)}</div>
                 <Sparkline values={view.spark.length ? view.spark : view.close != null ? [view.close, view.close] : []} positive={(view.changePct ?? 0) >= 0} height={28} />
-                <small>{view.source === "live" ? t.appbar.live : view.source === "snapshot" ? t.common.snapshot : t.common.notAvailable}</small>
+                <small>{view.source === "live" ? tone === "live" && !liveIndices.data?.stale ? t.appbar.live : "最近报价" : view.source === "snapshot" ? t.common.snapshot : t.common.notAvailable}</small>
               </div>
             ))}
           </div>
@@ -161,14 +166,16 @@ export default function MarketPage() {
             <div className="stack">
               <Panel
                 title={t.market.listTitle}
-                subtitle={`${filtered.length} / ${rows.length} · ${listMode === "watch" ? t.market.listWatch : t.market.listAll}`}
+                subtitle={`${filtered.length} 只 · ${listMode === "watch" ? t.market.listWatch : "全快照搜索"}${rows.length === 1000 ? " · 展示前 1000 只，请搜索缩小范围" : ""}`}
                 actions={(
                   <div className="row">
-                    <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.market.searchPlaceholder} aria-label={t.market.searchPlaceholder} size="sm" style={{ width: 200 }} />
+                    <Input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && /^\d{6}$/.test(query.trim())) openCode(query.trim()); }} placeholder={t.market.searchPlaceholder} aria-label={t.market.searchPlaceholder} size="sm" style={{ width: 200 }} />
+                    {liveEnabled && /^\d{6}$/.test(query.trim()) ? <Button variant="secondary" size="sm" onClick={() => openCode(query.trim())}>查看代码</Button> : null}
                     <Segmented ariaLabel="证券范围" size="sm" value={listMode} onChange={(value) => setListMode(value as "all" | "watch")} items={[{ value: "all", label: t.market.listAll }, { value: "watch", label: `${t.market.listWatch} ${codes.length}` }]} />
                   </div>
                 )}
               >
+                {liveEnabled ? <p className="page-note-sm">输入六位代码后按 Enter，可查看未导入本地快照的证券。</p> : null}
                 {listMode === "watch" && codes.length === 0 ? (
                   <StatePanel empty emptyHint={`${t.market.watchEmpty}：${t.market.watchEmptyHint}`} />
                 ) : securitiesQuery.isError ? (
@@ -179,8 +186,8 @@ export default function MarketPage() {
               </Panel>
 
               <Panel
-                title={selected ? `${selected.code} ${selected.name}` : t.market.chart}
-                subtitle={selected ? `${selected.board} · ${selected.industry}` : undefined}
+                title={displayedBars ? `${displayedBars.code} ${quote?.name || displayedBars.name}` : selected ? `${selected.code} ${selected.name}` : profile.data ? `${profile.data.code} ${profile.data.name}` : t.market.chart}
+                subtitle={selected ? `${selected.board} · ${selected.industry}` : profile.data ? `${profile.data.board} · ${profile.data.industry}` : undefined}
                 actions={(
                   <div className="chart-tools" aria-label={t.market.indicators}>
                     <button className={`chip ${showMA5 ? "active" : ""}`} onClick={() => setShowMA5((value) => !value)} aria-pressed={showMA5}>{t.market.ma5}</button>
@@ -190,9 +197,11 @@ export default function MarketPage() {
                   </div>
                 )}
               >
-                {!minuteMode && (bars.isLoading ? <StatePanel loading /> : bars.error ? <StatePanel error={bars.error.message} onRetry={() => void bars.refetch()} /> : bars.data ? (
-                  <KLineChart bars={bars.data} palette={palette} height={420} showMA5={showMA5} showMA20={showMA20} showVolume={showVolume} />
-                ) : <StatePanel empty emptyHint={t.market.chartEmpty} />)}
+                {liveEnabled && !minuteMode ? <p className="page-note-sm">{publicBars.data ? `${publicBars.data.note ?? "公开源日线 · 不复权"} · ${publicBars.data.source ?? "—"}` : publicBars.error ? "公开日线暂不可用，以下显示本地快照（如有）。" : "正在载入公开源日线…"}</p> : null}
+                {!minuteMode && (!displayedBars && (bars.isLoading || (liveEnabled && publicBars.isLoading)) ? <StatePanel loading /> : displayedBars ? (
+                  <KLineChart bars={displayedBars} palette={palette} height={420} showMA5={showMA5} showMA20={showMA20} showVolume={showVolume} />
+                ) : bars.error || publicBars.error ? <StatePanel error={publicBars.error?.message || bars.error?.message || "日线不可用"} onRetry={() => { void bars.refetch(); if (liveEnabled) void publicBars.refetch(); }} />
+                : <StatePanel empty emptyHint={t.market.chartEmpty} />)}
                 {minuteMode ? (
                   <div className="minute-panel" data-testid="minute-panel">
                     <div className="row-between" style={{ marginBottom: "var(--sp-4)" }}><span className="switch-title">{t.market.minutesTitle}</span><span className="page-note-sm">{t.market.minutesHint}</span></div>
@@ -255,7 +264,7 @@ export default function MarketPage() {
 
             <div className="stack">
               <Panel
-                title={<><span className={DOT_CLASS[tone] ?? "dot"} aria-hidden="true" />{t.market.readings}</>}
+                title={<><span className={DOT_CLASS[tone] ?? "dot"} aria-hidden="true" />{readings.source === "live" ? tone === "live" && !liveQuotes.data?.stale ? t.market.readings : "最近报价" : "快照读数"}</>}
                 subtitle={liveSummary(liveStatus.data, snapshot?.end ? String(snapshot.end) : null)}
                 actions={liveBadge}
               >
@@ -279,6 +288,7 @@ export default function MarketPage() {
                 </div>
                 {!liveEnabled ? <p className="page-note-sm" style={{ marginTop: "var(--sp-4)" }}>{t.market.liveOff} <Link to="/settings">{t.common.openSettings}</Link></p> : null}
                 {liveEnabled && liveQuotes.isError ? <p className="warn-text" style={{ marginTop: "var(--sp-4)" }}>{t.market.quoteFailed}</p> : null}
+                {liveEnabled && liveQuotes.data?.stale ? <p className="warn-text" style={{ marginTop: "var(--sp-4)" }}>报价已延迟或缺少源端时间；当前显示最近可得价格。</p> : null}
                 {readings.suspended ? <p className="warn-text" style={{ marginTop: "var(--sp-4)" }}>{t.market.suspendedLabel}</p> : null}
                 <div className="row" style={{ marginTop: "var(--sp-6)" }}>
                   <Button variant="secondary" icon={inWatchlist ? StarOff : Star} onClick={toggleWatch} disabled={!code} loading={saveWatchlist.isPending}>{inWatchlist ? t.market.removeWatch : t.market.addWatch}</Button>

@@ -1,7 +1,7 @@
 """Local FastAPI research server (M5/M6): loopback-only, bearer-token protected.
 
-Serves the built UI from the same origin (no CORS), exposes the UI-API v2 contract and
-runs research jobs on a single worker.  There is no order routing or broker gateway.
+Serves the built UI and optionally trusts configured HTTPS frontend origins, exposes
+the UI-API v2 contract and runs research jobs on a single worker. There is no broker gateway.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 import quantcore
@@ -77,20 +78,28 @@ def create_app(
     *,
     token: str | None = None,
     port: int = 8000,
-    state_path: str | Path = DEFAULT_STATE_PATH,
+    state_path: str | Path | None = None,
     runner: Any = None,
     start_worker: bool = True,
     security: ServerSecurity | None = None,
+    allowed_origins: list[str] | tuple[str, ...] | None = None,
     data_root: str | Path | None = None,
     snapshots_root: str | Path | None = None,
     experiments_root: str | Path | None = None,
     ui_dir: str | Path | None = None,
     serve_ui: bool = True,
 ) -> FastAPI:
-    """Build the FastAPI application (no CORS middleware, loopback security)."""
+    """Build a loopback API, optionally readable from exact trusted HTTPS origins."""
     if security is None:
         resolved_token, generated = resolve_token(token)
-        security = ServerSecurity(token=resolved_token, port=port, token_generated=generated)
+        security = ServerSecurity(
+            token=resolved_token,
+            port=port,
+            token_generated=generated,
+            allowed_origins=tuple(allowed_origins or ()),
+        )
+    elif allowed_origins is not None:
+        raise ValueError("configure allowed_origins on security or create_app, not both")
     settings = Settings.create(
         data_root=data_root,
         snapshots_root=snapshots_root,
@@ -128,6 +137,14 @@ def create_app(
     app.state.settings = settings
     app.state.live = live
     app.add_middleware(GZipMiddleware, minimum_size=1024)
+    if security.allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=security.allowed_origins,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type"],
+            allow_private_network=True,
+        )
     app.add_middleware(SecurityMiddleware, security=security)
 
     # -- error contract: {"detail": ...}; 400/401/403/404/409/422/500 -------------------
@@ -165,7 +182,8 @@ def create_app(
             engine_available=quantcore.engine_available(),
             panel_available=quantcore.panel_available(),
             synthetic_only=_synthetic_only(workspace),
-            cors=False,
+            cors=bool(security.allowed_origins),
+            allowed_origins=list(security.allowed_origins or ()),
         )
 
     @app.get("/api/meta")
@@ -182,7 +200,8 @@ def create_app(
                 "experiments_root": str(settings.experiments_root),
                 "token_required": True,
                 "ui_served": bool(index_path.exists()),
-                "cors": False,
+                "cors": bool(security.allowed_origins),
+                "allowed_origins": list(security.allowed_origins or ()),
                 "api_version": "v2",
             }
         )

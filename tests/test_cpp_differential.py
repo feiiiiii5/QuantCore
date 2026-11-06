@@ -40,6 +40,8 @@ def _ref_config(config: BacktestConfig) -> RefConfig:
         t_plus_one=config.rules.t_plus_one,
         annual_days=config.annual_days,
         min_price_tick=round(config.rules.min_price_tick * 10000),
+        use_panel_corporate_actions=config.use_panel_corporate_actions,
+        corporate_actions=config.corporate_actions,
     )
 
 

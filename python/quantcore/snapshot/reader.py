@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +13,7 @@ import pandas as pd
 from ..calendar import TradingCalendar, date_str
 from ..data.panel import PanelData
 from ..errors import SnapshotError
+from .checksums import sha256_file
 from .manifest import SnapshotManifest
 
 MANIFEST_NAME = "manifest.json"
@@ -124,7 +124,7 @@ class Snapshot:
             if not path.exists():
                 problems.append(f"{name}: missing file {dataset.file}")
                 continue
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            digest = sha256_file(path)
             if digest != dataset.sha256:
                 problems.append(f"{name}: sha256 mismatch")
             if path.stat().st_size != dataset.bytes:
@@ -136,7 +136,7 @@ class Snapshot:
             if not path.exists():
                 problems.append("panel: missing .qpanel file")
             else:
-                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                digest = sha256_file(path)
                 if digest != panel_info.get("sha256"):
                     problems.append("panel: .qpanel sha256 mismatch")
         if not self.manifest.snapshot_id.startswith(f"snap_{self.manifest.content_hash[:16]}"):
@@ -185,7 +185,7 @@ def load_snapshot(root: str | Path, snapshot_id: str) -> Snapshot:
 
 
 def list_snapshots(root: str | Path) -> list[SnapshotManifest]:
-    """List snapshot manifests under ``root``, newest first."""
+    """List the last published snapshot first, with creation-time legacy fallback."""
     root_path = Path(root)
     if not root_path.exists():
         return []
@@ -199,6 +199,17 @@ def list_snapshots(root: str | Path) -> list[SnapshotManifest]:
         except (json.JSONDecodeError, KeyError):
             continue
     manifests.sort(key=lambda item: (item.created_at, item.snapshot_id), reverse=True)
+    try:
+        published = json.loads((root_path / "latest.json").read_text(encoding="utf-8"))
+        if isinstance(published, dict):
+            for index, manifest in enumerate(manifests):
+                if manifest.snapshot_id == published.get(
+                    "snapshot_id"
+                ) and manifest.content_hash == published.get("content_hash"):
+                    manifests.insert(0, manifests.pop(index))
+                    break
+    except (OSError, ValueError):
+        pass  # Older/copied roots have no publication record; retain file ordering.
     return manifests
 
 

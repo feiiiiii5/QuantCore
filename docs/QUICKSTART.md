@@ -52,6 +52,8 @@ uv run --no-sync qc serve --data-root data --port 8000 --open
 网络数据接入默认关闭。导入后，先检查数据质量，再构建快照，并在回测时明确选择该快照。
 **CLI 回测省略 `--snapshot` 时会新建合成数据，不会自动使用最近导入的数据。**
 
+增量更新要求沿用同一来源、证券范围和关键参数。切换来源或范围时，界面选择“替换数据”，CLI 使用 `--no-incremental` 或 `--reset`。取数或质量检查失败会保留旧仓；已保存的快照与实验独立保留。
+
 查看已有快照：
 
 ```bash
@@ -64,14 +66,14 @@ uv run --no-sync qc snapshot list --snapshots-root data/snapshots
 
 ```bash
 QC_ALLOW_NETWORK=1 uv run --no-sync qc data update --provider sina \
-  --codes 600000,000001,300750 --start 2024-01-01 --end 2026-10-31 --data-root data
+  --codes 600000,000001,300750 --start 2024-01-01 --end 2026-10-31 --data-root data --reset
 uv run --no-sync qc snapshot build --data-root data --snapshots-root data/snapshots
 uv run --no-sync qc data integrity --snapshots-root data/snapshots
 ```
 
 随后按上面的方式明确选择构建出的快照。公开源并非授权行情 feed；日线深度、成交额估算、复权和公司行为近似等限制见 [DATA-LICENSES.md](DATA-LICENSES.md)。本次文档更新未重新验证真实网络导入。
 
-Tushare 等 provider 接口属于可选集成，真实 Token 路径及其网络许可配置仍需验证，不作为这份快速上手的运行前提。
+Tushare 可通过 `--allow-network` 或 `QC_ALLOW_NETWORK=1` 明确启用，并用 `--codes` 选择证券；仍需另行安装可选 SDK 并配置本地凭据。CLI/API 到适配器的参数链已有离线 fake Pro 测试，真实 Token 与网络服务未验证，不作为这份快速上手的运行前提。
 
 ### 可选实时行情
 

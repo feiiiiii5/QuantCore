@@ -30,15 +30,27 @@ def serve_command(
         False, "--open/--no-open", help="Open the tokenised URL in a browser"
     ),
     start_worker: bool = typer.Option(True),
+    allow_origin: list[str] | None = typer.Option(
+        None, "--allow-origin", help="Exact trusted HTTPS browser origin; may be repeated"
+    ),
 ) -> None:
     """Run the local research API + built UI on 127.0.0.1 (loopback only)."""
     import uvicorn
 
-    from quantcore.server import SecurityMiddleware, create_app, resolve_token
+    from quantcore.server import SecurityMiddleware, ServerSecurity, create_app, resolve_token
 
     resolved_token, generated = resolve_token(token)
+    try:
+        configured_security = ServerSecurity(
+            token=resolved_token,
+            port=port,
+            token_generated=generated,
+            allowed_origins=tuple(allow_origin or ()),
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--allow-origin") from exc
     application = create_app(
-        token=resolved_token,
+        security=configured_security,
         port=port,
         state_path=state_path if state_path is not None else data_root / "state.sqlite",
         data_root=data_root,

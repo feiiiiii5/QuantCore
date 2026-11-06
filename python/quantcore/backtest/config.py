@@ -111,6 +111,10 @@ class BacktestConfig(BaseModel):
         description="optional local security code for buy-and-hold benchmark",
     )
     corporate_actions: list[dict[str, Any]] = Field(default_factory=list)
+    use_panel_corporate_actions: bool = Field(
+        default=True,
+        description="apply local panel dividends/splits; explicit events override matching sec/date",
+    )
 
     @model_validator(mode="after")
     def _validate_dates(self) -> BacktestConfig:
@@ -176,6 +180,7 @@ class BacktestConfig(BaseModel):
             "trace_level": self.trace.code,
             "seed": self.seed,
             "annual_days": self.annual_days,
+            "corporate_actions": self.corporate_actions,
         }
         return kwargs
 
@@ -183,8 +188,14 @@ class BacktestConfig(BaseModel):
         return self.model_dump(mode="json")
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> BacktestConfig:
-        return cls.model_validate(payload)
+    def from_dict(cls, payload: dict[str, Any], *, legacy: bool = False) -> BacktestConfig:
+        # Persisted runs before the event bridge ignored both panel and explicit
+        # events. Preserve that behavior only at a historical loading boundary.
+        data = dict(payload)
+        if legacy and "use_panel_corporate_actions" not in data:
+            data["use_panel_corporate_actions"] = False
+            data["corporate_actions"] = []
+        return cls.model_validate(data)
 
 
 DEFAULT_CONFIG = BacktestConfig()

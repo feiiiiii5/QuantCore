@@ -154,7 +154,11 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
     store = ExperimentStore(experiments_root)
     source_run_id = payload.get("source_run_id")
     source = store.get(str(source_run_id)) if source_run_id else None
-    config_data = dict(source.metadata.get("config") or {}) if source else {}
+    config_data = (
+        BacktestConfig.from_dict(dict(source.metadata.get("config") or {}), legacy=True).to_dict()
+        if source
+        else {}
+    )
     for key, value in (payload.get("config") or {}).items():
         if key in {"costs", "exec", "rules", "risk"}:
             config_data[key] = {**config_data.get(key, {}), **value}
@@ -258,15 +262,13 @@ def run_backtest_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
 
 
 def run_data_update_job(payload: dict[str, Any], ctx: JobContext | None = None) -> dict[str, Any]:
-    """Fetch a provider into the Parquet warehouse (quality-gated)."""
+    """Import data and optionally freeze it in this job, independently of the browser."""
     _check(ctx)
     _progress(0.05, ctx)
     data_root = Path(payload.get("data_root") or "data")
     state = SQLiteState(Path(payload.get("state_path") or data_root / "state.sqlite"))
     store = ParquetStore(data_root / "warehouse", state=state)
-    if bool(payload.get("reset")):
-        store.reset()
-    name = str(payload.get("provider") or "synthetic")
+    name = str(payload.get("provider") or "synthetic").strip().lower()
     kwargs: dict[str, Any] = {}
     if name == "synthetic":
         kwargs["config"] = _panel_spec(payload)
@@ -284,18 +286,55 @@ def run_data_update_job(payload: dict[str, Any], ctx: JobContext | None = None) 
             kwargs["codes"] = list(payload["codes"])
         if payload.get("limit") is not None:
             kwargs["limit"] = int(payload["limit"])
+    if name == "tushare":
+        kwargs["allow_network"] = os.environ.get("QC_ALLOW_NETWORK") == "1"
     _progress(0.2, ctx)
     _check(ctx)
     provider = create_provider(name, **kwargs)
     ingestor = ProviderIngestor(provider, store)
     start = str(payload.get("start") or "2020-01-02")
     end = str(payload.get("end") or "2024-12-31")
-    result = ingestor.update(start, end, incremental=bool(payload.get("incremental", True)))
+    result = ingestor.update(
+        start,
+        end,
+        incremental=bool(payload.get("incremental", True)),
+        reset=bool(payload.get("reset")),
+        codes=payload.get("codes"),
+    )
     _progress(0.8, ctx)
     _check(ctx)
     payload_out = {"kind": "data_update", **result.to_dict()}
+    if payload.get("build_snapshot"):
+        snapshots_root = Path(payload.get("snapshots_root") or data_root / "snapshots")
+        _progress(0.85, ctx)
+        _check(ctx)
+        try:
+            manifest = build_snapshot_from_store(
+                store, snapshots_root, state=state, require_qpanel=True
+            )
+        except Exception as exc:
+            raise RuntimeError(f"data import succeeded; snapshot build failed: {exc}") from exc
+        _progress(0.97, ctx)
+        _check(ctx)
+        payload_out.update(
+            snapshot_id=manifest.snapshot_id,
+            snapshot=_snapshot_result(manifest, snapshots_root),
+        )
     _progress(1.0, ctx)
     return payload_out
+
+
+def _snapshot_result(manifest: Any, snapshots_root: Path) -> dict[str, Any]:
+    return {
+        "kind": "snapshot_build",
+        "snapshot_id": manifest.snapshot_id,
+        "content_hash": manifest.content_hash,
+        "path": str(snapshots_root / manifest.snapshot_id),
+        "n_sec": manifest.metadata.get("n_sec"),
+        "n_time": manifest.metadata.get("n_time"),
+        "synthetic": manifest.synthetic,
+        "panel_available": bool(manifest.panel.get("available", False)),
+    }
 
 
 def run_snapshot_job(payload: dict[str, Any], ctx: JobContext | None = None) -> dict[str, Any]:
@@ -317,16 +356,7 @@ def run_snapshot_job(payload: dict[str, Any], ctx: JobContext | None = None) -> 
     _progress(0.8, ctx)
     _check(ctx)
     _progress(1.0, ctx)
-    return {
-        "kind": "snapshot_build",
-        "snapshot_id": manifest.snapshot_id,
-        "content_hash": manifest.content_hash,
-        "path": str(snapshots_root / manifest.snapshot_id),
-        "n_sec": manifest.metadata.get("n_sec"),
-        "n_time": manifest.metadata.get("n_time"),
-        "synthetic": manifest.synthetic,
-        "panel_available": bool(manifest.panel.get("available", False)),
-    }
+    return _snapshot_result(manifest, snapshots_root)
 
 
 def run_job(payload: dict[str, Any], ctx: JobContext | None = None) -> dict[str, Any]:

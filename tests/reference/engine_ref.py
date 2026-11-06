@@ -80,6 +80,14 @@ def run_reference(
     prev_close = [0] * n_sec
     pending: np.ndarray | None = None
     pending_equity = 0
+    actions: dict[tuple[int, int], dict[str, Any]] = {}
+    if cfg.use_panel_corporate_actions:
+        indices = panel.sec_index()
+        for action in panel.corporate_actions.to_dict(orient="records"):
+            if action["sec_id"] in indices and int(action["ex_date"]) > 0:
+                actions[indices[action["sec_id"]], int(action["ex_date"])] = action
+    for action in cfg.corporate_actions:
+        actions[int(action["sec"]), int(action["ex_date"])] = action
 
     def position_qty(sec: int) -> int:
         return sum(lot[0] for lot in lots.get(sec, []))
@@ -108,6 +116,8 @@ def run_reference(
 
     def mark_to_market(day: int) -> None:
         for sec in range(n_sec):
+            if prices["suspended"][day, sec] > 0.5:
+                continue
             close_px = prices["close"][day, sec]
             if np.isfinite(close_px) and close_px > 0:
                 last_px[sec] = _px(close_px)
@@ -325,6 +335,19 @@ def run_reference(
             )
 
     for day in range(n_time):
+        for sec in range(n_sec):
+            action = actions.get((sec, dates[day]))
+            if action is None:
+                continue
+            cash_per_share = _px(float(action.get("cash_per_share", 0.0)))
+            cash += position_qty(sec) * cash_per_share
+            split = float(action.get("split_ratio", 1.0))
+            for lot in lots.get(sec, []):
+                lot[0] = llround(lot[0] * split)
+            if prev_close[sec] > 0:
+                prev_close[sec] = llround((prev_close[sec] - cash_per_share) / split)
+                if prev_close[sec] > 0:
+                    last_px[sec] = prev_close[sec]
         if pending is not None:
             execute(day)
             pending = None

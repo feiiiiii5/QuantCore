@@ -8,7 +8,7 @@ export const qk = {
   meta: ["meta"] as const,
   doctor: ["doctor"] as const,
   overview: (snapshot?: string) => ["market", "overview", snapshot ?? "latest"] as const,
-  securities: (query: string) => ["market", "securities", query] as const,
+  securities: (query: string, limit: number, codes?: string[]) => ["market", "securities", query, limit, codes?.join(",") ?? "all"] as const,
   securityProfile: (code: string) => ["market", "profile", code] as const,
   financials: (code: string) => ["market", "financials", code] as const,
   bars: (code: string | null, snapshot?: string) => ["market", "bars", code ?? "", snapshot ?? "latest"] as const,
@@ -27,6 +27,7 @@ export const qk = {
   liveStatus: ["live", "status"] as const,
   liveIndices: ["live", "indices"] as const,
   liveQuotes: (codes: string[]) => ["live", "quotes", codes.join(",")] as const,
+  liveBars: (code: string | null) => ["live", "bars", code ?? ""] as const,
   watchlist: ["live", "watchlist"] as const,
   dataIntegrity: (snapshot?: string) => ["data", "integrity", snapshot ?? "latest"] as const,
   onboarding: ["onboarding"] as const,
@@ -46,8 +47,8 @@ export function useDoctor() {
 export function useOverview(snapshot?: string) {
   return useQuery({ queryKey: qk.overview(snapshot), queryFn: () => api.overview(snapshot), staleTime: 15_000 });
 }
-export function useSecurities(query = "", limit = 300) {
-  return useQuery({ queryKey: qk.securities(`${query}:${limit}`), queryFn: () => api.securities(query, limit), staleTime: 15_000 });
+export function useSecurities(query = "", limit = 300, codes?: string[], enabled = true) {
+  return useQuery({ queryKey: qk.securities(query, limit, codes), queryFn: () => api.securities(query, limit, codes), staleTime: 15_000, enabled });
 }
 export function useBars(code: string | null, snapshot?: string) {
   return useQuery({ queryKey: qk.bars(code, snapshot), queryFn: () => api.bars(code ?? "", snapshot), enabled: Boolean(code) });
@@ -179,6 +180,16 @@ export function useCapacity() {
 /** Server-side live status (polled); keeps the UI honest about offline/synthetic modes. */
 export function useLiveStatus() {
   return useQuery({ queryKey: qk.liveStatus, queryFn: api.liveStatus, refetchInterval: 5_000, staleTime: 2_000, retry: false });
+}
+export function useLiveBars(code: string | null, enabled = true) {
+  return useQuery({
+    queryKey: qk.liveBars(code),
+    queryFn: () => api.liveBars(code!),
+    enabled: enabled && !!code,
+    staleTime: 30_000,
+    refetchInterval: enabled ? 60_000 : false,
+    retry: 1,
+  });
 }
 export function useLiveIndices(enabled = true) {
   return useQuery({ queryKey: qk.liveIndices, queryFn: api.liveIndices, refetchInterval: 5_000, staleTime: 2_000, retry: false, enabled });

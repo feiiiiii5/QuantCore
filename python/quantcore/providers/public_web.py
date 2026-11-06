@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Any
 
 import numpy as np
@@ -204,7 +205,7 @@ def parse_sina_daily(payload: Any, code: str) -> pd.DataFrame:
 
 
 def parse_tencent_qfq(payload: Any, symbol: str) -> pd.DataFrame:
-    """Parse Tencent fqkline qfq rows to a date/close frame (adjusted, CNY)."""
+    """Preserve adjusted OHLC and its quoted decimal resolution for model validation."""
     data = payload.get("data") if isinstance(payload, Mapping) else None
     entry = data.get(symbol) if isinstance(data, Mapping) else None
     rows = None
@@ -212,6 +213,7 @@ def parse_tencent_qfq(payload: Any, symbol: str) -> pd.DataFrame:
         rows = entry.get("qfqday") or entry.get("day")
     records = rows if isinstance(rows, list) else []
     parsed: list[dict[str, Any]] = []
+    precision = 2
     for item in records:
         if not isinstance(item, (list, tuple)) or len(item) < 3:
             continue
@@ -220,11 +222,23 @@ def parse_tencent_qfq(payload: Any, symbol: str) -> pd.DataFrame:
             close = float(item[2])
         except (TypeError, ValueError):
             continue
-        parsed.append({"date": day, "close": close})
-    frame = pd.DataFrame(parsed, columns=["date", "close"])
+        record = {"date": day, "close": close}
+        if len(item) >= 5:
+            try:
+                record.update(open=float(item[1]), high=float(item[3]), low=float(item[4]))
+                precision = max(
+                    precision,
+                    *(-int(Decimal(str(value)).as_tuple().exponent) for value in item[1:5]),
+                )
+            except (ValueError, TypeError):
+                continue
+        parsed.append(record)
+    frame = pd.DataFrame(parsed)
     if frame.empty:
-        return frame
-    return frame.drop_duplicates(subset=["date"], keep="last").reset_index(drop=True)
+        return pd.DataFrame(columns=["date", "open", "high", "low", "close"])
+    frame = frame.drop_duplicates(subset=["date"], keep="last").reset_index(drop=True)
+    frame.attrs["price_tick"] = 10.0**-precision
+    return frame
 
 
 def empty_public_bars() -> pd.DataFrame:
@@ -239,9 +253,15 @@ def empty_corporate_actions() -> pd.DataFrame:
 
 
 def build_canonical_bars(
-    raw: pd.DataFrame, factor: pd.Series, *, board: str, st: bool, source: str
+    raw: pd.DataFrame,
+    factor: pd.Series,
+    *,
+    board: str,
+    st: bool,
+    source: str,
+    actions: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Assemble canonical raw-price bars; pre_close follows the derived adjustment.
+    """Assemble raw-price bars; trading references follow supplied verified events.
 
     If the raw frame has no amount column, amount is estimated from
     volume x mean(open, high, low, close); magnitude only (not a real traded value).
@@ -257,6 +277,19 @@ def build_canonical_bars(
     with np.errstate(divide="ignore", invalid="ignore"):
         ratio = np.where(factors[1:] > 0, factors[:-1] / factors[1:], 1.0)
     pre_close[1:] = np.round(close[:-1] * ratio, 2)
+    if actions is not None:
+        # Cash-only qfq/raw ratios vary naturally with price. Trading references
+        # follow verified events, never those signal-price ratio movements.
+        pre_close[1:] = close[:-1]
+        positions = {int(day): i for i, day in enumerate(bars["date"])}
+        for event in actions.to_dict(orient="records"):
+            index = positions.get(int(event["ex_date"]))
+            if index is not None and index > 0:
+                pre_close[index] = round(
+                    (pre_close[index] - float(event["cash_per_share"]))
+                    / float(event["split_ratio"]),
+                    2,
+                )
     bars["pre_close"] = pre_close
     if "amount" not in bars.columns or bars["amount"].isna().all():
         average = bars[["open", "high", "low", "close"]].mean(axis=1)
@@ -281,15 +314,10 @@ def build_canonical_bars(
     return normalize_bars(bars)
 
 
-def derive_adjustment(
+def _derive_multiplicative_adjustment(
     raw: pd.DataFrame, adjusted: pd.DataFrame, *, source: str = "PUBLIC_WEB_APPROX"
 ) -> tuple[pd.Series, pd.DataFrame]:
-    """Derive adj_factor (forward-adjusted / raw close) and approximate actions.
-
-    A factor jump above the rounding-noise bound max(0.2%, 0.02/price) marks an ex-date;
-    small jumps are treated as cash dividends, large ones as splits. EXPECTED columns:
-    raw needs date/close/sec_id, adjusted needs date/close.
-    """
+    """Retain legacy ratio-step semantics for a verified multiplicative series."""
     factors = pd.Series(1.0, index=raw.index, dtype="float64")
     if raw.empty or adjusted.empty or "sec_id" not in raw.columns:
         return factors, empty_corporate_actions()
@@ -310,8 +338,7 @@ def derive_adjustment(
     confirm_days = min(5, max(1, len(raw_ratio) - 1))
     eps = 0.002
     accepted = np.empty(len(raw_ratio), dtype=float)
-    # Start from the median of the first observations: one noisy leading bar must not shift
-    # the baseline factor for the whole series.
+    # A median baseline avoids promoting one noisy leading bar to the whole series.
     current = float(np.median(raw_ratio[: min(5, len(raw_ratio))]))
     accepted[0] = current
     candidate_start: int | None = None
@@ -378,3 +405,96 @@ def derive_adjustment(
         for ex_date, jump, previous in breaks
     ]
     return factors, pd.DataFrame(actions, columns=list(ACTION_COLUMNS))
+
+
+def derive_adjustment(
+    raw: pd.DataFrame, adjusted: pd.DataFrame, *, source: str = "PUBLIC_WEB_APPROX"
+) -> tuple[pd.Series, pd.DataFrame]:
+    """Validate price coverage, then distinguish additive cash and pure ratio series.
+
+    Raw A-share quotes have a one-cent tick; Tencent's decimal resolution is
+    retained by its parser. Each observed pair has half a tick of rounding error.
+    Mixed affine transforms and negative inferred cash events are unsupported.
+    """
+    if raw.empty:
+        return pd.Series(1.0, index=raw.index), empty_corporate_actions()
+    if adjusted.empty:
+        raise ProviderError("qfq coverage is empty; cannot verify adjustments")
+    for frame in (raw, adjusted):
+        values = frame["close"].to_numpy(float)
+        if not np.isfinite(values).all() or (values <= 0).any():
+            raise ProviderError("qfq coverage requires positive finite closes")
+    missing = sorted(set(raw["date"]) - set(adjusted["date"]))
+    if missing:
+        raise ProviderError(
+            f"qfq coverage starts {int(adjusted['date'].min())}; missing date {missing[0]}"
+        )
+    fields = ["open", "high", "low", "close"]
+    if not all(field in raw and field in adjusted for field in fields):
+        # Legacy close-only fixtures describe an explicitly multiplicative series.
+        return _derive_multiplicative_adjustment(raw, adjusted, source=source)
+    merged = (
+        raw[["date", *fields]]
+        .drop_duplicates("date", keep="last")
+        .merge(
+            adjusted[["date", *fields]].drop_duplicates("date", keep="last"),
+            on="date",
+            suffixes=("_raw", "_adj"),
+            sort=True,
+        )
+    )
+    observed = merged[[f"{field}_raw" for field in fields]].to_numpy(float)
+    qfq = merged[[f"{field}_adj" for field in fields]].to_numpy(float)
+    if (
+        not np.isfinite(observed).all()
+        or not np.isfinite(qfq).all()
+        or (observed <= 0).any()
+        or (qfq <= 0).any()
+    ):
+        raise ProviderError("qfq adjustment validation requires positive finite OHLC pairs")
+    raw_half = float(raw.attrs.get("price_tick", 0.01)) / 2
+    qfq_half = float(adjusted.attrs.get("price_tick", 0.01)) / 2
+    tolerance = raw_half + qfq_half
+    offsets = observed - qfq
+    lower = offsets.max(axis=1) - tolerance
+    upper = offsets.min(axis=1) + tolerance
+    if (lower > upper + 1e-10).any():
+        ratio_lower = ((qfq - qfq_half) / (observed + raw_half)).max(axis=1)
+        ratio_upper = ((qfq + qfq_half) / (observed - raw_half)).min(axis=1)
+        if (ratio_lower <= ratio_upper + 1e-10).all():
+            return _derive_multiplicative_adjustment(raw, adjusted, source=source)
+        first = int(merged.loc[lower > upper + 1e-10, "date"].iloc[0])
+        raise ProviderError(
+            f"unsupported mixed affine qfq adjustment at {first}; cash-only OHLC do not agree"
+        )
+    actions = []
+    lo, hi = float(lower[0]), float(upper[0])
+    for index in range(1, len(merged)):
+        next_lo, next_hi = float(lower[index]), float(upper[index])
+        if max(lo, next_lo) <= min(hi, next_hi) + 1e-10:
+            lo, hi = max(lo, next_lo), min(hi, next_hi)
+            continue
+        cash = round((lo + hi - next_lo - next_hi) / 2, 4)
+        if cash <= 0 or cash >= observed[index - 1, 3]:
+            raise ProviderError(
+                f"unsupported non-positive or incompatible cash adjustment at {int(merged.iloc[index]['date'])}"
+            )
+        actions.append(
+            {
+                "sec_id": str(raw["sec_id"].iloc[0]),
+                "ann_date": 0,
+                "record_date": int(merged.iloc[index - 1]["date"]),
+                "ex_date": int(merged.iloc[index]["date"]),
+                "pay_date": 0,
+                "cash_per_share": cash,
+                "split_ratio": 1.0,
+                "rights_ratio": 0.0,
+                "rights_price": 0.0,
+                "source": source,
+            }
+        )
+        lo, hi = next_lo, next_hi
+    mapping = dict(zip(merged["date"], qfq[:, 3] / observed[:, 3], strict=True))
+    return raw["date"].map(mapping).astype(float), pd.DataFrame(
+        actions, columns=list(ACTION_COLUMNS)
+    )

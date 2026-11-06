@@ -11,6 +11,8 @@ vi.mock("./api/client", () => ({
     dataStatus: vi.fn().mockResolvedValue({ data_root: "", warehouse: { exists: false, datasets: {}, rows: 0, bytes: 0, manifest_hash: "" }, snapshots: [], storage: { warehouse_bytes: 0, snapshot_bytes: 0, experiments_bytes: 0, free_bytes: 0 }, providers: [] }),
     jobs: vi.fn().mockResolvedValue([]),
     securities: vi.fn().mockResolvedValue([]),
+    liveStatus: vi.fn().mockResolvedValue({ enabled: false, status: "disabled", market: { phase: "closed" } }),
+    liveIndices: vi.fn().mockResolvedValue({ quotes: [] }),
   },
   getApiBase: () => "",
   getToken: () => "",

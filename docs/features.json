@@ -1,7 +1,7 @@
 {
   "project": "QuantCore",
   "version": "0.1.0",
-  "generated": "2026-11-06",
+  "generated": "2026-11-07",
   "features": [
     {
       "id": "M0-001",
@@ -1010,16 +1010,145 @@
       "title": "fractional cost scenarios retain native experiment context",
       "passes": true,
       "evidence": "RobustnessPanel.test.tsx: 1 passed; real C++ experiment to research E2E covers default, fractional and single scenarios; exact displayed values and fees, desktop/mobile no overflow"
+    },
+    {
+      "id": "R7-001",
+      "milestone": "R7",
+      "title": "native corporate actions and ledger metrics",
+      "passes": true,
+      "evidence": "C++ 101/101; tests/test_corporate_backtest.py and tests/test_corporate_validation.py; split/dividend/missing-mark/FIFO, batch/snapshot/legacy replay and explicit unsupported rights/tax checks"
+    },
+    {
+      "id": "R7-002",
+      "milestone": "R7",
+      "title": "warehouse replacement and incremental provenance",
+      "passes": true,
+      "evidence": "tests/test_data_update_safety.py, test_ingest_identity.py and test_data_store.py; reset failure preserves data, cross-entry metadata, empty replacement, provider identity and synthetic attribution"
+    },
+    {
+      "id": "R7-003",
+      "milestone": "R7",
+      "title": "screening and snapshot reuse",
+      "passes": true,
+      "evidence": "tests/test_screener_performance.py and test_workspace_cache.py; identical screening API responses, matrix materialization bounds, cache invalidation; five-sample local median 627.68ms to 36.37ms"
+    },
+    {
+      "id": "R7-004",
+      "milestone": "R7",
+      "title": "whole-snapshot search and import job handoff",
+      "passes": true,
+      "evidence": "29 UI tests; tests/test_market_search.py; real-server E2E 19/19 includes replace import, automatic snapshot, command search and market navigation"
+    },
+    {
+      "id": "R7-005",
+      "milestone": "R7",
+      "title": "corporate-action benchmark and missing-quote semantics",
+      "passes": true,
+      "evidence": "tests/test_benchmark.py; cash retained without reinvestment, missing-window excess return null and adjacent quote-pair tracking"
+    },
+    {
+      "id": "R8-001",
+      "milestone": "R8",
+      "title": "fresh per-security quotes and independent daily candles",
+      "passes": true,
+      "evidence": "test_live_quotes.py, test_live_quote_freshness.py, test_live_history.py and MarketPage.test.tsx; true source timestamps, stale states, per-code fallback, history independent of snapshots and live candle updates; public 600000 history/quote probe after close"
+    },
+    {
+      "id": "R8-002",
+      "milestone": "R8",
+      "title": "quote-driven persisted live paper accounts",
+      "passes": true,
+      "evidence": "test_paper_live.py; valid post-order quote intervals, shared incremental-volume budget, shared per-security daily cumulative high-water mark across source switching/rollback/restart, including legacy counter migration, T+1/fees/limits and persistence; real-server UI waiting-path E2E"
+    },
+    {
+      "id": "R8-003",
+      "milestone": "R8",
+      "title": "equivalent vectorized panels and strategy signals",
+      "passes": true,
+      "evidence": "test_panel_matrix.py, test_qpanel_export.py and screener performance; 17-field matrix and 10-template equivalence; five-sample export 3.50x, candidate signals 3.83-5.89x, identical hashes; performance-q005.json"
+    },
+    {
+      "id": "R8-004",
+      "milestone": "R8",
+      "title": "three fixed candidate strategies and reproducible study",
+      "passes": true,
+      "evidence": "test_research_strategies.py, test_candidate_study.py; actual eight-survivor 5120-bar sample, predeclared phases/costs and 24/24 generic replays; STRATEGY-STUDY.md records losing results and non-PIT/source limitations"
+    },
+    {
+      "id": "R8-005",
+      "milestone": "R8",
+      "title": "additive adjustment validation and causal research factors",
+      "passes": true,
+      "evidence": "test_public_adjustment.py, test_research_signal_adjustment.py and test_research_sample_workflow.py; offset drift no longer creates false cash events, online/offline share finalization with identical panel hashes"
+    },
+    {
+      "id": "R8-006",
+      "milestone": "R8",
+      "title": "private Sites frontend with exact local API bridge",
+      "passes": true,
+      "evidence": "test_site_bridge.py, connection.test.ts; explicit HTTPS origins, PNA preflight and protected API/WS; private frontend published, authenticated browser-to-loopback end-to-end remains unverified; SITES.md"
+    },
+    {
+      "id": "R8-007",
+      "milestone": "R8",
+      "title": "authenticated connection probes and stream switching",
+      "passes": true,
+      "evidence": "connection.test.ts and liveStream.test.ts; current draft values verified against protected metadata, old requests/cache/socket callbacks isolated after API/token changes; UI 39 passed"
+    },
+    {
+      "id": "R9-001",
+      "milestone": "R9",
+      "title": "historical paper ex-date corporate-action approximation",
+      "passes": true,
+      "evidence": "tests/test_paper_corporate.py and test_paper_corporate_api.py; pre-tax ex-date cash, per-purchase-lot split rounding, suspended marks, pending-order cancellation, persisted event audit and reset; invalid rights/tax/event models reject. Legacy past events are not retroactively settled; live paper has no event feed."
+    },
+    {
+      "id": "R9-002",
+      "milestone": "R9",
+      "title": "server-owned import and native snapshot job with reconnectable UI",
+      "passes": true,
+      "evidence": "tests/test_data_snapshot_chain.py and ui/src/pages/DataPage.test.tsx; build_snapshot=true completes import/freeze in one job, preserves import-only API defaults, tab/API-scoped refresh reconnect, error retry and queued cohort identity; cancellation retains already committed data/snapshots."
+    },
+    {
+      "id": "R9-003",
+      "milestone": "R9",
+      "title": "custom data-root job-state default",
+      "passes": true,
+      "evidence": "tests/test_data_snapshot_chain.py::test_app_factory_keeps_jobs_in_the_selected_workspace; absent state_path resolves to data_root/state.sqlite. Explicit state path overrides remain; experiments_root is separate."
+    },
+    {
+      "id": "R9-004",
+      "milestone": "R9",
+      "title": "verified native sidecar addition and repair",
+      "passes": true,
+      "evidence": "tests/test_snapshot_native_upgrade.py; existing Parquet-only/missing/corrupt derived caches repaired without changing data/hash/id; writer failure, manifest publication failure, unsafe filename, immutable corruption and missing writer fail visibly; retry recovers, each publication atomic."
+    },
+    {
+      "id": "R9-005",
+      "milestone": "R9",
+      "title": "streaming snapshot file checksums",
+      "passes": true,
+      "evidence": "tests/test_snapshot_checksum_memory.py; real 16 MiB file digest exact and measured Python checksum allocation bounded below 2 MiB; builder/reader use streaming SHA-256 rather than whole-file read. Not a whole-pipeline memory or speed claim."
+    },
+    {
+      "id": "R9-006",
+      "milestone": "R9",
+      "title": "last successful snapshot publication survives content reuse and restart",
+      "passes": true,
+      "evidence": "tests/test_snapshot_publication.py: A then B then reused A selects A for Workspace and CLI, including restart; original manifest bytes unchanged; failed repair/publication retains prior choice; absent/stale/malformed publication records use legacy fallback. Installed-browser repeat verified data selection after mixed prior snapshots."
     }
   ],
   "verified_at": "2026-11-02",
   "verified_by": "local gates: pytest (all green, see acceptance report); ctest 95/95; UI vitest 10; Playwright e2e 18/18 (redesigned UI); ruff/mypy; make verify-cpp; make doctor/demo; ui-audit 10 routes + mobile + dark (0 console errors, 0 overflow); real-data pipeline: Sina 3-name import + snapshot + qc data integrity (status ok) + cpp backtest; live quotes verified with QC_ALLOW_NETWORK=1 (REST + /ws/live frames)",
-  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display only, no L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope.",
+  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display and local virtual matching only, no real routing or L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope. Historical paper now supports a pre-tax ex-date cash/per-lot split approximation; prior-account past events are not reconstructed, and live paper has no corporate-action feed. Cancellation of data jobs does not roll back committed warehouse/snapshot output.",
   "incremental_verification": {
-    "date": "2026-11-06",
-    "scope": "R5/R6 code with R6 local-only verification; historical M0-M10 external/platform evidence retains original date; no deployment or new push",
-    "python": "383 passed / 2 skipped",
-    "ui": "20 passed",
-    "checks": "ruff lint/format 164 files; mypy 106 files; C++ differential 6/6 and existing verify_cpp gate; UI build; isolated real-server E2E 19/19; cost workflow desktop/mobile zero page overflow and console errors"
+    "date": "2026-11-07",
+    "scope": "R9 local verification and private Sites frontend v5; earlier external/platform evidence keeps its original dates; Python/C++ backend remains local",
+    "python": "629 passed / 2 skipped",
+    "cpp": "native version 0.1.1; current differential 6/6 and verify_cpp passed; sources unchanged, R7 ctest 101/101",
+    "ui": "48 passed / 18 files",
+    "checks": "ruff lint/format 202 files; mypy 116 source files; TypeScript/Vite build; isolated real-server E2E 21/21; prior R8 candidate-study generic replay 24/24",
+    "unverified": "authenticated browser Sites-to-loopback full flow; real Tushare token; full market scale; signed installers; real brokerage",
+    "local_delivery": "macOS 27 ARM64 / CPython 3.12 native wheel installed in a separate environment with frozen hashed runtime requirements; cpp demo and exact equity/trades/metrics replay; 4 installed-server/browser flows including repeated data reuse; build environment audit 83 packages with no known vulnerabilities, editable project explicitly omitted; not separate-machine or signed-installer validation"
   }
 }

@@ -19,9 +19,10 @@ namespace qc {
 //  - max_drawdown: max(1 - equity/peak) as a positive fraction, peak starts at
 //    initial_cash and only uses the recorded equity.
 //  - calmar: annualized_return / max_drawdown (0 when max_drawdown is 0).
-//  - win_rate / profit_factor: per closed sell fill, FIFO cost reconstruction from the
-//    trade list (fees included). profit_factor is +inf when there are profits and no
-//    losses, 0 when there are no closed trades.
+//  - win_rate / profit_factor: per closed sell fill, using the ledger's realized FIFO
+//    P&L (fees included, split-adjusted). Caller-constructed trades without realized
+//    P&L fall back to trade-list FIFO reconstruction. Dividends contribute to equity,
+//    not sell-fill P&L. profit_factor is +inf with profits and no losses, 0 with no sells.
 //  - turnover: sum(|fill amount|) / mean equity (mean across initial + recorded equity).
 Metrics compute_metrics(const std::vector<Money>& equity, Money initial_cash,
                         const std::vector<Trade>& trades, int annual_days,

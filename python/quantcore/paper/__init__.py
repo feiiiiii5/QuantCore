@@ -1,7 +1,7 @@
-"""Local paper trading (M9): simulated A-share execution only.
+"""Local A-share paper accounts over historical snapshots or fresh public quotes.
 
-There is no real order routing, broker gateway or network access anywhere in this
-package: sessions read one immutable local snapshot and mutate a JSON account state.
+Sessions mutate only their JSON account state. Quote fetching belongs to the server's
+read-only live service; this package never connects to a broker or routes real orders.
 """
 
 from __future__ import annotations
@@ -13,12 +13,14 @@ from .errors import (
     PaperNotFoundError,
     PaperValidationError,
 )
+from .live import LivePaperSessionEngine
 from .market import PaperMarketData
 from .models import PaperOrder, PaperPosition, PaperSession, PaperTrade
 from .rules import canonical_buy_qty, fee_breakdown, price_limit_pct, round_to_tick
 from .store import PaperStore
 
 __all__ = [
+    "LivePaperSessionEngine",
     "PaperConflictError",
     "PaperError",
     "PaperMarketData",

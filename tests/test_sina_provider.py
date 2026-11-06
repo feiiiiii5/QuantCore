@@ -263,7 +263,10 @@ def test_real_recorded_qfq_derives_a_dividend_break() -> None:
     values = factor.to_numpy()
     assert values[0] < 0.99  # pre-dividend qfq factor
     assert values[-1] == pytest.approx(1.0)
-    assert np.all(np.diff(values) >= -1e-9)  # adj_factor is non-decreasing
+    # Tencent cash-only qfq is an additive transform. Its qfq/raw signal ratio
+    # can decrease on ordinary down days; it must reproduce the source prices.
+    expected = raw["date"].map(qfq.set_index("date")["close"]) / raw["close"]
+    np.testing.assert_allclose(values, expected)
     assert len(actions) == 1
     action = actions.iloc[0]
     assert int(action["ex_date"]) == 20260716
@@ -274,9 +277,7 @@ def test_real_recorded_qfq_derives_a_dividend_break() -> None:
     bars = provider.fetch_daily_bars(["600000"], "2026-07-15", "2026-07-17")
     ex_row = bars[bars["date"] == 20260716].iloc[0]
     previous = bars[bars["date"] == 20260715].iloc[0]
-    adjusted_reference = (
-        float(previous["close"]) * float(previous["adj_factor"]) / float(ex_row["adj_factor"])
-    )
+    adjusted_reference = float(previous["close"]) - float(action["cash_per_share"])
     assert ex_row["pre_close"] == pytest.approx(adjusted_reference, abs=0.011)
     assert ex_row["limit_up"] > ex_row["close"] > ex_row["limit_down"]
 

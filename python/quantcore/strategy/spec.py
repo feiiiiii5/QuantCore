@@ -147,7 +147,13 @@ class StrategySpec(BaseModel):
         """Source bytes that define the strategy behaviour (for the content hash)."""
         if self.template is not None:
             chunks = []
-            for path in BUILTIN_TEMPLATE_FILES:
+            paths: tuple[Path, ...] = BUILTIN_TEMPLATE_FILES
+            if self.template in {"trend_momentum", "liquid_reversal", "defensive_low_vol"}:
+                paths = (
+                    *paths,
+                    Path(__file__).resolve().parent.parent / "templates" / "research.py",
+                )
+            for path in paths:
                 if path.exists():
                     chunks.append(path.read_bytes())
             return b"\n".join(chunks)

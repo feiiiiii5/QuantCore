@@ -49,6 +49,8 @@ class RefConfig:
     t_plus_one: bool = True
     annual_days: int = 244
     min_price_tick: int = 100
+    use_panel_corporate_actions: bool = True
+    corporate_actions: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass

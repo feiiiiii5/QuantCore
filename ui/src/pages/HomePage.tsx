@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, CheckCircle2, FlaskConical, Plus, ShieldCheck, Sparkles, X } from "lucide-react";
-import { api } from "../api/client";
 import {
-  qk, useBootstrap, useCompleteOnboardingStep, useDataIntegrity, useExperiments,
+  useBootstrap, useCompleteOnboardingStep, useDataIntegrity, useExperiments, useSecurities,
   useLiveIndices, useLiveQuotes, useLiveStatus, useOnboarding, useOverview, useSaveWatchlist, useWatchlist,
 } from "../api/queries";
 import type { OnboardingStep } from "../api/types";
@@ -44,13 +43,7 @@ export default function HomePage() {
   const watchlist = useWatchlist();
   const codes = watchlist.data?.codes ?? [];
   const liveQuotes = useLiveQuotes(codes, liveEnabled);
-  const securities = useQuery({
-    queryKey: qk.securities("home-watch:1000"),
-    queryFn: () => api.securities("", 1000),
-    enabled: codes.length > 0,
-    staleTime: 60_000,
-    retry: false,
-  });
+  const securities = useSecurities("", 1000, codes, codes.length > 0);
   const onboarding = useOnboarding();
   const completeStep = useCompleteOnboardingStep();
   const bootstrap = useBootstrap();
@@ -143,7 +136,7 @@ export default function HomePage() {
                 </div>
                 <div className="kpi-value">{view.close == null ? "—" : num(view.close)}</div>
                 <Sparkline values={fallbackSpark(view.spark, view.close)} positive={(view.changePct ?? 0) >= 0} height={30} />
-                <small>{view.source === "live" ? t.appbar.live : view.source === "snapshot" ? t.common.snapshot : t.common.notAvailable}</small>
+                <small>{view.source === "live" ? tone === "live" && !liveIndices.data?.stale ? t.appbar.live : "最近报价" : view.source === "snapshot" ? t.common.snapshot : t.common.notAvailable}</small>
               </div>
             ))}
           </div>
@@ -160,7 +153,7 @@ export default function HomePage() {
         <Panel
           title={t.home.watchlist}
           subtitle={t.home.watchlistHint}
-          actions={liveEnabled ? <Badge tone="ok" dot>{t.appbar.live}</Badge> : <Badge tone="warn" dot>{t.market.offlineSnapshot}</Badge>}
+          actions={liveEnabled ? <Badge tone={tone === "live" && liveQuotes.data?.stale === false ? "ok" : "warn"} dot>{tone === "live" && liveQuotes.data?.stale === false ? t.appbar.live : "最近报价 / 本地回退"}</Badge> : <Badge tone="warn" dot>{t.market.offlineSnapshot}</Badge>}
           bodyClassName="home-watchlist-body"
         >
           <div className="stack">

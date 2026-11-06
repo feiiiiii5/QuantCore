@@ -17,6 +17,7 @@ import numpy as np
 
 from ..backtest.config import CostModelConfig, RuleSetConfig
 from ..calendar import to_date_int
+from .corporate import PaperCorporateActions, purchase_lots, sell_lots
 from .errors import (
     PaperConflictError,
     PaperNotFoundError,
@@ -57,6 +58,7 @@ class PaperSessionEngine:
                 f"session dates are not on the snapshot calendar ({exc})"
             ) from exc
         self._rules = self.rules
+        self._corporate = PaperCorporateActions(market, session, self.costs)
 
     # -- construction ------------------------------------------------------
     @classmethod
@@ -115,6 +117,7 @@ class PaperSessionEngine:
             "orders": [order.to_dict() for order in self.session.orders],
             "trades": [trade.to_dict() for trade in self.session.trades],
             "equity_curve": list(self.session.equity_curve),
+            "corporate_events": [dict(event) for event in self.session.corporate_events],
         }
 
     # -- order lifecycle ---------------------------------------------------
@@ -227,8 +230,9 @@ class PaperSessionEngine:
         for _ in range(count):
             if self.cur_idx >= self.end_idx:
                 break
-            self.cur_idx += 1
-            day = self.cur_idx
+            day = self.cur_idx + 1
+            self._corporate.apply(day)
+            self.cur_idx = day
             self.session.current_date = int(self.market.dates[day])
             for position in self.session.positions.values():
                 position.available = position.qty  # T+1: yesterday's buys become sellable
@@ -259,6 +263,7 @@ class PaperSessionEngine:
         self.session.trades = []
         self.session.next_order_seq = 1
         self.session.next_trade_seq = 1
+        self.session.corporate_events.clear()
         self.session.status = "active"
         self.session.equity_curve = [
             {
@@ -430,9 +435,11 @@ class PaperSessionEngine:
                     available=0,
                     avg_cost=round(total / qty, 6),
                     last=fill,
+                    lots=[qty],
                 )
             else:
                 old_cost = position.avg_cost * position.qty
+                position.lots = [*purchase_lots(position), qty]
                 position.qty += qty
                 position.avg_cost = round((old_cost + total) / position.qty, 6)
                 position.last = fill
@@ -442,6 +449,7 @@ class PaperSessionEngine:
                 self._reject(order, "insufficient_position")
                 return None
             self.session.cash = round(self.session.cash + amount - fee_total, 4)
+            sell_lots(position, qty)
             position.qty -= qty
             position.available = max(0, position.available - qty)
             position.last = fill
@@ -472,6 +480,8 @@ class PaperSessionEngine:
         for position in self.session.positions.values():
             sec = self.market.sec_index.get(position.sec_id)
             if sec is None:
+                continue
+            if self._is_suspended(day, sec):
                 continue
             close = self.market.value("close", day, sec)
             if np.isfinite(close) and close > 0:

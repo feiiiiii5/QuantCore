@@ -8,14 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
-import json
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from quantcore.realtime.clock import (
-    SHANGHAI_TZ,
     is_trading_day,
     last_trade_date,
     market_clock,
@@ -31,52 +29,11 @@ from quantcore.realtime.quotes import (
 )
 from quantcore.realtime.service import LiveConfig, LiveQuoteService
 from quantcore.server import create_app
+from tests.live_quote_fixtures import FakeHttp, _at, _eastmoney_payload, _sina_text
 
-FIXTURES = Path(__file__).parent / "fixtures" / "live"
 TOKEN = "test-token"
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 BASE_URL = "http://127.0.0.1:8000"
-
-
-def _eastmoney_payload() -> dict:
-    return json.loads((FIXTURES / "eastmoney_ulist.json").read_text(encoding="utf-8"))
-
-
-def _sina_text() -> str:
-    return (FIXTURES / "sina_quotes.txt").read_text(encoding="utf-8")
-
-
-def _at(text: str) -> dt.datetime:
-    return dt.datetime.fromisoformat(text).replace(tzinfo=SHANGHAI_TZ)
-
-
-class FakeHttp:
-    """Request-aware fake transport backed by the recorded fixtures."""
-
-    def __init__(self, *, fail_json: bool = False) -> None:
-        self.fail_json = fail_json
-        self.json_calls = 0
-        self.text_calls = 0
-        self.index_rows = [_eastmoney_payload()["data"]["diff"][2]]
-        self.stock_rows = _eastmoney_payload()["data"]["diff"][:2]
-
-    async def get_json(self, url: str, *, headers: dict[str, str] | None = None):
-        self.json_calls += 1
-        if self.fail_json:
-            raise ConnectionError("eastmoney blocked (simulated)")
-        rows = (
-            list(self.index_rows)
-            if ("1.000001" in url or "0.399001" in url)
-            else list(self.stock_rows)
-        )
-        return {"data": {"total": len(rows), "diff": rows}}
-
-    async def get_text(self, url: str, *, headers: dict[str, str] | None = None) -> str:
-        self.text_calls += 1
-        lines = _sina_text().splitlines()
-        if "sh000001" in url or "sz399001" in url:
-            return lines[2]
-        return "\n".join(lines[:2])
 
 
 # ------------------------------------------------------------------ parsers
@@ -373,6 +330,11 @@ def test_out_of_bounds_calendar_falls_back_without_crashing(
     weekend = _at("2026-11-07T10:00:00")
     assert market_phase(weekend) == "holiday"
     assert next_open(_at("2026-11-06T16:00:00")) == _at("2026-11-09T09:30:00")
+    # This is explicitly the weekday fallback, not a claim about holiday sessions.
+    assert next_open(_at("2026-11-30T16:00:00")) == _at("2026-12-01T09:30:00")
+    assert next_open(_at("2026-12-31T16:00:00")) == _at("2027-01-01T09:30:00")
+    assert last_trade_date(_at("2027-01-01T09:00:00")) == 20261231
+    assert last_trade_date(_at("2026-11-02T09:00:00")) == 20261030
 
 
 # ------------------------------------------------- live REST/WS contract shape

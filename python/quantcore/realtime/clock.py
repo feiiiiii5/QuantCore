@@ -71,20 +71,20 @@ def _next_session(day: int) -> int:
     try:
         return int(trading_calendar.next_trading_day(day))
     except Exception:  # pragma: no cover - calendar out of bounds / dependency missing
-        candidate = day + 1
-        while _weekday(candidate) >= 5:
-            candidate += 1
-        return candidate
+        candidate = from_date_int(day) + dt.timedelta(days=1)
+        while candidate.weekday() >= 5:
+            candidate += dt.timedelta(days=1)
+        return candidate.year * 10000 + candidate.month * 100 + candidate.day
 
 
 def _previous_session(day: int) -> int:
     try:
         return int(trading_calendar.previous_trading_day(day))
     except Exception:  # pragma: no cover - calendar out of bounds / dependency missing
-        candidate = day - 1
-        while _weekday(candidate) >= 5:
-            candidate -= 1
-        return candidate
+        candidate = from_date_int(day) - dt.timedelta(days=1)
+        while candidate.weekday() >= 5:
+            candidate -= dt.timedelta(days=1)
+        return candidate.year * 10000 + candidate.month * 100 + candidate.day
 
 
 def _is_trading_day(day: int, holidays: set[int] | None = None) -> bool:

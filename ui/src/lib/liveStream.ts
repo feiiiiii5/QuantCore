@@ -52,9 +52,11 @@ function open(key: string, stream: Stream): void {
   }
   stream.socket = socket;
   socket.onopen = () => {
+    if (stream.socket !== socket) return;
     stream.retries = 0;
   };
   socket.onmessage = (event) => {
+    if (stream.socket !== socket) return;
     try {
       const message = JSON.parse(String(event.data)) as LiveStreamMessage;
       if (message && message.type === "snapshot" && message.quotes) {
@@ -65,10 +67,12 @@ function open(key: string, stream: Stream): void {
     }
   };
   socket.onclose = () => {
+    if (stream.socket !== socket) return;
     stream.socket = null;
     scheduleReconnect(key, stream);
   };
   socket.onerror = () => {
+    if (stream.socket !== socket) return;
     try { socket.close(); } catch { /* noop */ }
   };
 }
@@ -102,6 +106,19 @@ export function subscribeLiveQuotes(codes: string[], listener: Listener): () => 
     stream.socket = null;
     streams.delete(key);
   };
+}
+
+/** Replace every shared connection after saving a different API base or bearer token. */
+export function resetLiveStreams(): void {
+  for (const [key, stream] of streams) {
+    if (stream.timer != null) window.clearTimeout(stream.timer);
+    stream.timer = null;
+    stream.retries = 0;
+    const previous = stream.socket;
+    stream.socket = null;
+    try { previous?.close(); } catch { /* noop */ }
+    open(key, stream);
+  }
 }
 
 /** True when at least one shared socket is connected (used by pages for a live badge). */

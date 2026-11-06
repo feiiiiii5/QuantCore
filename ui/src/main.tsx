@@ -19,6 +19,11 @@ if (urlToken) {
   window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
 }
 
+// A hosted test frontend needs an explicit connection to the visitor's local service.
+if (import.meta.env.VITE_QC_DEFAULT_API_BASE && !localStorage.getItem("qc_token") && window.location.pathname === "/") {
+  window.history.replaceState(null, "", "/settings");
+}
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 0, refetchOnWindowFocus: false } },
 });

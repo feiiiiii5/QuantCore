@@ -11,14 +11,26 @@ from typing import Any
 from ..data.panel import PANEL_FIELDS, PanelData
 from ..data.state import SQLiteState
 from ..data.synthetic import generate_quick_panel
+from ..errors import SnapshotError
 from ..snapshot.manifest import SnapshotManifest
-from ..snapshot.reader import Snapshot, find_snapshot, list_snapshots, load_snapshot
+from ..snapshot.reader import Snapshot, list_snapshots, load_snapshot
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATA_ROOT = REPO_ROOT / "data"
 DEFAULT_SNAPSHOTS_ROOT = DEFAULT_DATA_ROOT / "snapshots"
 DEFAULT_EXPERIMENTS_ROOT = REPO_ROOT / "experiments"
 DEFAULT_UI_DIR = REPO_ROOT / "ui" / "dist"
+
+
+def _snapshot_signature(root: Path, manifest: SnapshotManifest) -> tuple[tuple[int, ...], ...]:
+    """Cheap file identities for a snapshot that has already passed full verification."""
+    paths = [root / "manifest.json", *(root / item.file for item in manifest.datasets.values())]
+    if manifest.panel.get("available") and manifest.panel.get("file"):
+        paths.append(root / str(manifest.panel["file"]))
+    return tuple(
+        (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+        for stat in (path.stat() for path in paths)
+    )
 
 
 @dataclass(frozen=True)
@@ -84,6 +96,9 @@ class Workspace:
     state: SQLiteState
     queue: Any = field(default=None, repr=False)
     _cache: OrderedDict[str, Snapshot] = field(default_factory=OrderedDict, repr=False)
+    _cache_signatures: dict[str, tuple[tuple[int, ...], ...]] = field(
+        default_factory=dict, repr=False
+    )
     _panel_cache: OrderedDict[str, PanelData] = field(default_factory=OrderedDict, repr=False)
     _synthetic: PanelData | None = field(default=None, repr=False)
 
@@ -91,23 +106,44 @@ class Workspace:
         return list_snapshots(self.settings.snapshots_root)
 
     def snapshot(self, reference: str | None = None) -> Snapshot:
-        if reference is None:
-            manifests = self.list_snapshot_manifests()
+        manifests = self.list_snapshot_manifests()
+        if reference is None or reference == "latest":
             if not manifests:
-                raise FileNotFoundError(
-                    f"no snapshots under {self.settings.snapshots_root}; build one first"
+                if reference is None:
+                    raise FileNotFoundError(
+                        f"no snapshots under {self.settings.snapshots_root}; build one first"
+                    )
+                raise SnapshotError(f"no snapshots found under {self.settings.snapshots_root}")
+            manifest = manifests[0]
+        else:
+            matches = [item for item in manifests if item.snapshot_id.startswith(reference)]
+            if not matches:
+                raise SnapshotError(
+                    f"snapshot {reference!r} not found under {self.settings.snapshots_root}"
                 )
-            reference = manifests[0].snapshot_id
-        manifest = find_snapshot(self.settings.snapshots_root, reference).manifest
+            if len(matches) > 1:
+                raise SnapshotError(
+                    f"snapshot reference {reference!r} is ambiguous: "
+                    f"{[item.snapshot_id for item in matches[:5]]}"
+                )
+            manifest = matches[0]
         key = manifest.snapshot_id
         cached = self._cache.get(key)
         if cached is not None:
-            self._cache.move_to_end(key)
-            return cached
+            try:
+                signature = _snapshot_signature(cached.root, manifest)
+            except OSError:
+                signature = None
+            if signature is not None and signature == self._cache_signatures.get(key):
+                self._cache.move_to_end(key)
+                return cached
         snapshot = load_snapshot(self.settings.snapshots_root, key)
+        self._panel_cache.pop(key, None)
         self._cache[key] = snapshot
+        self._cache_signatures[key] = _snapshot_signature(snapshot.root, snapshot.manifest)
         while len(self._cache) > self.settings.snapshot_cache_size:
-            self._cache.popitem(last=False)
+            old_key, _ = self._cache.popitem(last=False)
+            self._cache_signatures.pop(old_key, None)
         return snapshot
 
     def snapshot_panel(self, snapshot: Snapshot) -> PanelData:

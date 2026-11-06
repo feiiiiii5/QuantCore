@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,8 +26,10 @@ from ..data.panel import SCHEMA_VERSION, PanelData
 from ..data.state import SQLiteState
 from ..errors import SnapshotError
 from ..quality import QualityReport, run_quality_checks
+from .checksums import sha256_file
 from .manifest import MANIFEST_SCHEMA_VERSION, SnapshotDataset, SnapshotManifest
 from .qpanel import write_qpanel
+from .reader import Snapshot
 
 SNAPSHOT_FILE_ORDER: tuple[str, ...] = (
     "calendar",
@@ -87,7 +90,7 @@ def snapshot_content_hash(panel: PanelData) -> tuple[str, dict[str, Any]]:
 def _write_frame(tmp: Path, name: str, frame: pd.DataFrame) -> SnapshotDataset:
     target = tmp / f"{name}.parquet"
     frame.to_parquet(target, engine="pyarrow", compression="zstd", index=False)
-    digest = hashlib.sha256(target.read_bytes()).hexdigest()
+    digest = sha256_file(target)
     return SnapshotDataset(
         name=name,
         file=target.name,
@@ -95,6 +98,73 @@ def _write_frame(tmp: Path, name: str, frame: pd.DataFrame) -> SnapshotDataset:
         sha256=digest,
         bytes=target.stat().st_size,
     )
+
+
+def _ensure_native_sidecar(
+    panel: PanelData, directory: Path, manifest: SnapshotManifest
+) -> SnapshotManifest:
+    """Repair a derived cache without rewriting immutable data or snapshot identity.
+
+    Each publication is atomic. If manifest publication fails after the sidecar
+    rename, the build fails and a retry verifies or regenerates the cache; no
+    successful result is returned for that partially published upgrade.
+    """
+    if manifest.snapshot_id != directory.name:
+        raise SnapshotError("manifest snapshot id does not match its directory")
+    if manifest.panel.get("file", "panel.qpanel") != "panel.qpanel":
+        raise SnapshotError("snapshot native sidecar filename must be panel.qpanel")
+    data_only = replace(manifest, panel={"available": False})
+    problems = Snapshot(directory, data_only).verify()
+    if problems:
+        raise SnapshotError(f"refusing native sidecar upgrade: {problems}")
+    target = directory / "panel.qpanel"
+    if target.is_symlink():
+        raise SnapshotError("snapshot native sidecar must not be a symbolic link")
+    if manifest.panel.get("available") and target.is_file():
+        digest = sha256_file(target)
+        if digest == manifest.panel.get("sha256") and target.stat().st_size == manifest.panel.get(
+            "bytes"
+        ):
+            return manifest
+    if not panel_available():
+        raise CppUnavailableError(
+            "snapshot requires a .qpanel sidecar but the C++ PanelWriter is not available; "
+            "run `make build` and retry"
+        )
+    token = uuid.uuid4().hex
+    native_tmp = directory / f".tmp-native-{token}.qpanel"
+    manifest_tmp = directory / f".tmp-native-{token}.json"
+    try:
+        panel_info = write_qpanel(panel, native_tmp)
+        panel_info.update(file="panel.qpanel", available=True)
+        updated = replace(manifest, panel=panel_info)
+        manifest_tmp.write_text(updated.to_json(), encoding="utf-8")
+        os.replace(native_tmp, target)
+        os.replace(manifest_tmp, directory / "manifest.json")
+        return updated
+    finally:
+        native_tmp.unlink(missing_ok=True)
+        manifest_tmp.unlink(missing_ok=True)
+
+
+def _record_publication(
+    manifest: SnapshotManifest, directory: Path, state: SQLiteState | None
+) -> None:
+    """Publish selection separately from the snapshot's immutable creation time."""
+    if state is not None:
+        state.record_snapshot(
+            manifest.snapshot_id, str(directory), manifest.content_hash, manifest.synthetic
+        )
+    temporary = directory.parent / f".tmp-latest-{uuid.uuid4().hex}.json"
+    try:
+        temporary.write_text(
+            json.dumps({"snapshot_id": manifest.snapshot_id, "content_hash": manifest.content_hash})
+            + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, directory.parent / "latest.json")
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def build_snapshot(
@@ -127,8 +197,9 @@ def build_snapshot(
                 f"snapshot id collision/integrity failure for {snapshot_id}: "
                 "directory content does not match the requested panel"
             )
-        if state is not None:
-            state.record_snapshot(snapshot_id, str(final), content_hash, manifest.synthetic)
+        if require_qpanel:
+            manifest = _ensure_native_sidecar(panel, final, manifest)
+        _record_publication(manifest, final, state)
         return manifest
 
     temporary = root_path / f".tmp-{snapshot_id}-{uuid.uuid4().hex[:8]}"
@@ -187,8 +258,7 @@ def build_snapshot(
     except BaseException:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
-    if state is not None:
-        state.record_snapshot(snapshot_id, str(final), content_hash, manifest.synthetic)
+    _record_publication(manifest, final, state)
     return manifest
 
 

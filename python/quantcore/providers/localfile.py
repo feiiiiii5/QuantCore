@@ -182,6 +182,8 @@ class LocalFileProvider(DataProvider):
         self, codes: Iterable[str] | None, start: int | str, end: int | str
     ) -> pd.DataFrame:
         self.require("financials")
+        if "financials" not in self.file_names and not self._has_dataset("financials"):
+            return normalize_financials(pd.DataFrame())
         self.limiter.acquire()
         frame = normalize_financials(self._read("financials"))
         return subset_frame(
@@ -192,6 +194,10 @@ class LocalFileProvider(DataProvider):
         self, codes: Iterable[str] | None, start: int | str, end: int | str
     ) -> pd.DataFrame:
         self.require("corporate_actions")
+        if "corporate_actions" not in self.file_names and not self._has_dataset(
+            "corporate_actions"
+        ):
+            return normalize_corporate_actions(pd.DataFrame())
         self.limiter.acquire()
         frame = normalize_corporate_actions(self._read("corporate_actions"))
         return subset_frame(

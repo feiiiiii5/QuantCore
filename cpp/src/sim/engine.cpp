@@ -95,8 +95,14 @@ Engine::Engine(const Panel& panel, BacktestConfig config) : panel_(panel), cfg_(
     if (ca.sec < 0 || static_cast<size_t>(ca.sec) >= panel_.n_sec() || ca.ex_date == kInvalidDate) {
       invalid("corporate action has invalid security/ex_date");
     }
-    if (ca.cash_per_share < 0.0 || !(ca.split_ratio > 0.0)) {
+    if (!std::isfinite(ca.cash_per_share) || !std::isfinite(ca.split_ratio) ||
+        ca.cash_per_share < 0.0 || !(ca.split_ratio > 0.0)) {
       invalid("corporate action cash/split_ratio invalid");
+    }
+    const bool in_window = (cfg_.start == kInvalidDate || ca.ex_date >= cfg_.start) &&
+                           (cfg_.end == kInvalidDate || ca.ex_date <= cfg_.end);
+    if (in_window && cfg_.costs.enable_dividend_tax && ca.cash_per_share > 0.0) {
+      invalid("dividend tax is not implemented; use pre-tax dividends");
     }
   }
 }
@@ -106,7 +112,6 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
   const size_t ns = panel.n_sec();
   const size_t nt = panel.n_time();
   BacktestResult result;
-  result.engine_version = "0.1.0";
   result.seed = cfg_.seed;
 
   Ledger ledger(cfg_.initial_cash, cfg_.rules.t_plus_one, ns);
@@ -207,6 +212,10 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
           const double raw =
               (static_cast<double>(base) - static_cast<double>(cash_per_share)) / ca.split_ratio;
           adjusted_prev[ca.sec] = raw > 0.0 ? static_cast<Px>(std::llround(raw)) : 0;
+          // A suspended ex-date has no new close. Rebase its stale mark with the
+          // share/cash adjustment so valuation and forced liquidation stay coherent.
+          ledger.mark(ca.sec, adjusted_prev[ca.sec]);
+          prev_close[sec] = adjusted_prev[ca.sec];
         }
       }
     }
@@ -245,7 +254,8 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
       if (px > 0) {
         costs = compute_costs(cfg_.costs, Side::Sell, amount, security_ctx(security));
       }
-      ledger.add_sell(static_cast<int32_t>(sec), date, qty, amount, costs.total);
+      const Money realized_pnl =
+          ledger.add_sell(static_cast<int32_t>(sec), date, qty, amount, costs.total);
       Trade tr;
       tr.date = date;
       tr.sec = static_cast<int32_t>(sec);
@@ -253,12 +263,17 @@ BacktestResult Engine::run(TargetSource& targets, CancelToken& cancel) {
       tr.px = px;
       tr.qty = qty;
       tr.amount = amount;
+      tr.realized_pnl = realized_pnl;
       set_trade_pnl_fields(tr, costs);
       result.trades.push_back(tr);
     }
 
     // 4) Mark to market at today's close (stale marks kept on missing/suspended data).
     for (size_t sec = 0; sec < ns; ++sec) {
+      // Providers may carry a finite pre-suspension close through halted bars.
+      // It must not overwrite an ex-date-adjusted mark or reference price.
+      if (PanelViews::flag(views.suspended, sec, i))
+        continue;
       const Px close_px = PanelViews::px(views.close, sec, i);
       if (close_px > 0) {
         ledger.mark(static_cast<int32_t>(sec), close_px);

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ValidationError
 
 from ..errors import StrategyValidationError
 from ..strategy.base import Strategy, UniverseFilter
-from . import builtin
+from . import builtin, research
 
 
 @dataclass(frozen=True)
@@ -70,6 +70,24 @@ for _entry in (
         "多因子打分: 动量 + 低波 + 价值 + 质量",
         builtin.MultiFactorParams,
         lambda params, universe, name: builtin.MultiFactorStrategy(params, universe, name),
+    ),
+    TemplateEntry(
+        "trend_momentum",
+        "趋势动量研究候选: 正动量与长期均线过滤, 等权配置",
+        research.TrendMomentumParams,
+        lambda params, universe, name: research.TrendMomentumStrategy(params, universe, name),
+    ),
+    TemplateEntry(
+        "liquid_reversal",
+        "流动性反转研究候选: 短期落后、长期趋势与成交额过滤",
+        research.LiquidReversalParams,
+        lambda params, universe, name: research.LiquidReversalStrategy(params, universe, name),
+    ),
+    TemplateEntry(
+        "defensive_low_vol",
+        "防御低波研究候选: 正趋势、低波筛选与逆波动配置",
+        research.DefensiveLowVolParams,
+        lambda params, universe, name: research.DefensiveLowVolStrategy(params, universe, name),
     ),
 ):
     register_template(_entry)
