@@ -69,13 +69,13 @@ def _spearman(left: np.ndarray, right: np.ndarray) -> float | None:
 
 
 def _bucket_indices(values: np.ndarray, quantiles: int) -> np.ndarray:
-    """Assign quantile buckets ``0..quantiles-1`` by rank; -1 marks missing."""
+    """Split stable zero-based ranks into balanced groups; -1 marks nonfinite values."""
     buckets = np.full(values.shape, -1, dtype=np.int64)
     valid = np.flatnonzero(np.isfinite(values))
     if valid.size == 0:
         return buckets
-    ranks = pd.Series(values[valid]).rank(method="first", pct=True).to_numpy()
-    buckets[valid] = np.minimum((ranks * quantiles).astype(np.int64), quantiles - 1)
+    order = valid[np.argsort(values[valid], kind="stable")]
+    buckets[order] = np.arange(valid.size) * quantiles // valid.size
     return buckets
 
 

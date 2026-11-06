@@ -209,3 +209,17 @@
 .check-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); flex: 0 0 auto; }
 .stat-tile-value { overflow-wrap: anywhere; }
 
+/* Cost multipliers are scenarios, not timestamps. */
+.cost-sensitivity-result { min-width: 0; border-top: 1px solid var(--separator); padding-top: var(--sp-6); }
+.cost-sensitivity-result > p { margin: 0; overflow-wrap: anywhere; }
+.cost-sensitivity-figure { margin: 0; }
+.cost-sensitivity-bars { display: grid; gap: var(--sp-5); margin: var(--sp-5) 0 0; padding: 0; list-style: none; }
+.cost-sensitivity-bar-row { display: grid; grid-template-columns: minmax(48px, auto) minmax(60px, 1fr) minmax(65px, auto); gap: var(--sp-5); align-items: center; font-size: var(--fs-caption); font-variant-numeric: tabular-nums; }
+.cost-sensitivity-multiplier { overflow-wrap: anywhere; }
+.cost-sensitivity-track { position: relative; height: 16px; min-width: 0; background: var(--surface-3); border-radius: var(--radius-xs); }
+.cost-sensitivity-track::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--separator-strong); }
+.cost-sensitivity-bar { position: absolute; top: 2px; bottom: 2px; border-radius: var(--radius-xs); }
+.cost-sensitivity-value { text-align: right; }
+.cost-sensitivity-table table { min-width: 560px; }
+.cost-sensitivity-table tbody th { font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; }
+

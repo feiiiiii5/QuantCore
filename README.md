@@ -38,6 +38,7 @@ QuantCore 把这四件事做成默认流程，而不是留给用户自己补的�
 点击「沿用数据与参数」会读取原实验保存的快照或面板，保留费用与规则，生成带来源链接的新实验；
 不会重新生成一份看起来相似的合成数据。点击「继续研究」会带着当前实验进入稳健性检查。
 月收益包含跨月首个交易日的变化；模拟账户成本保留计算精度，不同起始日期的账户组合按共同区间重新配置权重。
+成本敏感性按真实费用倍数展示情景条形图与指标表，小数倍数分别保留；总费用统一换算为元。
 
 ![实验对比：归一化净值与研究条件](docs/screenshots/research-comparison.png)
 
@@ -137,7 +138,7 @@ QC_ALLOW_NETWORK=1 uv run qc serve --port 8000 --open
   sonner（通知）、cmdk（命令面板）、vaul（移动抽屉）、TradingView lightweight-charts（图表）、TanStack（表格/数据）。
 - **本地优先**：Parquet 权威数据 + DuckDB 查询 + SQLite 状态 + `.qpanel` 引擎输入；运行期零 CDN，
   token 只在本机；网络能力显式开启，测试只走录制 fixture。
-- **质量门禁**：pytest 373 passed / 2 skipped、Playwright 18/18、vitest 19、ruff/mypy 全绿；
+- **质量门禁**：本地 pytest 383 passed / 2 skipped、Playwright 19/19、vitest 20、ruff/mypy 全绿；
   既有 CI 覆盖 macOS / Ubuntu / Windows smoke / UI / Windows 打包；当前优化的本机验证见验收报告。
 - **可验证**：`make verify-cpp` 检查 C++ 后端、C++/参考实现差分与性能门禁；
   `make e2e` 用隔离服务跑完整 UI 流程，不污染工作区。

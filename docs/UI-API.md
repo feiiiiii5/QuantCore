@@ -134,8 +134,8 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 
 ## Research robustness (M7 advanced)
 - `POST /api/research/overfitting` `{run_id,n_trials?}` → `{observations,periods_per_year,sharpe,deflated_sharpe,expected_max_sharpe,n_trials,skew,kurtosis,verdict}`
-- `POST /api/research/pbo` `{run_ids:[],n_splits?:8}` → `{run_ids,n_splits,combinations,pbo,median_oos_rank,logits[][]}`
-- `POST /api/research/cost_sensitivity` `{run_id,multipliers?:[0,0.5,1,2,3]}` → `{points:[{multiplier,total_return,annualized_return,sharpe,max_drawdown,total_fees}],breakeven_multiplier?}`; original experiment is never modified
+- `POST /api/research/pbo` `{run_ids:[],n_splits?:8}` → `{run_ids,n_splits,combinations,pbo,median_oos_rank,logits[][]}`。公开 OOS 排名 1 为最好；内部 logit 使用并列平均秩，较好表现对应正值。PBO 按 `logit <= 0` 统计未胜过 OOS 中位数的比例，中位并列计入；完全相同的实验不会被视为独立的稳健证据。
+- `POST /api/research/cost_sensitivity` `{run_id,multipliers?:[0,0.5,1,2,3]}` → `{run_id,points:[{multiplier,total_return,annualized_return,sharpe,max_drawdown,total_fees}],breakeven_multiplier?}`。费用倍数是情景标签，保留小数；收益和回撤为小数，`total_fees` 为 1e-4 元定点值，界面转为元。原实验不被修改。
 - `POST /api/research/monte_carlo` `{run_id,n_paths?:500,horizon?:250}` → `{terminal_return:{p05,p25,p50,p75,p95},max_drawdown:{p05,p50,p95},paths?}` (block=20, deterministic seed)
 - `POST /api/research/capacity` `{run_id,adv_participation?:0.1}` → `{capacity_cny,participation,avg_turnover,avg_adv_cny,limiting_sec,notes}`; approximate, 400 when data is missing
 

@@ -1,12 +1,25 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02（Apple 设计语言 + 成熟开源方案重构轮 R4）。M0–M10 功能门禁完成；R2（qc doctor/demo、部分成交、本地工具链）与 R3（产品理念、UI 重构、实时行情、真实数据、零基础引导）保持全绿；R4 按 Apple HIG 重做前端设计系统（Radix UI / framer-motion / sonner / cmdk / vaul / lightweight-charts），以 exchange-calendars 真实 XSHG 日历替换启发式，修复实时行情与 provider 的一组正确性问题，并端到端验证真实联网行情（REST + WebSocket）。授权 vendor 行情、签名/公证安装包仍是文档化限制。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（M0–M10 **134/134**，R5 增量 **6/6**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（M0–M10 **134/134**，R5 增量 **6/6**，R6 本地增量 **4/4**）。
 
 > **交接记录（2026-11-02）**：上一会话留下的迁移交接文档（377 行）的独有内容已吸收进
 > `docs/PROGRESS.md`（开发环境/门禁基线/提交流程/工作边界）与 `README.md` 文档索引，交接文件已删除；
 > `docs/ARCHITECTURE.md` 与 `docs/RELEASE.md` 中与当前代码事实不符的历史表述（导航数量、子进程资源限制、
 > Playwright 数量、Windows 验证状态）已修正。下列已知限制保持原文，未做弱化。
+
+## 2026-11-06 本地增量验收：稳健性研究口径（R6）
+
+本阶段仅本地构建、测试与验收，不部署上线。本轮没有推送新提交，也没有修改运行时依赖或 C++ 引擎；真实回测和成本重跑继续经过 C++20 `qcore`。
+
+- PBO：按[原论文算法 2.3(f,g)](https://carmamaths.org/jon/backtest2.pdf)修正 relative-rank/logit 方向。公开 OOS 排名仍为 1 最好；内部并列采用平均秩，保留本项目 `logit <= 0` 计入 PBO 的政策。相同收益不是独立稳健证据，不再产生正 logit。持久化与 HTTP 回归共 **3 passed**；原方向的两个用例实际失败，并列补充用例也在修复前失败。
+- 因子分组：稳定零起排名分桶，修复 5 只证券分 5 组时底组空、顶组重复的偏移；并列按证券原顺序，非有限值不分组。新增 **6 passed**，其中原实现 **3 failed / 3 passed**；真实 `analyze_factor` 报告逐组收益与已知前瞻收益一致。
+- Monte Carlo：回撤峰值纳入初始资金 1.0。持久化 -1% 日收益、单日采样时，原实现的回撤分位数全为 0，修复后为 1%；新增 **1 passed**。采样模型未改变。
+- 成本敏感性：费用倍数改为情景条形图与指标表，保留 0、0.5、任意小数及单点，费用从 1e-4 元转换为元。真实浏览器从实验进入研究，核对响应 `run_id`、真实 C++ 后端与每行的收益/年化/Sharpe/回撤/费用；默认、小数、单点情景均通过。原界面使用时间坐标，不能正确逐项展示这些情景；新增浏览器断言在原界面失败。
+- 本地全套：Python **383 passed / 2 skipped**；Vitest **20 passed**；真实服务 Playwright **19/19**，新增成本流程的桌面 1440×1000 与手机 390×844 检查无页面横向溢出、无控制台错误。TypeScript/Vite 构建通过；Ruff lint/format（164 文件）与 mypy（106 源文件）通过。
+- C++：本地编译扩展与 `engine_backend=cpp` 已核对，既有 `scripts/verify_cpp.py` 通过，差分 **6/6**。300×965 合成面板的 20 因子约 20.94ms，单引擎约 2.78ms；仅为本机合成基准，不构成全市场结论。
+
+界面证据：[桌面成本情景](screenshots/cost-sensitivity.png)、[手机成本情景](screenshots/cost-sensitivity-mobile.png)，均为本地 SYNTHETIC 数据。未进行部署、实盘、授权数据源或其他平台验收；旧 CI 结果只适用于旧提交。
 
 ## 2026-11-06 增量验收：研究证据与账户正确性
 

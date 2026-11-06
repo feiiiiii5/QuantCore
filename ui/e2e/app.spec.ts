@@ -56,6 +56,53 @@ async function createExperiment(request: APIRequestContext): Promise<string> {
   throw new Error("backtest job did not finish");
 }
 
+test("cost scenarios preserve fractional multipliers through native backtests", async ({ page, request }) => {
+  const errors = await prepare(page);
+  await bootstrap(request);
+  const runId = await createExperiment(request);
+  const experiment = await request.get(`/api/experiments/${runId}/result`, { headers: AUTH });
+  expect((await experiment.json()).engine_backend).toBe("cpp");
+  await page.goto(`/experiments?run=${encodeURIComponent(runId)}`);
+  await page.getByRole("link", { name: "继续研究" }).click();
+  await expect(page).toHaveURL(new RegExp(`/research\\?run=${runId}`));
+  const table = page.getByRole("table", { name: "成本情景指标", exact: true });
+  for (const multipliers of [[0, 0.5, 1, 2, 3], [0.25, 0.5, 1.5], [0.5]]) {
+    if (multipliers.length !== 5) await page.getByLabel("成本倍数", { exact: true }).fill(multipliers.join(", "));
+    const pending = page.waitForResponse((response) => response.url().endsWith("/api/research/cost_sensitivity") && response.request().method() === "POST");
+    await page.getByRole("button", { name: "成本敏感性", exact: true }).click();
+    const response = await pending;
+    expect(response.ok()).toBeTruthy();
+    const result = await response.json();
+    expect(result.run_id).toBe(runId);
+    expect(result.points.map((point: { multiplier: number }) => point.multiplier)).toEqual(multipliers);
+    await expect(table).toBeVisible();
+    await expect(table.locator("tbody tr")).toHaveCount(multipliers.length);
+    for (const [index, point] of result.points.entries()) {
+      const row = table.locator("tbody tr").nth(index);
+      await expect(row.getByRole("rowheader")).toHaveText(`${point.multiplier}×`);
+      const fees = `¥${(point.total_fees / 10000).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      await expect(row.getByRole("cell")).toHaveText([
+        `${(point.total_return * 100).toFixed(2)}%`,
+        `${(point.annualized_return * 100).toFixed(2)}%`,
+        point.sharpe.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        `${(point.max_drawdown * 100).toFixed(2)}%`,
+        fees,
+      ]);
+    }
+    if (multipliers.length === 5) {
+      await page.getByRole("region", { name: "成本敏感性结果" }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: "/tmp/qc-cost-sensitivity.png" });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(table).toBeVisible();
+      await page.getByRole("region", { name: "成本敏感性结果" }).scrollIntoViewIfNeeded();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+      await page.screenshot({ path: "/tmp/qc-cost-sensitivity-mobile.png" });
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    }
+  }
+  expect(errors).toEqual([]);
+});
+
 test("today dashboard shows market, watchlist, beginner progress and data health", async ({ page, request }) => {
   const errors = await prepare(page, { beginner: true });
   await bootstrap(request);

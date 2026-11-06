@@ -132,6 +132,12 @@ make bench-scale
 - 前端工程：Vite dev proxy 重写 Origin（修复 dev 403）、manualChunks、`ui/scripts/ui-audit.mjs` 审计脚本；tsc/vitest/build 全绿。
 - 验证：pytest 352 passed/2 skipped、ctest 95/95、Playwright 18/18、vitest 10、ruff/mypy 105 files；真实联网行情 /api/live/status=live + WS 帧（浦发 10.14 / 平安 11.58 + 4 指数）。
 
+## 本地稳健性研究修正（2026-11-06 R6）
+- 当前阶段仅本地构建、测试与验收，不部署；C/C++ 为硬约束，生产回测保持 C++20 `qcore`。
+- 修正 PBO relative-rank 方向与并列平均秩、因子分组偏移，以及 Monte Carlo 首日相对初始资金的回撤。
+- 成本敏感性改为按费用情景展示的条形图与指标表；默认、小数及单点均通过真实 C++ 回测到界面的流程验证。
+- 本地 Python 383 passed/2 skipped、Vitest 20、Playwright 19/19；Ruff/mypy、UI build、C++ verify gate 通过。详细证据见验收报告 R6；本轮未推送或部署。
+
 ## 已知缺口
 1. M9：实时行情来自公开网页接口（未授权、约 3 秒轮询、无 L2），仅展示；UI 已用共享 WS 消费，但数据源本身仍非授权 feed；部分成交按「日成交量参与率上限」近似（无盘口/排队/滑点），公司行为未实现；不得声称可实盘。
 2. M8：分钟线是 SYNTHETIC 视图（由日线拆桶），C++ 引擎仍只做日线、无分钟级回测/撮合；C++ 回测仍按
