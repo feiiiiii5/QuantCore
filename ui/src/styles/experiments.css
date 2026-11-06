@@ -1,0 +1,63 @@
+/* Experiment records and comparisons share the workbench's existing surface tokens. */
+.exp-card { cursor: default; }
+.exp-card-select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.exp-card-select .exp-card-head { width: 100%; }
+.exp-card-heading { display: block; min-width: 0; }
+.exp-card-heading > span { display: block; }
+.exp-card-select .exp-metrics { width: 100%; }
+.exp-card-foot { justify-content: space-between; }
+.exp-card-foot .check-row { cursor: pointer; }
+.exp-section-title { margin: 0; font-size: var(--fs-headline); font-weight: var(--fw-semibold); }
+.sheet-panel.exp-comparison-sheet[data-side="right"][data-size="lg"] { width: min(1080px, 96vw); }
+.exp-comparison { min-width: 0; }
+.exp-comparison .callout p { margin: var(--sp-2) 0 0; font-size: var(--fs-footnote); color: var(--text-2); }
+.exp-warnings { margin: 0; padding-left: var(--sp-7); font-size: var(--fs-footnote); line-height: 1.65; color: var(--text-2); }
+.exp-comparison-table table { min-width: 540px; }
+.exp-comparison-table td { vertical-align: top; }
+.exp-comparison-table th { min-width: 110px; }
+.exp-comparison-table thead th { text-align: right; }
+.exp-comparison-table th:first-child { text-align: left; }
+.exp-comparison-table th .badge { margin-top: var(--sp-3); }
+.exp-run-label { display: block; white-space: normal; overflow-wrap: anywhere; }
+.exp-delta { display: block; margin-top: var(--sp-2); font-size: var(--fs-caption2); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.exp-assumptions { padding: var(--sp-5); border: 1px solid var(--separator); border-radius: var(--radius); }
+.exp-assumptions summary { cursor: pointer; font-size: var(--fs-footnote); font-weight: var(--fw-medium); }
+.exp-assumptions .table-wrap { margin-top: var(--sp-5); }
+.exp-assumptions table { min-width: 560px; }
+.exp-assumptions th { min-width: 120px; white-space: normal; }
+.exp-assumptions th .badge { display: table; margin-top: var(--sp-3); }
+.exp-assumptions td { min-width: 170px; vertical-align: top; }
+.exp-value { margin: 0; font-family: var(--font-mono); font-size: var(--fs-caption2); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-2); }
+.exp-assumptions .exp-value { max-width: 34ch; }
+.exp-run-sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); }
+.exp-run-source { min-width: 0; padding: var(--sp-6); border: 1px solid var(--separator); border-radius: var(--radius); background: var(--surface); }
+.exp-run-source > .row-between > strong { min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: var(--fs-footnote); }
+.exp-source-list { margin: var(--sp-5) 0 0; }
+.exp-source-list > div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: var(--sp-5); padding: var(--sp-3) 0; font-size: var(--fs-caption); }
+.exp-source-list dt { color: var(--text-3); }
+.exp-source-list dd { margin: 0; overflow-wrap: anywhere; min-width: 0; color: var(--text-2); }
+.exp-provenance { border: 1px solid var(--separator); border-radius: var(--radius); padding: var(--sp-5) var(--sp-6); }
+.exp-provenance summary { display: flex; align-items: center; gap: var(--sp-5); flex-wrap: wrap; cursor: pointer; font-size: var(--fs-footnote); font-weight: var(--fw-medium); }
+.exp-provenance summary::before { content: "+"; color: var(--text-3); }
+.exp-provenance[open] summary::before { content: "−"; }
+.exp-provenance h4 { margin: var(--sp-6) 0 var(--sp-4); font-size: var(--fs-caption); font-weight: var(--fw-medium); }
+.exp-provenance-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--sp-8); }
+.exp-provenance > .page-note-sm { margin-top: var(--sp-6); }
+@media (max-width: 700px) {
+  .sheet-panel.exp-comparison-sheet[data-side="right"][data-size="lg"] { width: 100vw; }
+  .exp-run-sources, .exp-provenance-grid { grid-template-columns: minmax(0, 1fr); }
+  .exp-comparison .row-between > .field { width: 100%; }
+}

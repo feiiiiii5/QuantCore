@@ -1,12 +1,28 @@
 # 验收报告 — 对照任务书
 
 > 状态：2026-11-02（Apple 设计语言 + 成熟开源方案重构轮 R4）。M0–M10 功能门禁完成；R2（qc doctor/demo、部分成交、本地工具链）与 R3（产品理念、UI 重构、实时行情、真实数据、零基础引导）保持全绿；R4 按 Apple HIG 重做前端设计系统（Radix UI / framer-motion / sonner / cmdk / vaul / lightweight-charts），以 exchange-calendars 真实 XSHG 日历替换启发式，修复实时行情与 provider 的一组正确性问题，并端到端验证真实联网行情（REST + WebSocket）。授权 vendor 行情、签名/公证安装包仍是文档化限制。
-> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（当前 **134/134**）。
+> 本报告只写实际运行过的命令与结果。`docs/features.json` 为逐项真相源（M0–M10 **134/134**，R5 增量 **6/6**）。
 
 > **交接记录（2026-11-02）**：上一会话留下的迁移交接文档（377 行）的独有内容已吸收进
 > `docs/PROGRESS.md`（开发环境/门禁基线/提交流程/工作边界）与 `README.md` 文档索引，交接文件已删除；
 > `docs/ARCHITECTURE.md` 与 `docs/RELEASE.md` 中与当前代码事实不符的历史表述（导航数量、子进程资源限制、
 > Playwright 数量、Windows 验证状态）已修正。下列已知限制保持原文，未做弱化。
+
+## 2026-11-06 增量验收：研究证据与账户正确性
+
+新增内容围绕真实流程：实验归一化比较与条件差异、原实验数据/参数复用与父记录、稳健性跳转，以及账户和行情身份正确性。没有增加运行时依赖或真实下单能力。旧 M0–M10 证据保留原核对日期，不能理解为本次重新验证了所有外部数据和发布平台。
+
+- Python 全套：`uv run --no-sync pytest -o addopts=--strict-markers` → **370 passed / 2 skipped**。
+- `ruff check` / `ruff format --check`、mypy（106 源文件）通过。
+- 前端：`NODE_OPTIONS=--no-experimental-webstorage pnpm -C ui test` → **19 passed**；TypeScript 与生产构建通过。
+- 真实服务浏览器：既有 E2E **18/18**，覆盖主流程、插件、模拟账户、深色与移动端。新增流程用独立真实服务与 Playwright CLI 验证了 URL 选择、归一化/资金差异提示、来源数据与参数复用、新实验父记录、稳健性上下文；桌面 1440×1000 与手机 390×844 均无页面横向溢出，控制台 0 错误。首页实测未请求 Monaco。
+- C++：`uv run --no-sync python scripts/verify_cpp.py` 通过，差分 **6/6**。300×965 合成面板，引擎约 **2.79ms**，20 因子约 **24ms**；并非全市场或实盘结果。
+- 原实现红测：跨起始日 50/50 组合错误显示 +3.3333%，持仓重开损失 20 元成本；证券切换保留旧报价、WS 停帧不再刷新、账户切换被迟到响应覆盖。对应回归均已通过。
+- 本机 Node 26 的原生 Web Storage 与现有 jsdom 环境冲突，因此测试显式关闭该 Node 实验能力；未更换锁定依赖。
+
+验证取舍：本次没有修改 C++ 核心，不重新建立另一套撮合实现或重跑全市场规模试验；检查集中于收益、账本、数据身份、任务生命周期及真实界面。真实 Tushare Token、授权实时源、Windows 安装、签名包和实盘能力仍未验证。
+
+本次界面证据：[桌面对比](screenshots/research-comparison.png)、[手机对比](screenshots/research-comparison-mobile.png)，均为明确标注的 SYNTHETIC 数据。
 
 ## 里程碑
 | 阶段 | 状态 | 证据 |

@@ -41,12 +41,12 @@ export function useJobProgress(jobId: string | null, onTerminal?: (job: Job) => 
       terminal = true;
       clearTimers();
       socket?.close();
-      setState((current) => ({ ...current, job, error: job.status === "failed" ? (job.error ?? "job failed") : current.error }));
+      setState((current) => ({ ...current, job, error: job.status === "failed" ? (job.error ?? "job failed") : null }));
       terminalRef.current?.(job);
     };
     const apply = (job: Job) => {
       if (disposed) return;
-      setState((current) => ({ ...current, job, error: job.status === "failed" ? (job.error ?? "job failed") : current.error }));
+      setState((current) => ({ ...current, job, error: job.status === "failed" ? (job.error ?? "job failed") : null }));
       if (job.status === "done" || job.status === "failed" || job.status === "cancelled") finish(job);
     };
     const clearTimers = () => {
@@ -86,12 +86,15 @@ export function useJobProgress(jobId: string | null, onTerminal?: (job: Job) => 
           const message: unknown = JSON.parse(event.data);
           if (!message || typeof message !== "object") return;
           const payload = message as Record<string, unknown>;
+          if (isJob(payload.job)) {
+            apply(payload.job);
+            return;
+          }
           const messageError = payload.error;
           if (payload.type === "error" && typeof messageError === "string") {
             setState((current) => ({ ...current, error: messageError }));
             return;
           }
-          if (isJob(payload.job)) apply(payload.job);
         } catch {
           /* ignore malformed frames; polling remains available */
         }

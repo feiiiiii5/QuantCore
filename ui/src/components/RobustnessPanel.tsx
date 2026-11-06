@@ -28,8 +28,8 @@ function verdictLabel(verdict: string): string {
   return verdict;
 }
 
-export default function RobustnessPanel({ experiments }: { experiments: Experiment[] }) {
-  const [runId, setRunId] = useState("");
+export default function RobustnessPanel({ experiments, initialRunId = "" }: { experiments: Experiment[]; initialRunId?: string }) {
+  const [runId, setRunId] = useState(initialRunId);
   const [nTrials, setNTrials] = useState("10");
   const [pboIds, setPboIds] = useState<string[]>([]);
   const [nSplits, setNSplits] = useState("8");
@@ -47,6 +47,13 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
   const busy = overfitting.isPending || pbo.isPending || cost.isPending || monteCarlo.isPending || capacity.isPending;
   const error = formError || [overfitting.error, pbo.error, cost.error, monteCarlo.error, capacity.error].find(Boolean)?.message || "";
 
+  useEffect(() => {
+    if (initialRunId) setRunId(initialRunId);
+  }, [initialRunId]);
+  const resetOverfitting = overfitting.reset, resetCost = cost.reset, resetMonteCarlo = monteCarlo.reset, resetCapacity = capacity.reset;
+  useEffect(() => {
+    resetOverfitting(); resetCost(); resetMonteCarlo(); resetCapacity(); setFormError("");
+  }, [runId, resetOverfitting, resetCost, resetMonteCarlo, resetCapacity]);
   useEffect(() => {
     if (!runId && experiments.length) setRunId(experiments[0].run_id);
   }, [runId, experiments]);
@@ -83,10 +90,10 @@ export default function RobustnessPanel({ experiments }: { experiments: Experime
   };
 
   const overResult = overfitting.data;
-  const experimentOptions = experiments.map((item) => ({
+  const experimentOptions = [...(runId && !experiments.some((item) => item.run_id === runId) ? [{ value: runId, label: `历史实验 · ${runId}` }] : []), ...experiments.map((item) => ({
     value: item.run_id,
     label: `${item.strategy_name || item.template} · ${item.run_id.slice(-8)}`,
-  }));
+  }))];
 
   const costSeries: ChartSeries[] = cost.data?.points.length
     ? [

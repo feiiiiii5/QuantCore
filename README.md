@@ -29,6 +29,18 @@ QuantCore 把这四件事做成默认流程，而不是留给用户自己补的�
 | 带数据体检的研究：覆盖率、缺口、OHLC、涨跌停、复权先过检 | 收益承诺，不把研究近似包装成真实市场结论 |
 | 零基础也能用的引导：一键示例、白话模板、结论先行的结果页 | 云平台，不上传你的数据与策略 |
 
+## 让一次研究可以继续追问
+
+实验页把数据指纹、策略参数、费用、成交假设与代码版本放在同一个记录里。
+选中 2–4 个实验后，对比按各自记录的初始资金归一化的净值、回撤和指标差值，
+并逐项标出数据、区间、资金与规则的差异。条件不同可以观察，不能把差值全归因于策略。
+
+点击「沿用数据与参数」会读取原实验保存的快照或面板，保留费用与规则，生成带来源链接的新实验；
+不会重新生成一份看起来相似的合成数据。点击「继续研究」会带着当前实验进入稳健性检查。
+月收益包含跨月首个交易日的变化；模拟账户成本保留计算精度，不同起始日期的账户组合按共同区间重新配置权重。
+
+![实验对比：归一化净值与研究条件](docs/screenshots/research-comparison.png)
+
 ## 三条原则
 
 **看得懂。** 打开首页先回答「今天市场怎么样、我的自选怎么样、下一步做什么」，而不是先给一堆表单。
@@ -124,8 +136,8 @@ QC_ALLOW_NETWORK=1 uv run qc serve --port 8000 --open
   sonner（通知）、cmdk（命令面板）、vaul（移动抽屉）、TradingView lightweight-charts（图表）、TanStack（表格/数据）。
 - **本地优先**：Parquet 权威数据 + DuckDB 查询 + SQLite 状态 + `.qpanel` 引擎输入；运行期零 CDN，
   token 只在本机；网络能力显式开启，测试只走录制 fixture。
-- **质量门禁**：pytest 352 passed / 2 skipped、ctest 95/95、Playwright 18/18、vitest 10、ruff/mypy 全绿；
-  CI 覆盖 macOS / Ubuntu / Windows smoke / UI / Windows 打包。
+- **质量门禁**：pytest 370 passed / 2 skipped、Playwright 18/18、vitest 19、ruff/mypy 全绿；
+  既有 CI 覆盖 macOS / Ubuntu / Windows smoke / UI / Windows 打包；当前优化的本机验证见验收报告。
 - **可验证**：`make verify-cpp` 检查 C++ 后端、C++/参考实现差分与性能门禁；
   `make e2e` 用隔离服务跑完整 UI 流程，不污染工作区。
 

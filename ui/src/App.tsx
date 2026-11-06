@@ -10,14 +10,6 @@ import Toasts from "./components/Toasts";
 import StatusBar from "./components/StatusBar";
 import ErrorBoundary from "./components/ErrorBoundary";
 import HomePage from "./pages/HomePage";
-import MarketPage from "./pages/MarketPage";
-import ScreenerPage from "./pages/ScreenerPage";
-import BacktestPage from "./pages/BacktestPage";
-import ExperimentPage from "./pages/ExperimentPage";
-import ResearchPage from "./pages/ResearchPage";
-import PaperPage from "./pages/PaperPage";
-import DataPage from "./pages/DataPage";
-import SettingsPage from "./pages/SettingsPage";
 import { NAV_ITEMS, navItemByShortcut, titleForPath } from "./lib/nav";
 import {
   applyAppearance, readAppearance, subscribeAppearance, toggleTheme, type Appearance,
@@ -27,6 +19,14 @@ import { useWorkspace } from "./store/workspace";
 import { zhCN as t } from "./i18n/zh-CN";
 
 const StrategyPage = lazy(() => import("./pages/StrategyPage"));
+const MarketPage = lazy(() => import("./pages/MarketPage"));
+const ScreenerPage = lazy(() => import("./pages/ScreenerPage"));
+const BacktestPage = lazy(() => import("./pages/BacktestPage"));
+const ExperimentPage = lazy(() => import("./pages/ExperimentPage"));
+const ResearchPage = lazy(() => import("./pages/ResearchPage"));
+const PaperPage = lazy(() => import("./pages/PaperPage"));
+const DataPage = lazy(() => import("./pages/DataPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 function isTyping(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;

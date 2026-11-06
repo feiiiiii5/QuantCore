@@ -1,18 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Download, GitCompare, Play, RotateCcw, SlidersHorizontal, Square } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  useBars, useCancelJob, useDataIntegrity, useDataStatus, useExperimentResult,
+  useBars, useCancelJob, useDataIntegrity, useDataStatus, useExperimentDetail, useExperimentResult,
   useOnboardingPresets, useReplayExperiment, useSecurities, useSubmitBacktest, useTemplates,
 } from "../api/queries";
 import { downloadWithAuth, isApiError } from "../api/client";
-import type { BacktestResultPayload, StrategyPreset, Trade } from "../api/types";
+import type { StrategyPreset, Trade } from "../api/types";
 import {
   Badge, Button, Callout, Chart, ChartCard, EmptyState, Field, Input, KLineChart, PageHeader, Panel, ProgressBar,
   Select, Skeleton, StatTile, Tabs, Textarea, VirtualTable, defaultsFromSchema, type ChartSeries,
 } from "../components";
 import { useJobProgress } from "../hooks/useJobProgress";
-import { dateInt, fixedToYuan, money, monthKey, num, pct } from "../lib/format";
+import { dateInt, fixedToYuan, money, num, pct } from "../lib/format";
+import { drawdowns, monthlyReturns } from "../lib/backtestAnalysis";
+import { configFromDraft, restoreDraft } from "../lib/backtestDraft";
 import { notify } from "../lib/notify";
 import { useChartPalette } from "../theme";
 import { useBeginner } from "../store/ui";
@@ -33,18 +35,6 @@ const TAB_ITEMS = [
   { id: "explain", label: "交易解释" },
 ];
 
-function monthlyReturns(result: BacktestResultPayload): Array<{ month: string; value: number }> {
-  const buckets = new Map<string, { first: number; last: number }>();
-  result.dates.forEach((date, index) => {
-    const key = monthKey(date);
-    const equity = result.equity[index];
-    const bucket = buckets.get(key);
-    if (!bucket) buckets.set(key, { first: equity, last: equity });
-    else bucket.last = equity;
-  });
-  return [...buckets.entries()].map(([month, values]) => ({ month, value: values.first > 0 ? values.last / values.first - 1 : 0 }));
-}
-
 export default function BacktestPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -57,7 +47,9 @@ export default function BacktestPage() {
   const replay = useReplayExperiment();
   const securities = useSecurities("", 1000);
   const dataStatus = useDataStatus();
-  const integrity = useDataIntegrity();
+  const sourceId = searchParams.get("source");
+  const sourceQuery = useExperimentDetail(sourceId);
+  const restoredSource = useRef<string | null>(null);
   const stored = useWorkspace.getState().backtestDraft;
   const [draft, setDraft] = useState<BacktestDraft>(() => ({
     ...DEFAULTS,
@@ -66,6 +58,7 @@ export default function BacktestPage() {
     paramsText: searchParams.get("params") || stored.paramsText || DEFAULTS.paramsText,
   }));
   const [snapshot, setSnapshot] = useState("");
+  const integrity = useDataIntegrity(snapshot && !snapshot.startsWith("source:") ? snapshot : undefined);
   const [jobId, setJobId] = useState<string | null>(null);
   const [experimentId, setExperimentId] = useState("");
   const [error, setError] = useState("");
@@ -83,8 +76,17 @@ export default function BacktestPage() {
 
   useEffect(() => { setDraftStore(draft); }, [draft, setDraftStore]);
   useEffect(() => {
+    if (!sourceId || !sourceQuery.data || restoredSource.current === sourceId) return;
+    try {
+      setDraft(restoreDraft(sourceQuery.data, DEFAULTS));
+      setSnapshot(`source:${sourceId}`);
+      restoredSource.current = sourceId;
+      setError("");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "无法载入原实验"); }
+  }, [sourceId, sourceQuery.data]);
+  useEffect(() => {
     const job = progress.job;
-    if (!job) return;
+    if (!job || job.id !== jobId) return;
     if (job.status === "done") {
       const runId = typeof job.result?.run_id === "string" ? job.result.run_id : "";
       if (runId) {
@@ -97,7 +99,7 @@ export default function BacktestPage() {
       setError(job.error || (job.status === "cancelled" ? "已取消" : "回测失败"));
       resetSubmit();
     }
-  }, [progress.job, resetSubmit]);
+  }, [progress.job, jobId, resetSubmit]);
   useEffect(() => { setSelectedTrade(null); setTab("equity"); }, [experimentId]);
 
   const update = (key: keyof BacktestDraft, value: string) => setDraft((current) => ({ ...current, [key]: value }));
@@ -112,24 +114,16 @@ export default function BacktestPage() {
     setDraft((current) => ({ ...current, template: preset.template, paramsText: JSON.stringify(preset.params ?? {}) }));
   };
   const run = () => {
+    if (running) return;
     setError(""); setNotice(""); setReplayMessage(""); setExperimentId("");
+    setJobId(null);
     try {
+      if (sourceId && (sourceQuery.isPending || sourceQuery.error || restoredSource.current !== sourceId)) throw new Error(sourceQuery.error?.message || "请等待原实验载入后再运行");
       const params: unknown = JSON.parse(draft.paramsText);
       if (!params || typeof params !== "object" || Array.isArray(params)) throw new Error("参数必须是 JSON 对象");
-      const config = {
-        start: draft.start, end: draft.end, initial_cash: Number(draft.cash), trace: draft.trace, seed: Number(draft.seed),
-        benchmark_code: draft.benchmarkCode.trim() || undefined,
-        costs: {
-          commission_rate: Number(draft.commissionRate) / 100, min_commission: Number(draft.minCommission),
-          stamp_duty_rate: Number(draft.stampDutyRate) / 100, transfer_fee_rate: 0.00001, exchange_fee_rate: 0.00001, reg_fee_rate: 0.000002,
-        },
-        exec: { type: draft.exec, slippage_bps: Number(draft.slippageBps) || 0, max_participation: Number(draft.maxParticipation) || 1, min_rebalance_value: Number(draft.minRebalanceValue) || 0 },
-        risk: {
-          max_positions: draft.maxPositions ? Number(draft.maxPositions) : undefined,
-          max_weight: draft.maxWeight ? Number(draft.maxWeight) : undefined,
-        },
-      };
-      submit.mutate({ template: draft.template, params, snapshot: snapshot || undefined, config }, {
+      const config = configFromDraft(draft, sourceQuery.data);
+      const data = snapshot.startsWith("source:") ? { source_run_id: snapshot.slice(7) } : { snapshot: snapshot || undefined };
+      submit.mutate({ template: draft.template, params, ...data, config }, {
         onSuccess: (response) => { setJobId(response.job_id); },
         onError: (reason) => setError(reason.message),
       });
@@ -148,13 +142,11 @@ export default function BacktestPage() {
 
   const equitySeries = useMemo<ChartSeries[]>(() => {
     if (!result) return [];
-    const drawdown = result.equity.map((value, index) => {
-      const peak = Math.max(...result.equity.slice(0, index + 1));
-      return peak > 0 ? (value / peak - 1) * 100 : 0;
-    });
+    const initial = result.config?.initial_cash;
+    const drawdown = drawdowns(result.equity, typeof initial === "number" ? initial : undefined);
     const series: ChartSeries[] = [
       { kind: "area", title: "净值", data: result.dates.map((date, index) => ({ time: date, value: result.equity[index] })) },
-      { kind: "area", title: "回撤（%）", pane: 1, color: palette.down, data: result.dates.map((date, index) => ({ time: date, value: drawdown[index] })) },
+      { kind: "area", title: "回撤（%）", pane: 1, color: palette.down, data: result.dates.map((date, index) => ({ time: date, value: drawdown[index] * 100 })) },
     ];
     if (result.benchmark?.equity) {
       const benchmark = result.benchmark.equity;
@@ -167,7 +159,8 @@ export default function BacktestPage() {
   }, [result, palette]);
   const monthlySeries = useMemo<ChartSeries[]>(() => {
     if (!result) return [];
-    const monthly = monthlyReturns(result).slice(-36);
+    const initial = result.config?.initial_cash;
+    const monthly = monthlyReturns(result.dates, result.equity, typeof initial === "number" ? initial : undefined).slice(-36);
     return [{
       kind: "histogram", title: "月度收益（%）",
       data: monthly.map((item) => ({ time: item.month + "-01", value: item.value * 100, color: item.value >= 0 ? palette.up : palette.down })),
@@ -189,9 +182,12 @@ export default function BacktestPage() {
     const sum = (key: keyof Trade) => list.reduce((total, trade) => total + fixedToYuan(typeof trade[key] === "number" ? trade[key] as number : 0), 0);
     return { commission: sum("commission"), stamp: sum("stamp_duty"), transfer: sum("transfer_fee"), other: sum("other_fee"), total: sum("fee_total") };
   }, [result]);
-  const running = Boolean(jobId && progress.job && ["pending", "running"].includes(progress.job.status));
+  const running = submit.isPending || Boolean(jobId && (!progress.job || progress.job.id !== jobId || ["pending", "running"].includes(progress.job.status)));
   const phase = result || running ? 3 : draft.template ? 2 : 1;
-  const integrityBadge = integrity.isError
+  const dataLabel = snapshot.startsWith("source:") ? "原实验的已保存数据" : snapshot || "内置 SYNTHETIC";
+  const integrityBadge = snapshot.startsWith("source:")
+    ? { tone: "neutral" as const, text: "沿用原实验数据 · 未重新体检" }
+    : !snapshot ? { tone: "info" as const, text: "SYNTHETIC · 仅演示" } : integrity.isError
     ? { tone: "warn" as const, text: isApiError(integrity.error) && integrity.error.status === 404 ? "数据体检：后端未就绪" : "数据体检：暂不可用" }
     : integrity.data
       ? { tone: integrity.data.status === "ok" ? "ok" as const : integrity.data.status === "warn" ? "warn" as const : "danger" as const, text: `数据体检 ${integrity.data.status === "ok" ? "通过" : integrity.data.status === "warn" ? "有警告" : "未通过"} · 覆盖 ${integrity.data.coverage.coverage_pct.toFixed(1)}%` }
@@ -223,6 +219,7 @@ export default function BacktestPage() {
           </>
         )}
       />
+      {sourceId ? <Callout tone={sourceQuery.error ? "danger" : "info"} title={sourceQuery.error ? "原实验加载失败" : sourceQuery.isPending ? "正在载入原实验" : "沿用原实验开展新研究"}>{sourceQuery.error?.message || `保留数据、策略和费用假设；改动参数后会保存为新实验，原记录保留。来源：${sourceId}`}</Callout> : null}
       {screenerNote ? <Callout tone="info" title="来自选股的条件">「{screenerNote}」——当前回测按策略模板在全市场选股，该条件仅作研究记录，不改变回测股票池。</Callout> : null}
 
       <div className="wizard" id="bt-wizard">
@@ -271,7 +268,7 @@ export default function BacktestPage() {
           </div>
           <div className="grid grid-3">
             <Field label="数据快照" hint="默认内置 SYNTHETIC，无需导入">
-              <Select value={snapshot} onChange={(event) => setSnapshot(event.target.value)} options={[{ value: "", label: "内置 SYNTHETIC" }, ...(dataStatus.data?.snapshots ?? []).map((item) => ({ value: item.id, label: `${item.id.slice(0, 18)} · ${item.n_sec} 券 · ${dateInt(item.start)}–${dateInt(item.end)}${item.synthetic ? " · SYNTHETIC" : ""}` }))]} />
+              <Select value={snapshot} onChange={(event) => setSnapshot(event.target.value)} options={[...(sourceId && sourceQuery.data ? [{ value: `source:${sourceId}`, label: "沿用原实验的已保存数据" }] : []), { value: "", label: "内置 SYNTHETIC" }, ...(dataStatus.data?.snapshots ?? []).map((item) => ({ value: item.id, label: `${item.id.slice(0, 18)} · ${item.n_sec} 券 · ${dateInt(item.start)}–${dateInt(item.end)}${item.synthetic ? " · SYNTHETIC" : ""}` }))]} />
             </Field>
             <Field label="开始日期"><Input value={draft.start} onChange={(event) => update("start", event.target.value)} placeholder="YYYY-MM-DD" aria-label="开始日期" /></Field>
             <Field label="结束日期"><Input value={draft.end} onChange={(event) => update("end", event.target.value)} placeholder="YYYY-MM-DD" aria-label="结束日期" /></Field>
@@ -306,7 +303,7 @@ export default function BacktestPage() {
           <div className="wizard-summary">
             <span>区间 <strong>{draft.start} → {draft.end}</strong></span>
             <span>资金 <strong>{money(Number(draft.cash))}</strong></span>
-            <span>数据 <strong>{snapshot ? snapshot.slice(0, 18) : "内置 SYNTHETIC"}</strong></span>
+            <span>数据 <strong>{dataLabel}</strong></span>
             <Badge tone={integrityBadge.tone}>{integrityBadge.text}</Badge>
           </div>
         </section>
@@ -318,7 +315,7 @@ export default function BacktestPage() {
           </div>
           <div className="wizard-summary">
             <span>策略 <strong>{draft.template}</strong></span>
-            <span>快照 <strong>{snapshot || "内置 SYNTHETIC"}</strong></span>
+            <span>快照 <strong>{dataLabel}</strong></span>
             <span>区间 <strong>{draft.start} → {draft.end}</strong></span>
             <span>初始资金 <strong>{money(Number(draft.cash))}</strong></span>
           </div>
@@ -341,7 +338,7 @@ export default function BacktestPage() {
             <div className="conclusion-head"><h2 className="conclusion-title">结论：{result.metrics.total_return >= 0 ? "本次回测取得正收益" : "本次回测亏损"}，最大回撤 {pct(result.metrics.max_drawdown)}</h2></div>
             <p className="conclusion-text">总收益 <strong>{pct(result.metrics.total_return)}</strong>（年化 {pct(result.metrics.annualized_return)}），Sharpe <strong>{num(result.metrics.sharpe)}</strong>，交易 <strong>{result.trades.length}</strong> 笔，已扣成本 <strong>{money(fixedToYuan(result.metrics.total_fees))}</strong>。{benchmarkDiff == null ? "未设置基准。" : benchmarkDiff >= 0 ? `跑赢基准 ${pct(benchmarkDiff)}。` : `跑输基准 ${pct(Math.abs(benchmarkDiff))}。`}</p>
             <div className="row">
-              <Badge tone={integrityBadge.tone}>{integrityBadge.text}</Badge>
+              <Badge tone={result.synthetic ? "info" : "neutral"}>{result.synthetic ? "SYNTHETIC · 仅演示" : result.snapshot?.source ? `来源 ${String(result.snapshot.source)}` : "来源未记录"}</Badge>
               <Badge tone="ok">成本后口径 · 已扣费用</Badge>
               <Badge tone="warn">样本内 · 未做样本外验证</Badge>
               <Badge tone="neutral">引擎 {result.engine_backend} {result.engine_version}</Badge>
@@ -350,7 +347,7 @@ export default function BacktestPage() {
               <Button variant="primary" icon={SlidersHorizontal} onClick={scrollToWizard}>改参数再跑</Button>
               <Button variant="secondary" icon={GitCompare} disabled={!experimentId} onClick={() => experimentId && navigate(`/experiments?run=${encodeURIComponent(experimentId)}`)}>加入对比</Button>
               <Button variant="secondary" icon={Download} disabled={!experimentId} onClick={() => experimentId && void downloadWithAuth(`/api/experiments/${experimentId}/report`, `${experimentId}.html`)}>查看报告</Button>
-              <Button variant="ghost" disabled={!experimentId} onClick={() => experimentId && navigate(`/research?run=${encodeURIComponent(experimentId)}`)}>做样本外验证</Button>
+              <Button variant="ghost" disabled={!experimentId} onClick={() => experimentId && navigate(`/research?run=${encodeURIComponent(experimentId)}`)}>检查稳健性</Button>
             </div>
           </div>
           <div className="metric-grid">

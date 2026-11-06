@@ -19,11 +19,16 @@ class BacktestRequest(BaseModel):
     experiments_root: str | None = None
     config: dict[str, Any] = Field(default_factory=dict)
     synthetic: dict[str, Any] = Field(default_factory=dict)
+    source_run_id: str | None = Field(default=None, min_length=1, max_length=120)
 
     @model_validator(mode="after")
     def _one_strategy_source(self) -> BacktestRequest:
-        if (self.template is None) == (self.strategy is None):
+        if self.template is not None and self.strategy is not None:
             raise ValueError("provide exactly one of 'template' or 'strategy'")
+        if self.template is None and self.strategy is None and self.source_run_id is None:
+            raise ValueError("provide 'template', 'strategy', or 'source_run_id'")
+        if self.source_run_id and (self.snapshot is not None or self.synthetic):
+            raise ValueError("source_run_id reuses recorded data; omit snapshot and synthetic")
         return self
 
 

@@ -1,7 +1,7 @@
 {
   "project": "QuantCore",
   "version": "0.1.0",
-  "generated": "2026-11-02",
+  "generated": "2026-11-06",
   "features": [
     {
       "id": "M0-001",
@@ -940,9 +940,58 @@
       "title": "zero-basis tutorial (docs/TUTORIAL.md)",
       "passes": true,
       "evidence": "docs/TUTORIAL.md: install -> start -> 今日 -> 4-step checklist -> market live/offline -> first backtest + how to read results -> data health/import -> paper trading -> FAQ; every section ends with 'you should see'; 163 lines"
+    },
+    {
+      "id": "R5-001",
+      "milestone": "R5",
+      "title": "recorded-assumption experiment comparison",
+      "passes": true,
+      "evidence": "tests/test_experiment_comparison.py: 9 passed; ui/src/lib/experimentComparison.test.ts: 3 passed; normalized equity, drawdown, assumption differences/unknowns, legacy handling"
+    },
+    {
+      "id": "R5-002",
+      "milestone": "R5",
+      "title": "reuse saved experiment data with parent lineage",
+      "passes": true,
+      "evidence": "tests/test_experiment_lineage.py: 4 passed; original snapshot/persisted panel and config retained, parameter overrides, custom store, original record unchanged"
+    },
+    {
+      "id": "R5-003",
+      "milestone": "R5",
+      "title": "paper accounting survives restart and staggered allocations",
+      "passes": true,
+      "evidence": "tests/test_paper_accounting.py: 3 passed; original implementation failed cost basis and staggered 50/50 allocation cases"
+    },
+    {
+      "id": "R5-004",
+      "milestone": "R5",
+      "title": "selection-safe quotes and paper playback",
+      "passes": true,
+      "evidence": "ui/src/api/liveQuotes.test.tsx: 2 passed; ui/src/pages/PaperPage.test.tsx: 1 passed; code/account identity and late-response regressions reproduced before fixes"
+    },
+    {
+      "id": "R5-005",
+      "milestone": "R5",
+      "title": "owned worker shutdown and terminal job frames",
+      "passes": true,
+      "evidence": "tests/test_job_shutdown.py: 2 passed; ui/src/hooks/useJobProgress.test.tsx: 1 passed; worker retains ownership through shutdown and cancels claimed jobs"
+    },
+    {
+      "id": "R5-006",
+      "milestone": "R5",
+      "title": "correct monthly returns and capital-based drawdown",
+      "passes": true,
+      "evidence": "ui/src/lib/backtestAnalysis.test.ts: 2 passed; compounded month returns reconcile and drawdown includes initial capital"
     }
   ],
   "verified_at": "2026-11-02",
   "verified_by": "local gates: pytest (all green, see acceptance report); ctest 95/95; UI vitest 10; Playwright e2e 18/18 (redesigned UI); ruff/mypy; make verify-cpp; make doctor/demo; ui-audit 10 routes + mobile + dark (0 console errors, 0 overflow); real-data pipeline: Sina 3-name import + snapshot + qc data integrity (status ok) + cpp backtest; live quotes verified with QC_ALLOW_NETWORK=1 (REST + /ws/live frames)",
-  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display only, no L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope."
+  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display only, no L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope.",
+  "incremental_verification": {
+    "date": "2026-11-06",
+    "scope": "R5 changes; historical M0-M10 evidence retained with original verification date",
+    "python": "370 passed / 2 skipped",
+    "ui": "19 passed",
+    "checks": "ruff lint/format; mypy 106 files; C++ differential 6/6 + existing verify_cpp gate; UI build; isolated browser E2E 18/18; Playwright CLI research workflow, desktop/mobile no overflow and 0 console errors, no eager Monaco"
+  }
 }

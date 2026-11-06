@@ -110,9 +110,14 @@ class JobQueue:
 
     def stop(self, timeout: float = 5.0) -> None:
         self._stop.set()
+        with self._current_lock:
+            current = self._current
+        if current is not None:
+            self.state.request_cancel(current.job_id)
         if self._thread is not None:
             self._thread.join(timeout=timeout)
-            self._thread = None
+            if not self._thread.is_alive():
+                self._thread = None
 
     @property
     def running(self) -> bool:
@@ -138,6 +143,8 @@ class JobQueue:
         with self._current_lock:
             self._current = context
         try:
+            if self._stop.is_set():
+                self.state.request_cancel(job_id)
             if context.cancel_requested():
                 self.state.mark_cancelled(job_id, error="cancelled before start")
                 return

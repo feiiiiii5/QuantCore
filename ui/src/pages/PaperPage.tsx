@@ -39,12 +39,15 @@ export default function PaperPage() {
   const [limitPrice, setLimitPrice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [stepping, setStepping] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [autoRunning, setAutoRunning] = useState(false);
   const [alerts, setAlerts] = useState<Array<{ id: string; type: "equity_above" | "equity_below"; value: number }>>([]);
   const [alertType, setAlertType] = useState<"equity_above" | "equity_below">("equity_below");
   const [alertValue, setAlertValue] = useState("");
   const playTimer = useRef<number | null>(null);
+  const selectedRef = useRef("");
+  const stepInFlight = useRef(false);
 
   const stopPlay = useCallback(() => {
     if (playTimer.current !== null) {
@@ -54,32 +57,49 @@ export default function PaperPage() {
     setPlaying(false);
   }, []);
   useEffect(() => stopPlay, [stopPlay]);
+  const selectSession = useCallback((sessionId: string) => {
+    if (selectedRef.current === sessionId) return;
+    stopPlay();
+    selectedRef.current = sessionId;
+    setSelected(sessionId);
+    setDetail(null);
+    setAutoRunning(false);
+    setError("");
+  }, [stopPlay]);
 
   const loadSessions = useCallback(async () => {
     try {
       const list = await api.paperSessions();
       setSessions(list);
-      if (!selected && list.length) setSelected(list[0].id);
+      if (!selectedRef.current && list.length) selectSession(list[0].id);
     } catch (e) { setError(`${e}`); }
-  }, [selected]);
+  }, [selectSession]);
   const loadDetail = useCallback(async (sessionId: string) => {
     if (!sessionId) return;
     try {
-      setDetail(await api.paperSession(sessionId));
+      const next = await api.paperSession(sessionId);
+      if (selectedRef.current !== sessionId) return;
+      setDetail(next);
       setError("");
-    } catch (e) { setError(`${e}`); }
+    } catch (e) { if (selectedRef.current === sessionId) setError(`${e}`); }
   }, []);
   useEffect(() => {
     void loadSessions();
     api.snapshots().then(setSnapshots).catch(() => setSnapshots([]));
     api.securities("", 300).then(setSecurities).catch(() => setSecurities([]));
   }, [loadSessions]);
-  useEffect(() => { if (selected) void loadDetail(selected); }, [selected, loadDetail]);
+  useEffect(() => {
+    if (!selected) return;
+    void loadDetail(selected);
+    api.paperAutoStatus(selected).then((status) => {
+      if (selectedRef.current === selected) setAutoRunning(status.running);
+    }).catch(() => undefined);
+  }, [selected, loadDetail]);
   useEffect(() => {
     if (!autoRunning || !selected) return;
     const timer = window.setInterval(() => {
-      api.paperSession(selected).then((next) => { setDetail(next); checkAlerts(next); }).catch(() => undefined);
-      api.paperAutoStatus(selected).then((status) => { if (!status.running) setAutoRunning(false); }).catch(() => undefined);
+      api.paperSession(selected).then((next) => { if (selectedRef.current === selected) { setDetail(next); checkAlerts(next); } }).catch(() => undefined);
+      api.paperAutoStatus(selected).then((status) => { if (selectedRef.current === selected && !status.running) setAutoRunning(false); }).catch(() => undefined);
     }, 1000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,34 +129,40 @@ export default function PaperPage() {
     setBusy(true); setError("");
     try {
       const created = await api.createPaperSession({ snapshot: snapshot || null, initial_cash: Number(cash), name: name || undefined });
-      setSelected(created.id);
+      selectSession(created.id);
       await loadSessions();
       await loadDetail(created.id);
       setName("");
     } catch (e) { setError(`${e}`); } finally { setBusy(false); }
   };
   const step = async () => {
-    if (!selected) return;
+    if (!selected || selectedRef.current !== selected || stepInFlight.current) return;
+    stepInFlight.current = true;
+    setStepping(true);
     try {
       const next = await api.stepPaper(selected, 1);
+      if (selectedRef.current !== selected) return;
       setDetail(next);
       checkAlerts(next);
+      if (next.session.status === "finished") stopPlay();
       const fills = next.fills?.length ?? 0;
       if (fills > 0) notify({ title: "模拟成交", body: `${fills} 笔委托在 ${dateText(next.session.current_date)} 成交（仅本地模拟）`, kind: "success" });
       await loadSessions();
-    } catch (e) { stopPlay(); setError(`${e}`); }
+    } catch (e) { if (selectedRef.current === selected) { stopPlay(); setError(`${e}`); } }
+    finally { stepInFlight.current = false; setStepping(false); }
   };
   const toggleAuto = async () => {
-    if (!selected) return;
+    if (!selected || playing || stepInFlight.current) return;
     try {
-      if (autoRunning) { await api.stopPaperAuto(selected); setAutoRunning(false); notify({ title: "持续模拟已停止", kind: "info" }); }
+      if (autoRunning) { await api.stopPaperAuto(selected); if (selectedRef.current !== selected) return; setAutoRunning(false); notify({ title: "持续模拟已停止", kind: "info" }); }
       else {
         const status = await api.startPaperAuto(selected, 1000);
+        if (selectedRef.current !== selected) return;
         setAutoRunning(status.running);
         notify({ title: "持续模拟已启动", body: "服务端模拟时钟每 1s 推进 1 个交易日（历史快照，非实时行情）", kind: "info" });
       }
       await loadSessions();
-    } catch (e) { setError(`${e}`); }
+    } catch (e) { if (selectedRef.current === selected) setError(`${e}`); }
   };
   const togglePlay = () => {
     if (playing) { stopPlay(); return; }
@@ -144,14 +170,16 @@ export default function PaperPage() {
     playTimer.current = window.setInterval(() => { void step(); }, 900);
   };
   const reset = async () => {
-    if (!selected) return;
-    try { setDetail(await api.resetPaper(selected)); await loadSessions(); }
-    catch (e) { setError(`${e}`); }
+    if (!selected || stepInFlight.current || autoRunning) return;
+    stopPlay();
+    try { const next = await api.resetPaper(selected); if (selectedRef.current === selected) setDetail(next); await loadSessions(); }
+    catch (e) { if (selectedRef.current === selected) setError(`${e}`); }
   };
   const remove = async () => {
-    if (!selected || !window.confirm("删除这个模拟会话？仅删除本地模拟记录。")) return;
-    try { await api.deletePaperSession(selected); setSelected(""); setDetail(null); await loadSessions(); }
-    catch (e) { setError(`${e}`); }
+    if (!selected || stepInFlight.current || autoRunning || !window.confirm("删除这个模拟会话？仅删除本地模拟记录。")) return;
+    stopPlay();
+    try { await api.deletePaperSession(selected); if (selectedRef.current === selected) selectSession(""); await loadSessions(); }
+    catch (e) { if (selectedRef.current === selected) setError(`${e}`); }
   };
   const submitOrder = async () => {
     if (!selected) return;
@@ -160,14 +188,14 @@ export default function PaperPage() {
       const payload: Record<string, unknown> = { code: code.trim(), side, qty: Number(qty), order_type: orderType };
       if (orderType === "limit") payload.limit_price = Number(limitPrice);
       await api.submitPaperOrder(selected, payload);
-      setDetail(await api.paperSession(selected));
+      await loadDetail(selected);
       await loadSessions();
-    } catch (e) { setError(`${e}`); }
+    } catch (e) { if (selectedRef.current === selected) setError(`${e}`); }
   };
   const cancelOrder = async (order: PaperOrder) => {
     if (!selected) return;
-    try { await api.cancelPaperOrder(selected, order.id); setDetail(await api.paperSession(selected)); }
-    catch (e) { setError(`${e}`); }
+    try { await api.cancelPaperOrder(selected, order.id); await loadDetail(selected); }
+    catch (e) { if (selectedRef.current === selected) setError(`${e}`); }
   };
   const downloadSignals = async () => {
     if (!selected) return;
@@ -200,11 +228,11 @@ export default function PaperPage() {
         actions={(
           <>
             <Button variant="ghost" icon={Download} onClick={() => void downloadSignals()} disabled={!selected}>信号 CSV</Button>
-            <Button variant="primary" icon={SkipForward} onClick={() => void step()} disabled={!selected || playing}>下一交易日</Button>
-            <Button variant="secondary" icon={playing ? Pause : Play} onClick={togglePlay} disabled={!selected}>{playing ? "暂停" : "自动推进"}</Button>
-            <Button variant={autoRunning ? "danger" : "secondary"} icon={autoRunning ? Square : Play} onClick={() => void toggleAuto()} disabled={!selected}>{autoRunning ? "停止持续模拟" : "持续模拟"}</Button>
-            <Button variant="secondary" icon={RefreshCw} onClick={() => void reset()} disabled={!selected}>重置</Button>
-            <Button variant="danger" icon={Trash2} onClick={() => void remove()} disabled={!selected}>删除</Button>
+            <Button variant="primary" icon={SkipForward} onClick={() => void step()} disabled={!selected || playing || stepping || autoRunning}>下一交易日</Button>
+            <Button variant="secondary" icon={playing ? Pause : Play} onClick={togglePlay} disabled={!selected || autoRunning || (stepping && !playing)}>{playing ? "暂停" : "自动推进"}</Button>
+            <Button variant={autoRunning ? "danger" : "secondary"} icon={autoRunning ? Square : Play} onClick={() => void toggleAuto()} disabled={!selected || playing || stepping}>{autoRunning ? "停止持续模拟" : "持续模拟"}</Button>
+            <Button variant="secondary" icon={RefreshCw} onClick={() => void reset()} disabled={!selected || stepping || autoRunning}>重置</Button>
+            <Button variant="danger" icon={Trash2} onClick={() => void remove()} disabled={!selected || stepping || autoRunning}>删除</Button>
           </>
         )}
       />
@@ -229,7 +257,7 @@ export default function PaperPage() {
                 {sessions.map((session) => {
                   const sessionPnl = session.equity - session.starting_cash;
                   return (
-                    <button key={session.id} type="button" className={`session-card ${selected === session.id ? "selected" : ""}`} onClick={() => setSelected(session.id)} aria-pressed={selected === session.id}>
+                    <button key={session.id} type="button" className={`session-card ${selected === session.id ? "selected" : ""}`} onClick={() => selectSession(session.id)} aria-pressed={selected === session.id}>
                       <span className="session-card-name" title={session.name}>{session.name}</span>
                       <span className="session-card-sub">{session.id.slice(0, 14)} · {dateText(session.current_date)} · {session.status}</span>
                       <div className="session-stats">
