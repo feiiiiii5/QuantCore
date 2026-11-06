@@ -78,7 +78,7 @@ def create_app(
     *,
     token: str | None = None,
     port: int = 8000,
-    state_path: str | Path = DEFAULT_STATE_PATH,
+    state_path: str | Path | None = None,
     runner: Any = None,
     start_worker: bool = True,
     security: ServerSecurity | None = None,

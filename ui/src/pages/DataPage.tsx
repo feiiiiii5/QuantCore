@@ -7,8 +7,8 @@ import {
   useBuildSnapshot, useCompleteOnboardingStep, useDataCatalog, useDataIntegrity, useDataStatus,
   useLiveStatus, useQuality, useUpdateData,
 } from "../api/queries";
-import { isApiError } from "../api/client";
-import type { DataIntegrity, ProviderInfo, SnapshotStatus } from "../api/types";
+import { api, getApiBase, isApiError } from "../api/client";
+import type { DataIntegrity, Job, ProviderInfo, SnapshotStatus } from "../api/types";
 import {
   Badge, Button, Callout, Dialog, EmptyState, Field, Input, List, ListRow, PageHeader, Panel, ProgressBar, Select,
   Skeleton, StatTile,
@@ -20,6 +20,19 @@ import { zhCN as t } from "../i18n/zh-CN";
 import "./pages.css";
 
 interface DataJob { id: string; kind: "data_update" | "snapshot_build" }
+
+function savedDataJob(key: string): { job: DataJob | null; error: string } {
+  const raw = sessionStorage.getItem(key);
+  if (!raw) return { job: null, error: "" };
+  try {
+    const saved = JSON.parse(raw) as DataJob;
+    if (!saved || typeof saved.id !== "string" || !saved.id || !["data_update", "snapshot_build"].includes(saved.kind)) throw new Error("invalid job");
+    return { job: saved, error: "" };
+  } catch {
+    sessionStorage.removeItem(key);
+    return { job: null, error: "无法恢复上次数据任务：保存的记录无效。请检查数据与快照，必要时重新提交。" };
+  }
+}
 
 function CheckIcon({ status }: { status: string }) {
   if (status === "pass") return <CheckCircle2 size={16} style={{ color: "var(--ok)", flex: "0 0 auto" }} aria-hidden="true" />;
@@ -109,11 +122,16 @@ export default function DataPage() {
   const navigate = useNavigate();
   const beginner = useBeginner();
   const openOnboarding = useUIStore((state) => state.openOnboarding);
-  const [job, setJob] = useState<DataJob | null>(null);
+  const [jobStorageKey] = useState(() => `qc_data_job:${getApiBase()}`);
+  const [saved] = useState(() => savedDataJob(jobStorageKey));
+  const [job, setJob] = useState<DataJob | null>(saved.job);
+  const [restoring, setRestoring] = useState(Boolean(saved.job));
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const [restoredStatus, setRestoredStatus] = useState<Job | null>(null);
   const [progressHidden, setProgressHidden] = useState(false);
   const [qualitySnapshot, setQualitySnapshot] = useState<string | null>(null);
   const qualityQuery = useQuality(qualitySnapshot);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(saved.error);
   const [notice, setNotice] = useState("");
   const [provider, setProvider] = useState("synthetic");
   const [updateMode, setUpdateMode] = useState("incremental");
@@ -123,11 +141,37 @@ export default function DataPage() {
   const [localDir, setLocalDir] = useState("");
   const [codes, setCodes] = useState("");
   const [limit, setLimit] = useState("20");
-  const chainSnapshot = useRef(false);
   const handled = useRef<string>("");
   const healthMarked = useRef(false);
-  const progress = useJobProgress(job?.id ?? null);
+  const sameApi = jobStorageKey === `qc_data_job:${getApiBase()}`;
+  const progress = useJobProgress(!restoring && sameApi ? job?.id ?? null : null);
+  const currentJob = progress.job ?? restoredStatus;
   const completeStep = useCompleteOnboardingStep();
+
+  useEffect(() => {
+    if (!sameApi) { setJob(null); setRestoring(false); setError("API 地址已变更，请重新进入数据页查看该服务的任务。"); return; }
+    if (job) sessionStorage.setItem(jobStorageKey, JSON.stringify(job));
+    else sessionStorage.removeItem(jobStorageKey);
+  }, [job, jobStorageKey, sameApi]);
+  useEffect(() => {
+    if (!saved.job || !sameApi) return;
+    let disposed = false;
+    setError("");
+    void api.job(saved.job.id).then((remote) => {
+      if (disposed) return;
+      if (remote.id !== saved.job!.id || remote.kind !== saved.job!.kind) {
+        setJob(null); setError("无法恢复上次数据任务：任务类型不匹配。请检查数据与快照，必要时重新提交。");
+      } else setRestoredStatus(remote);
+      setRestoring(false);
+    }).catch((reason: unknown) => {
+      if (disposed) return;
+      if (isApiError(reason) && reason.status === 404) {
+        setJob(null); setRestoring(false);
+        setError("无法恢复上次数据任务：任务已不存在。请检查数据与快照，必要时重新提交。");
+      } else setError(`恢复任务连接失败：${reason instanceof Error ? reason.message : "服务暂不可用"}；任务记录已保留，可重试。`);
+    });
+    return () => { disposed = true; };
+  }, [saved.job, restoreAttempt, sameApi]);
 
   // Onboarding step "data_health" is not auto-detected by the backend; mark it once
   // the integrity report loads (idempotent, failures are ignored).
@@ -139,34 +183,33 @@ export default function DataPage() {
   }, [integrity.data]);
 
   useEffect(() => {
-    if (!progress.job || !job || progress.job.id !== job.id || handled.current === `${job.id}:${progress.job.status}`) return;
-    handled.current = `${job.id}:${progress.job.status}`;
-    if (progress.job.status === "done") {
-      if (job.kind === "data_update" && chainSnapshot.current) {
-        chainSnapshot.current = false;
-        snapshot.mutate(undefined, {
-          onSuccess: (response) => setJob({ id: response.job_id, kind: "snapshot_build" }),
-          onError: (reason) => { setError(reason.message); setJob(null); },
-        });
-      } else {
-        setNotice(job.kind === "snapshot_build" ? "快照构建完成" : "数据更新完成");
-        void status.refetch();
-        void integrity.refetch();
-        setJob(null);
-      }
-    } else if (progress.job.status === "failed" || progress.job.status === "cancelled") {
-      setError(progress.job.error || (progress.job.status === "cancelled" ? "任务已取消" : "任务失败"));
+    if (!sameApi || !currentJob || !job || currentJob.id !== job.id || handled.current === `${job.id}:${currentJob.status}`) return;
+    handled.current = `${job.id}:${currentJob.status}`;
+    if (currentJob.status === "done") {
+      const snapshotId = currentJob.result?.snapshot_id;
+      if (typeof snapshotId === "string" && snapshotId) {
+        setNotice(`${job.kind === "data_update" ? "数据更新与快照构建完成" : "快照构建完成"}：${snapshotId}`);
+      } else setError("任务完成但未返回快照 ID；请刷新快照列表，必要时点击「构建快照」重试。");
+      void status.refetch();
+      void integrity.refetch();
+      setJob(null);
+    } else if (currentJob.status === "failed" || currentJob.status === "cancelled") {
+      setError(currentJob.status === "cancelled"
+        ? "任务已取消。已经写入的数据和快照会保留，请检查下方快照列表；如缺少快照，可点击「构建快照」重试。"
+        : currentJob.error || "任务失败");
+      void status.refetch();
+      void integrity.refetch();
       setJob(null);
     }
-  }, [progress.job, job, snapshot, status, integrity]);
+  }, [currentJob, job, status, integrity, sameApi]);
 
   const copy = async (text: string, label: string) => {
     try { await navigator.clipboard.writeText(text); setNotice(`已复制${label}：${text}`); }
     catch { setNotice(`${label}：${text}（浏览器拒绝剪贴板，可手动复制）`); }
   };
   const startUpdate = (providerId = provider) => {
-    setError(""); setNotice(""); setProgressHidden(false); chainSnapshot.current = true;
-    const payload: Record<string, unknown> = { provider: providerId, start, end, incremental: updateMode === "incremental" };
+    setError(""); setNotice(""); setProgressHidden(false);
+    const payload: Record<string, unknown> = { provider: providerId, start, end, incremental: updateMode === "incremental", build_snapshot: true };
     if (providerId === "synthetic") {
       payload.n_sec = Number(nSec) || 40;
       payload.seed = 42;
@@ -178,7 +221,7 @@ export default function DataPage() {
     if (providerId === "local" && localDir.trim()) payload.local_dir = localDir.trim();
     update.mutate(payload, {
       onSuccess: (response) => setJob({ id: response.job_id, kind: "data_update" }),
-      onError: (reason) => { chainSnapshot.current = false; setError(reason.message); },
+      onError: (reason) => { setError(reason.message); },
     });
   };
   const startSnapshot = () => {
@@ -308,11 +351,12 @@ export default function DataPage() {
 
               {job && !progressHidden ? (
                 <div className="stack-tight">
-                  <ProgressBar value={Math.round((progress.job?.progress ?? 0) * 100)} label={`${job.kind === "data_update" ? "数据更新" : "快照构建"} · ${progress.job?.status ?? "排队"} · ${progress.transport ?? "等待"}`} />
+                  <ProgressBar value={Math.round((currentJob?.progress ?? 0) * 100)} label={`${job.kind === "data_update" ? "数据更新与快照" : "快照构建"} · ${restoring ? "恢复任务连接" : currentJob?.status ?? "排队"} · ${progress.transport ?? "等待"}`} />
                   <div><Button variant="ghost" size="sm" onClick={() => setProgressHidden(true)}>隐藏</Button></div>
                 </div>
               ) : null}
-              {job && progressHidden ? <p className="page-note-sm">{job.kind === "data_update" ? "数据导入继续运行，完成后会自动构建快照。" : "快照继续构建。"}<Button variant="ghost" size="sm" onClick={() => setProgressHidden(false)}>显示进度</Button></p> : null}
+              {job ? <p className="page-note-sm">任务在本地服务中继续执行，切页不会中断{job.kind === "data_update" ? "导入与快照构建" : "快照构建"}。{progressHidden ? <Button variant="ghost" size="sm" onClick={() => setProgressHidden(false)}>显示进度</Button> : null}</p> : null}
+              {job && restoring && error ? <Button variant="secondary" onClick={() => setRestoreAttempt((value) => value + 1)}>重试任务连接</Button> : null}
               {error ? <Callout tone="danger" title={error} /> : null}
               {notice ? <Callout tone="success" title={notice} /> : null}
             </div>

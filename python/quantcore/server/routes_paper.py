@@ -17,6 +17,7 @@ from fastapi.responses import Response
 from ..errors import QuantCoreError
 from ..paper import (
     LivePaperSessionEngine,
+    PaperConflictError,
     PaperError,
     PaperMarketData,
     PaperSession,
@@ -63,19 +64,16 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
         try:
             snapshot = workspace.snapshot(reference or None)
         except (FileNotFoundError, QuantCoreError) as exc:
-            raise HTTPException(
-                status_code=409,
-                detail=f"snapshot unavailable for paper session: {exc}",
-            ) from exc
+            raise PaperConflictError(f"snapshot unavailable for paper session: {exc}") from exc
         panel = workspace.snapshot_panel(snapshot)
         return PaperSessionEngine(PaperMarketData(panel), session)
 
     def _load_engine(session_id: str) -> PaperSessionEngine:
         try:
             session = store.load(session_id)
+            return _engine_for(session)
         except PaperError as exc:
             _fail(exc)
-        return _engine_for(session)
 
     def _mutate(session_id: str, callback: Any) -> Any:
         with store.session_lock(session_id):
@@ -83,8 +81,8 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
                 session = store.load(session_id)
             except PaperError as exc:
                 _fail(exc)
-            engine = _engine_for(session)
             try:
+                engine = _engine_for(session)
                 result = callback(engine)
             except PaperError as exc:
                 _fail(exc)
@@ -119,6 +117,8 @@ def register_paper_routes(app: FastAPI, workspace: Workspace) -> None:
                 end=payload.end,
                 name=payload.name,
             )
+            # Validate event models and dates before persisting the account.
+            PaperSessionEngine(market, session)
         except PaperError as exc:
             _fail(exc)
         store.save(session)

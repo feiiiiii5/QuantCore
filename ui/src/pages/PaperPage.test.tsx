@@ -9,7 +9,7 @@ vi.mock("../api/client", () => ({
   api: {
     paperSessions: vi.fn(), paperSession: vi.fn(), snapshots: vi.fn(), securities: vi.fn(),
     paperAutoStatus: vi.fn(), stepPaper: vi.fn(),
-    createPaperSession: vi.fn(), refreshPaper: vi.fn(), submitPaperOrder: vi.fn(),
+    createPaperSession: vi.fn(), refreshPaper: vi.fn(), submitPaperOrder: vi.fn(), resetPaper: vi.fn(),
   },
   getApiBase: () => "", getToken: () => "",
 }));
@@ -85,6 +85,8 @@ describe("paper account selection", () => {
     expect(screen.queryByRole("button", { name: "下一交易日" })).not.toBeInTheDocument();
     expect(await screen.findByText("行情陈旧，等待有效报价")).toBeInTheDocument();
     expect(screen.getByText(/600000.*缺少时间戳/)).toBeInTheDocument();
+    expect(screen.getByText("实时模拟不提供公司行为事件流；这里不展示历史调整记录。")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "公司行为调整记录" })).not.toBeInTheDocument();
   });
 
   it("submits a live virtual order and refreshes the resulting position", async () => {
@@ -104,5 +106,24 @@ describe("paper account selection", () => {
     await act(async () => { vi.advanceTimersByTime(3000); });
     expect(await screen.findByText("浦发银行")).toBeInTheDocument();
     expect(screen.getByText("2026-11-02T10:15:35+08:00")).toBeInTheDocument();
+  });
+
+  it("explains historical cash/share adjustments and canceled orders, then clears them on reset", async () => {
+    vi.mocked(api.paperSessions).mockResolvedValue([first]);
+    vi.mocked(api.paperSession).mockResolvedValue({ ...detail(first), corporate_events: [{
+      date: 20240103, code: "600000", sec_id: "SH.600000", cash: 50, qty_before: 100, qty_after: 200,
+      cancelled_order_ids: ["ord_before_split"], reason: "cash and split", model: "pre_tax_ex_date_approximation",
+    }] } as PaperSessionDetail);
+    vi.mocked(api.resetPaper).mockResolvedValue({ ...detail(first), corporate_events: [] } as PaperSessionDetail);
+    render(<MemoryRouter><PaperPage /></MemoryRouter>);
+    expect(await screen.findByRole("list", { name: "公司行为调整记录" })).toBeInTheDocument();
+    expect(screen.getByText(/现金变化.*50\.00/)).toBeInTheDocument();
+    expect(screen.getByText("股数 100 → 200")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("已撤销 1 笔相关委托"));
+    expect(screen.getByText("ord_before_split")).toBeInTheDocument();
+    expect(screen.getByText(/税前.*除权日近似/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重置" }));
+    expect(await screen.findByText("暂无公司行为调整")).toBeInTheDocument();
+    expect(screen.queryByText("ord_before_split")).not.toBeInTheDocument();
   });
 });

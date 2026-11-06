@@ -7,7 +7,7 @@ import pytest
 from quantcore.data.state import SQLiteState
 from quantcore.errors import SnapshotError
 from quantcore.server.workspace import Settings, Workspace
-from quantcore.snapshot import Snapshot
+from quantcore.snapshot import Snapshot, reader
 
 
 def test_snapshot_cache_reuses_verified_files_and_detects_changes(
@@ -21,14 +21,14 @@ def test_snapshot_cache_reuses_verified_files_and_detects_changes(
     workspace = Workspace(
         Settings.create(data_root=tmp_path), SQLiteState(tmp_path / "state.sqlite")
     )
-    read_bytes = Path.read_bytes
+    checksum = reader.sha256_file
     reads: list[Path] = []
 
-    def counted(path: Path) -> bytes:
+    def counted(path: Path) -> str:
         reads.append(path)
-        return read_bytes(path)
+        return checksum(path)
 
-    monkeypatch.setattr(Path, "read_bytes", counted)
+    monkeypatch.setattr(reader, "sha256_file", counted)
     snapshot = workspace.snapshot(synthetic_snapshot.snapshot_id)
     assert len(reads) == len(snapshot.manifest.datasets) + int(
         snapshot.manifest.panel.get("available", False)
@@ -43,7 +43,7 @@ def test_snapshot_cache_reuses_verified_files_and_detects_changes(
 
     # A real same-size on-disk mutation must invalidate the verified cache.
     path = directory / snapshot.manifest.datasets["bars"].file
-    data = bytearray(read_bytes(path))
+    data = bytearray(path.read_bytes())
     data[len(data) // 2] ^= 1
     path.write_bytes(data)
     with pytest.raises(SnapshotError, match="sha256 mismatch"):

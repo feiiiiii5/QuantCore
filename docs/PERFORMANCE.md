@@ -73,6 +73,23 @@
 
 另一次既有 `verify_cpp.py` 小集（300×965）测得原生 3.53ms、含冷导出包装 189.91ms、参考 519.65ms，差分 6/6 与验证门禁通过。这是脚本单次读数；不与上面的五次中位数混用，也不构成全市场、p99 延迟或实盘吞吐结论。未改变 C++ 构建选项，未使用 `-march=native`。
 
+## 2026-11-07 Q-005：快照校验的内存
+
+快照读取及构建的四处文件 SHA-256 校验改为 `hashlib.file_digest` 流式读取。原先会把整个 Parquet 或
+`.qpanel` 复制进 Python 内存；现在保持同一 SHA、同一损坏检测与已验证快照缓存契约，内存不随文件大小增长。
+
+Python 3.12.8 / macOS 27.3 arm64，文件缓存预热，两种方法交替运行各五次；时间取中位数，
+`tracemalloc` 记录校验期间的 Python 分配峰值（不是进程 RSS）。所有样本 SHA 相同，五次内存峰值各自相同。
+
+| 文件 | 整文件读取 | 流式读取 | Python 分配峰值：原先 → 当前 |
+|---|---:|---:|---:|
+| 16 MiB | 8.503 ms | 8.142 ms | 16,782,290 → 268,129 bytes |
+| 32 MiB | 17.782 ms | 16.166 ms | 33,559,506 → 268,129 bytes |
+
+本次收益主要是降低内存复制，32 MiB 样本峰值减少约 99.2%；不把这个比例称为回测提速。
+`test_snapshot_checksum_memory.py` 用真实 16 MiB 文件验证 SHA 和有界内存；原实现峰值超过 16 MiB，
+流式实现低于 2 MiB 门槛。缓存复用与同大小文件变异检测仍有独立行为回归。
+
 ## Regression gate
 
 `make perf-gate` runs `scripts/verify_cpp.py` on the deterministic 300×965 panel and

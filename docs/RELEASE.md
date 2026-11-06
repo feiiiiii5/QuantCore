@@ -1,39 +1,78 @@
-# Release checklist
+# Local release bundle
 
-QuantCore is local-first research software. A release is a verified local bundle,
-not a brokerage integration and not a signed Electron installer.
+Updated 2026-11-07. QuantCore supports local research and simulation on macOS/Linux.
+The native C++ wheel is platform/Python specific; it is not a `py3-none-any` wheel.
+This bundle is not a signed/notarized installer, a cloud backend, or a verified full Windows backend.
+Current validation results belong in [acceptance-report.md](acceptance-report.md), not a frozen test count here.
 
-## Current verified state (2026-11-02)
+## Prepare and build
 
-- `docs/features.json` **121/121** passes; known gaps stay documented in `docs/acceptance-report.md` and `docs/PROGRESS.md`.
-- Local gates: pytest 240 collected / 238 passed / 2 skipped; ctest 95/95; UI vitest 10; Playwright **18/18** via `make e2e`
-  (needs a local Chrome channel); ruff/format/mypy green; `make doctor` ok and `make demo` (<3 s, engine=cpp) verified.
-- CI: 5 jobs green — `test (macos-latest)`, `test (ubuntu-latest)`, `windows-smoke`, `ui`, `desktop-windows-package`.
-- Unsigned macOS/Windows zips are buildable: the macOS zip via `pnpm -C desktop package:mac` (local), the Windows zip in
-  the `desktop-windows-package` CI job. There is **no signing or notarization**, and the Windows zip has not been
-  install/run verified on a real Windows machine; Windows C++ support remains unverified (pure-Python smoke only).
-- Playwright E2E is local-only (`make e2e`); it is not part of GitHub CI.
+Use an already installed development environment (this run: Python 3.12), uv, the C++ build toolchain,
+frontend dependencies and pip-audit. `make release` does not install the project environment or run all quality gates.
+The wheel/sdist build can download build dependencies, and vulnerability lookup needs its advisory service.
+The resulting bundle can be checksum-verified offline; installing its runtime dependencies is not guaranteed offline.
 
-## Gate
+```sh
+make release
+```
 
-- [ ] `make setup && make ci-local` green (pytest, ctest, ruff format/check, mypy, C++ verify, UI build/test).
-- [ ] `make e2e` green against a real `qc serve` (Playwright **18**, no console/page errors or horizontal overflow; local Chrome channel required).
-- [ ] `uv run pytest -q` count documented in `docs/acceptance-report.md`.
-- [ ] No real order routing, no network calls at runtime, synthetic data labelled `SYNTHETIC`.
-- [ ] `docs/features.json` truthfully lists only verified features; known gaps stay documented.
-- [ ] macOS/Ubuntu CI green; Windows pure-Python smoke and unsigned package build green, but Windows install/run remains unverified.
+The entrypoint uses `uv run --no-sync` and a standard-library packager. Every run builds in a unique
+`dist/.release-<id>/bundle/` directory. It requires exactly one wheel and one source distribution for the
+current `pyproject.toml` version, validates wheel metadata and the presence of `_qcore`, then builds and archives the UI.
+The build explicitly selects the packager's interpreter; generated installation commands use its Python major/minor version.
+It never falls back to copying arbitrary older files from `dist/`.
 
-## Bundle
+Only after a successful audit and checksum generation is the new bundle moved to `dist/release/`.
+An existing successful bundle is preserved as `dist/release-previous-<id>/`; unrelated `dist/` outputs remain intact.
+Build, frontend, SBOM and audit logs remain in the printed staging directory, outside the completed bundle.
 
-- [ ] `make release` → `dist/release/quantcore-<version>-py3-none-any.whl`, sdist, `quantcore-ui-<version>.tar.gz`, `sbom.cdx.json`, `SHA256SUMS`.
-- [ ] `make audit` generates SBOM + `dist/pip-audit.json`; 0 known vulnerabilities or documented exceptions.
-- [ ] `python scripts/sbom.py` parses `uv.lock` + `ui/pnpm-lock.yaml` offline; component counts are plausible.
-- [ ] Checksums verify: `cd dist/release && sha256sum -c SHA256SUMS` (macOS: `shasum -a 256 -c`).
-- [ ] `uv run qc serve --ui-dir ui/dist` from a clean checkout shows the eight-page UI, `/health`, `/api/meta`.
-- [ ] `uv run pytest -m e2e` / `make e2e` is documented as requiring a local Chrome channel.
+## Contents and checksums
 
-## Publishing
+- One current native wheel, with its actual CPython/ABI/platform filename.
+- `quantcore-<version>.tar.gz` source distribution.
+- `quantcore-ui-<version>.tar.gz`, containing the freshly built `dist/` frontend directory.
+- `sbom.cdx.json`: offline inventory derived from Python and frontend lockfiles.
+- `pip-audit.json` and `audit-summary.json`: this run's dependency audit report and explicit outcome.
+- `INSTALL.md`: wheel installation, UI extraction, local self-check, synthetic demo and server commands.
+- `SHA256SUMS`: SHA-256 for payload files, excluding the manifest itself.
 
-- [ ] GitHub tag matches `pyproject.toml` version; release notes list verified features and known gaps.
-- [ ] Do not claim signed/notarized installers, a verified Windows install/run, real-broker execution or guaranteed alpha.
-- [ ] Attach the bundle plus `SHA256SUMS`; keep `docs/features.json` and acceptance report current.
+Checksums are generated with Python, so creation does not depend on GNU `sha256sum` or macOS `shasum` availability.
+From the finished bundle, either verification command can be used:
+
+```sh
+cd dist/release
+sha256sum -c SHA256SUMS
+# macOS alternative:
+shasum -a 256 -c SHA256SUMS
+```
+
+Checksums detect corruption; they do not authenticate the publisher. Review the wheel tag against the receiving
+machine/Python version. A source distribution requires a compatible C++ toolchain; it is not an installer fallback.
+
+## Audit and failure behavior
+
+The packager invokes pip-audit against the current interpreter's installed dependency directory, omitting editable
+distributions. It does not reuse a stale `dist/pip-audit.json`. This is a build-environment audit, not a proof that
+the wheel plus every future target environment or every lockfile entry has been audited.
+
+`audit-summary.json` records the process exit code, dependency count, known vulnerabilities and skipped dependencies.
+A nonzero process exit, absent/invalid report, known vulnerabilities or unreviewed skipped dependencies prevents success.
+The editable QuantCore source checkout is the sole intentional omission, recorded explicitly in the summary;
+other skipped packages still block completion. Project code is verified separately by tests and the emitted wheel install.
+Missing audit tooling, service/network failures and incomplete audits must not be reported as zero vulnerabilities passed.
+The current pipeline has no automatic exception approval; resolve/review the cause before producing a successful bundle.
+
+On failure the command exits nonzero, prints `FAILED` and the diagnostics location, and preserves the previous successful
+`dist/release/`. The new staging directory contains completed build artifacts, `audit-summary.json` where available,
+and logs such as `build.log`, `ui-build.log`, `sbom.log` and `audit.log`. Do not publish an incomplete staging directory.
+
+## Release validation
+
+Before publishing, independently verify the intended commit, native engine behavior, relevant tests and actual bundle install.
+Follow the [local test guide](LOCAL-TESTING.md) and record the commands/results in the acceptance report.
+Use a clean matching macOS/Linux environment to install the emitted wheel and run `qc doctor`, `qc demo`, replay and
+the bundled UI against `qc serve --ui-dir ui/dist`. UI browser checks require a real supported browser.
+
+The unsigned desktop shell, Windows smoke coverage and private Sites frontend are separate delivery paths.
+They do not establish signed installers, Windows C++ install/run support, real broker execution, production readiness or returns.
+This script builds local files and does not tag, push, upload or publish them.

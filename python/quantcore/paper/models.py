@@ -33,6 +33,7 @@ class PaperPosition:
     available: int
     avg_cost: float
     last: float
+    lots: list[int] = field(default_factory=list)
 
     def market_value(self) -> float:
         return _round_money(self.qty * self.last)
@@ -55,6 +56,7 @@ class PaperPosition:
             "available": int(self.available),
             "avg_cost": round(float(self.avg_cost), 6),
             "last": _round_money(self.last),
+            "lots": list(self.lots),
             "market_value": self.market_value(),
             "pnl": self.pnl(),
             "pnl_pct": self.pnl_pct(),
@@ -71,6 +73,7 @@ class PaperPosition:
             available=int(payload.get("available", 0)),
             avg_cost=float(payload.get("avg_cost", 0.0)),
             last=float(payload.get("last", 0.0)),
+            lots=[int(qty) for qty in payload.get("lots") or [payload.get("qty", 0)] if qty],
         )
 
 
@@ -279,6 +282,7 @@ class PaperSession:
     next_order_seq: int = 1
     next_trade_seq: int = 1
     schema_version: int = SCHEMA_VERSION
+    corporate_events: list[dict[str, Any]] = field(default_factory=list)
 
     # -- derived views -----------------------------------------------------
     @property
@@ -389,6 +393,7 @@ class PaperSession:
             "config": dict(self.config),
             "next_order_seq": int(self.next_order_seq),
             "next_trade_seq": int(self.next_trade_seq),
+            "corporate_events": [dict(event) for event in self.corporate_events],
         }
 
     @classmethod
@@ -420,6 +425,7 @@ class PaperSession:
             next_order_seq=int(payload.get("next_order_seq", 1)),
             next_trade_seq=int(payload.get("next_trade_seq", 1)),
             schema_version=int(payload.get("schema_version", SCHEMA_VERSION)),
+            corporate_events=[dict(event) for event in payload.get("corporate_events") or []],
         )
 
 

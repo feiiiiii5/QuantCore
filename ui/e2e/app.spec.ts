@@ -176,16 +176,26 @@ test("data page shows integrity first and keeps import/snapshot entry points", a
   await page.getByLabel("更新方式", { exact: true }).selectOption("replace");
   await page.getByLabel("证券数（synthetic）", { exact: true }).fill("12");
   const updateResponse = page.waitForResponse((response) => response.url().endsWith("/api/data/update") && response.request().method() === "POST");
-  const snapshotResponse = page.waitForResponse((response) => response.url().endsWith("/api/data/snapshot") && response.request().method() === "POST");
+  let snapshotRequests = 0;
+  page.on("request", (request) => { if (request.url().endsWith("/api/data/snapshot") && request.method() === "POST") snapshotRequests += 1; });
   await page.getByRole("button", { name: "更新并构建快照", exact: true }).click();
   const imported = await updateResponse;
   expect(imported.request().postDataJSON().incremental).toBe(false);
+  expect(imported.request().postDataJSON().build_snapshot).toBe(true);
   expect(imported.status()).toBe(202);
-  const snapshot = await snapshotResponse;
-  expect(snapshot.status()).toBe(202);
-  await expect(page.getByText("快照构建完成", { exact: true })).toBeVisible({ timeout: 60_000 });
-  const job = await request.get(`/api/jobs/${(await snapshot.json()).job_id}`, { headers: AUTH });
-  expect((await job.json()).status).toBe("done");
+  const jobId = (await imported.json()).job_id;
+  await page.getByRole("link", { name: "回测", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/backtest/);
+  await page.getByRole("link", { name: "数据", exact: true }).first().click();
+  let completed;
+  for (let index = 0; index < 300; index += 1) {
+    completed = await (await request.get(`/api/jobs/${jobId}`, { headers: AUTH })).json();
+    if (["done", "failed", "cancelled"].includes(completed.status)) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  expect(completed.status).toBe("done");
+  await expect(page.getByText(completed.result.snapshot_id).first()).toBeVisible({ timeout: 20_000 });
+  expect(snapshotRequests).toBe(0);
   const overview = await request.get("/api/market/overview", { headers: AUTH });
   expect((await overview.json()).snapshot.n_sec).toBe(12);
   await page.screenshot({ path: "/tmp/qc-data.png", fullPage: true });

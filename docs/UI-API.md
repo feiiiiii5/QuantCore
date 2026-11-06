@@ -13,6 +13,8 @@ WebSocket: `ws://127.0.0.1:<port>/ws/jobs/<job_id>?token=<token>` (jobs) and `/w
 - `GET /health` → `{status,version,engine_backend,engine_available,panel_available,synthetic_only,cors}`
 - `GET /api/meta` → `{version,engine_backend,synthetic_only,data_root,snapshots_root,experiments_root,token_required,ui_served}`
 
+Workspace defaults: a custom `data_root` also defaults `state_path` to `<data_root>/state.sqlite` and snapshots to `<data_root>/snapshots`. Explicit paths override these defaults. `experiments_root` remains separately configured; this is not complete filesystem isolation.
+
 ## Local self-check (doctor)
 - `GET /api/doctor?include_optional=true` →
   `{status:"ok"|"warn"|"fail",generated_at,version,engine_backend,engine_available,panel_available,root,counts:{pass,warn,fail,skip},checks:[{id,title,status:"pass"|"warn"|"fail"|"skip",detail,hint,required}]}`
@@ -114,8 +116,13 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 ## Data
 - `GET /api/data/status` → `{data_root,warehouse:{exists,datasets,rows,bytes,manifest_hash},snapshots:[{id,content_hash,created_at,synthetic,n_sec,n_time,fields,quality}],storage:{warehouse_bytes,snapshot_bytes,experiments_bytes,free_bytes},providers:[...]}`
 - `GET /api/data/providers` → `[{id,name,requires_token,requires_network,available,capabilities}]`
-- `POST /api/data/update` body `{provider,start?,end?,n_sec?,seed?,local_dir?,fixture_dir?,codes?,limit?,incremental?,reset?}` → 202 `{job_id}`. Incremental imports require the same source identity and code scope; changing them requires explicit replacement. Reset fetches and validates before clearing old datasets. Warehouse identity lives in `warehouse_manifest.json`, shared by CLI and API regardless of the jobs database.
+- `POST /api/data/update` body `{provider,start?,end?,n_sec?,seed?,local_dir?,fixture_dir?,codes?,limit?,incremental?,reset?,build_snapshot?:false}` → 202 `{job_id}`. Incremental imports require the same source identity and code scope; changing them requires explicit replacement. Reset fetches and validates before clearing old datasets. Warehouse identity lives in `warehouse_manifest.json`, shared by CLI and API regardless of the jobs database.
+  - `build_snapshot=true` performs quality-gated import and native snapshot construction in the same server job, without a second browser request. The result retains `kind:"data_update"` and adds `{snapshot_id,snapshot:{kind:"snapshot_build",snapshot_id,content_hash,path,n_sec,n_time,synthetic,panel_available}}`. Omitted/false preserves import-only behavior. The UI submits true.
+  - The running local server continues this job after page navigation. The UI stores its ID/type in tab-scoped `sessionStorage`, keyed by API base, and checks the existing job on refresh/return. Invalid/missing records are reported; transient connection errors retain the ID for retry. This is reconnecting to a job, not resuming work after server shutdown.
+  - Cancellation is cooperative, not transactional rollback. An import committed before cancellation remains; a snapshot already committed during cancellation also remains. Refresh the snapshot list before retrying. Snapshot failure after import reports `data import succeeded; snapshot build failed`; the warehouse remains for a manual snapshot retry.
 - `POST /api/data/snapshot` body `{data_root?,snapshots_root?,require_qpanel?}` → 202 `{job_id}`
+  - When `require_qpanel=true`, rebuilding the same snapshot can add or repair its derived `panel.qpanel`. Immutable datasets are verified first; corrupted datasets, unsafe sidecar filenames or missing native writer fail rather than return success. Data files, snapshot ID and content hash remain unchanged.
+  - Sidecar and manifest are published by separate atomic replacements, not one filesystem transaction. Manifest publication failure is an error; retry verifies/regenerates the derived cache. Temporary files are cleaned. SHA-256 file reads stream through `file_digest`, avoiding an extra whole-file allocation; this is not a whole-pipeline memory claim.
 - `GET /api/data/snapshots` → snapshot list
 - `GET /api/data/quality?snapshot=` → quality report
 - `POST /api/onboarding/bootstrap` body `{n_sec?,start?,end?,seed?}` → `{snapshot,snapshot_dir,run_id,report,message}` (synchronous)
@@ -131,14 +138,17 @@ JobView result for backtest includes `run_id`, `engine_backend`, `engine_version
 
 ## Paper trading (M9, local simulation only — no real orders)
 - `POST /api/paper/sessions` body `{mode?:"historical"|"live",snapshot?,initial_cash?,start?,end?,name?}` → **201** session view
-- `GET /api/paper/sessions` → list; `GET /api/paper/sessions/{sid}` → `{session,snapshot,account:{cash,market_value,equity,pnl,pnl_pct},positions[],orders[],trades[],equity_curve[]}`
+- `GET /api/paper/sessions` → list; `GET /api/paper/sessions/{sid}` → `{session,snapshot,account:{cash,market_value,equity,pnl,pnl_pct},positions[],orders[],trades[],equity_curve[],corporate_events[]}`
 - `POST /api/paper/sessions/{sid}/step` body `{}`/`{days}`/`{to_date}` → detail + `fills[]`; `POST .../reset`
 - `POST .../orders` body `{code|sec_id,side:"buy"|"sell",qty,order_type:"market"|"limit",limit_price?}` → `{order}`
 - `POST .../orders/{oid}/cancel`; `GET .../signals.csv`; `DELETE /api/paper/sessions/{sid}`
 - `mode` defaults to historical; old sessions remain historical. Historical mode needs a snapshot and fills on the next `step` at the next open / limit touch. Live creation needs no snapshot; snapshot/start/end do not determine live execution.
 - `POST /api/paper/sessions/{sid}/refresh` (no body) → detail + `fills[]` + `live:{state,as_of,notice,quotes[]}` for live sessions only (historical → 400). The route reads public quotes for holdings/open orders and persists valuation, observations and virtual fills. Each position can include `quote_timestamp`.
 - Live matching requires enabled quotes, an open market, valid fresh source timestamps and post-order incremental volume (default shared 10% budget per security). First observations, source/date changes and long gaps establish a baseline; repeated quotes and cumulative-volume rollback do not create new capacity. See [paper semantics](paper-trading.md) for exact age/gap/limit rules.
-- Board lots, T+1, price limits, suspensions, fees and cancellation apply. Sessions persist as atomic JSON under `data_root/paper/`. Only refresh requests match live orders: the selected open UI page requests them every 3s; the quote poller alone does not. No broker, real orders, order book or corporate-action processing.
+- Board lots, T+1, price limits, suspensions, fees and cancellation apply. Sessions persist as atomic JSON under `data_root/paper/`. Only refresh requests match live orders: the selected open UI page requests them every 3s; the quote poller alone does not. No broker, real orders or order book. Live accounts have no corporate-action feed.
+
+- Historical accounts settle snapshot cash/split events before ex-date orders: pre-tax cash on ex-date, per-purchase-lot positive half-up split rounding, preserved existing cost basis within six-decimal average-cost precision, rebased suspended marks, and cancellation of older pending/partial orders. `positions[].lots` persists quantities; `corporate_events[]` records `{date,code,sec_id,cash,qty_before,qty_after,cancelled_order_ids,reason,model}`. Reset clears this audit and restarts replay.
+- Old positions without lots migrate as one aggregate lot; accounts already past an event are not retroactively settled. Use reset/replay or a new account for a complete new-model run. Payment-date settlement, dividend tax, rights subscriptions and fractional cash are unsupported; invalid/unsupported event models return domain errors before creating or persisting a broken account. These rules do not apply to live accounts.
 
 ## Research robustness (M7 advanced)
 - `POST /api/research/overfitting` `{run_id,n_trials?}` → `{observations,periods_per_year,sharpe,deflated_sharpe,expected_max_sharpe,n_trials,skew,kurtosis,verdict}`

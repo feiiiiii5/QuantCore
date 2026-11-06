@@ -7,6 +7,7 @@ import {
   StatTile, Tabs, type ChartSeries,
 } from "../components";
 import PaperPortfolioPanel from "../components/PaperPortfolioPanel";
+import PaperCorporateEvents from "../components/PaperCorporateEvents";
 import { notify } from "../lib/notify";
 import { dateInt, money, pct } from "../lib/format";
 import { zhCN as t } from "../i18n/zh-CN";
@@ -321,6 +322,8 @@ export default function PaperPage() {
                   </ChartCard>
                 </div>
               </Panel>
+
+              <PaperCorporateEvents events={detail.corporate_events ?? []} live={isLive} />
 
               <Panel title="账户明细" subtitle="持仓 / 委托 / 成交；部分成交会显示 成交/委托 数量">
                 <Tabs items={TAB_ITEMS.map((item) => item.id === "orders" ? { ...item, badge: pendingOrders || undefined } : item)} value={tab} onChange={setTab} ariaLabel="模拟账户明细" />

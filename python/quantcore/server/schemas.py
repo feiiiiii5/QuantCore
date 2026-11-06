@@ -97,6 +97,7 @@ class DataUpdateRequest(BaseModel):
     column_mapping: dict[str, Any] | None = None
     incremental: bool = True
     reset: bool = False
+    build_snapshot: bool = False
     # Public-web providers (sina/eastmoney): sample a few symbols before a full import.
     codes: list[str] | None = Field(default=None, max_length=50)
     limit: int | None = Field(default=None, ge=1, le=6000)

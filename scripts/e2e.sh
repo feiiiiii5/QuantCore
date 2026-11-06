@@ -46,7 +46,7 @@ fi
 echo "[e2e] running Playwright..."
 (
   cd ui
-  QC_E2E_BASE="http://127.0.0.1:${PORT}" QC_E2E_TOKEN="$TOKEN" pnpm exec playwright test
+  QC_E2E_BASE="http://127.0.0.1:${PORT}" QC_E2E_TOKEN="$TOKEN" pnpm exec playwright test "$@"
 )
 
 echo "[e2e] passed"

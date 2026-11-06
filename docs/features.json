@@ -1,7 +1,7 @@
 {
   "project": "QuantCore",
   "version": "0.1.0",
-  "generated": "2026-11-06",
+  "generated": "2026-11-07",
   "features": [
     {
       "id": "M0-001",
@@ -1094,11 +1094,46 @@
       "title": "authenticated connection probes and stream switching",
       "passes": true,
       "evidence": "connection.test.ts and liveStream.test.ts; current draft values verified against protected metadata, old requests/cache/socket callbacks isolated after API/token changes; UI 39 passed"
+    },
+    {
+      "id": "R9-001",
+      "milestone": "R9",
+      "title": "historical paper ex-date corporate-action approximation",
+      "passes": true,
+      "evidence": "tests/test_paper_corporate.py and test_paper_corporate_api.py; pre-tax ex-date cash, per-purchase-lot split rounding, suspended marks, pending-order cancellation, persisted event audit and reset; invalid rights/tax/event models reject. Legacy past events are not retroactively settled; live paper has no event feed."
+    },
+    {
+      "id": "R9-002",
+      "milestone": "R9",
+      "title": "server-owned import and native snapshot job with reconnectable UI",
+      "passes": true,
+      "evidence": "tests/test_data_snapshot_chain.py and ui/src/pages/DataPage.test.tsx; build_snapshot=true completes import/freeze in one job, preserves import-only API defaults, tab/API-scoped refresh reconnect, error retry and queued cohort identity; cancellation retains already committed data/snapshots."
+    },
+    {
+      "id": "R9-003",
+      "milestone": "R9",
+      "title": "custom data-root job-state default",
+      "passes": true,
+      "evidence": "tests/test_data_snapshot_chain.py::test_app_factory_keeps_jobs_in_the_selected_workspace; absent state_path resolves to data_root/state.sqlite. Explicit state path overrides remain; experiments_root is separate."
+    },
+    {
+      "id": "R9-004",
+      "milestone": "R9",
+      "title": "verified native sidecar addition and repair",
+      "passes": true,
+      "evidence": "tests/test_snapshot_native_upgrade.py; existing Parquet-only/missing/corrupt derived caches repaired without changing data/hash/id; writer failure, manifest publication failure, unsafe filename, immutable corruption and missing writer fail visibly; retry recovers, each publication atomic."
+    },
+    {
+      "id": "R9-005",
+      "milestone": "R9",
+      "title": "streaming snapshot file checksums",
+      "passes": true,
+      "evidence": "tests/test_snapshot_checksum_memory.py; real 16 MiB file digest exact and measured Python checksum allocation bounded below 2 MiB; builder/reader use streaming SHA-256 rather than whole-file read. Not a whole-pipeline memory or speed claim."
     }
   ],
   "verified_at": "2026-11-02",
   "verified_by": "local gates: pytest (all green, see acceptance report); ctest 95/95; UI vitest 10; Playwright e2e 18/18 (redesigned UI); ruff/mypy; make verify-cpp; make doctor/demo; ui-audit 10 routes + mobile + dark (0 console errors, 0 overflow); real-data pipeline: Sina 3-name import + snapshot + qc data integrity (status ok) + cpp backtest; live quotes verified with QC_ALLOW_NETWORK=1 (REST + /ws/live frames)",
-  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display and local virtual matching only, no real routing or L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope.",
+  "note": "All listed features pass. Documented limitations: no real broker/live trading; the live quote feed is an unofficial public web source (Sina/Eastmoney), ~3s polling, display and local virtual matching only, no real routing or L2/order book; real historical data uses Sina public endpoints (no token, unofficial, ~2000 bars), amount is estimated and corporate actions are approximate (SINA_APPROX); exchange-calendars XSHG ships sessions through 2026-12-31 (later dates fall back); incremental ingest does not re-derive historical adj_factor after a new ex-date (use a full rebuild around dividend season); ST limits and historical limit prices are rule-approximations; full-market import has not been run end-to-end (estimated 30-45 min for ~5500 names); signed/notarised installers remain out of scope. Historical paper now supports a pre-tax ex-date cash/per-lot split approximation; prior-account past events are not reconstructed, and live paper has no corporate-action feed. Cancellation of data jobs does not roll back committed warehouse/snapshot output.",
   "incremental_verification": {
     "date": "2026-11-06",
     "scope": "R8 local verification plus private Sites frontend publication; earlier external/platform evidence retains original dates; Python/C++ backend remains local",
